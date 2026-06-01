@@ -11,7 +11,7 @@
 > **Pré-requisito concluído:** antes de avançar na Entrega 02, os 6 pontos avaliados como *"Atendeu
 > Parcialmente"* na Entrega 01 (arquitetura técnica, camadas de código, módulo core, hierarquia
 > arquitetural e estrutura visual) foram corrigidos em
-> [`Entrega-01-Complemento-Arquitetura-Tecnica.md`](Entrega-01-Complemento-Arquitetura-Tecnica.md).
+> [`Entrega-01-Complemento-Arquitetura-Tecnica.md`](../Entrega%201/Entrega-01-Complemento-Arquitetura-Tecnica.md).
 > A **camada de dados** ali descrita (PostgreSQL OLTP + Data Warehouse para BI) é a base que esta
 > Entrega 02 detalha.
 

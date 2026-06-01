@@ -33,7 +33,7 @@ geração de indicadores gerenciais (BI).
 A modelagem reflete fielmente os sete módulos operacionais (Cadastro, Atendimento/Coleta, Logística,
 Laboratorial, Faturamento, Financeiro, Compras), os serviços compartilhados de segurança e auditoria, e
 a camada analítica de BI descritos na Entrega 01 e detalhados tecnicamente no
-[Complemento de Arquitetura Técnica](Entrega-01-Complemento-Arquitetura-Tecnica.md).
+[Complemento de Arquitetura Técnica](../Entrega%201/Entrega-01-Complemento-Arquitetura-Tecnica.md).
 
 ## 2. Objetivos da modelagem
 
@@ -60,7 +60,7 @@ a camada analítica de BI descritos na Entrega 01 e detalhados tecnicamente no
 O modelo conceitual apresenta as entidades principais e seus relacionamentos em alto nível, sem detalhar
 atributos. Ele evidencia o fluxo central da operação — do cadastro do paciente até o registro financeiro.
 
-> Diagrama: [`diagramas/MER-conceitual.mmd`](diagramas/MER-conceitual.mmd)
+> Diagrama: [`diagramas/MER-conceitual.mmd`](../diagramas/MER-conceitual.mmd)
 
 **Entidades centrais e seu papel:**
 
@@ -74,7 +74,7 @@ atributos. Ele evidencia o fluxo central da operação — do cadastro do pacien
 
 ## 5. Modelo lógico — dicionário de dados por módulo
 
-Diagrama completo (atributos, PKs, FKs, cardinalidades): [`diagramas/MER-logico.mmd`](diagramas/MER-logico.mmd)
+Diagrama completo (atributos, PKs, FKs, cardinalidades): [`diagramas/MER-logico.mmd`](../diagramas/MER-logico.mmd)
 
 > Convenções: **PK** = chave primária · **FK** = chave estrangeira · **UK** = chave única (UNIQUE).
 > Todas as entidades operacionais possuem timestamp de criação (omitido nas tabelas por concisão quando
@@ -212,7 +212,7 @@ Para suportar indicadores sem comprometer a performance operacional, o BI usa um
 separado (OLAP), alimentado por ETL a partir da base operacional. O paciente aparece **anonimizado**
 (LGPD), e o acesso é *read-only*.
 
-> Diagrama: [`diagramas/BI-esquema-estrela.mmd`](diagramas/BI-esquema-estrela.mmd)
+> Diagrama: [`diagramas/BI-esquema-estrela.mmd`](../diagramas/BI-esquema-estrela.mmd)
 
 **Tabelas-fato** (métricas): `fato_atendimento`, `fato_faturamento`, `fato_financeiro`, `fato_logistica`.
 **Dimensões** (contexto): `dim_tempo`, `dim_unidade`, `dim_convenio`, `dim_procedimento`, `dim_paciente_anon`.
