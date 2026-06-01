@@ -1,0 +1,96 @@
+%% ERP LabVida — Modelo Dimensional do BI (ESQUEMA ESTRELA)
+%% Entrega 02 — camada analítica (OLAP), alimentada por ETL a partir da base operacional
+%% Tabelas-fato no centro, dimensões ao redor. Visão Read-Only (LGPD: paciente anonimizado).
+erDiagram
+
+    DIM_TEMPO {
+        int sk_tempo PK
+        date data
+        int ano
+        int mes
+        int dia
+        varchar dia_semana
+        int trimestre
+    }
+    DIM_UNIDADE {
+        int sk_unidade PK
+        uuid id_origem
+        varchar nome
+        varchar tipo
+    }
+    DIM_CONVENIO {
+        int sk_convenio PK
+        uuid id_origem
+        varchar nome
+        varchar registro_ans
+    }
+    DIM_PROCEDIMENTO {
+        int sk_procedimento PK
+        uuid id_origem
+        varchar codigo_tuss
+        varchar nome
+        varchar setor
+    }
+    DIM_PACIENTE_ANON {
+        int sk_paciente PK
+        varchar faixa_etaria
+        varchar sexo
+        varchar regiao "sem PII (LGPD)"
+    }
+
+    FATO_ATENDIMENTO {
+        int sk_fato PK
+        int sk_tempo FK
+        int sk_unidade FK
+        int sk_convenio FK
+        int sk_procedimento FK
+        int sk_paciente FK
+        int qtd_exames
+        numeric tempo_atendimento_min
+        numeric tempo_ciclo_os_horas
+    }
+    FATO_FATURAMENTO {
+        int sk_fato PK
+        int sk_tempo FK
+        int sk_unidade FK
+        int sk_convenio FK
+        int sk_procedimento FK
+        numeric valor_faturado
+        numeric valor_glosado
+        numeric ticket_medio
+    }
+    FATO_FINANCEIRO {
+        int sk_fato PK
+        int sk_tempo FK
+        int sk_unidade FK
+        int sk_convenio FK
+        numeric valor_recebido
+        numeric valor_repassado
+        numeric rentabilidade
+    }
+    FATO_LOGISTICA {
+        int sk_fato PK
+        int sk_tempo FK
+        int sk_unidade FK
+        int qtd_amostras
+        numeric tempo_transito_horas
+        int amostras_divergentes
+    }
+
+    DIM_TEMPO          ||--o{ FATO_ATENDIMENTO  : ""
+    DIM_UNIDADE        ||--o{ FATO_ATENDIMENTO  : ""
+    DIM_CONVENIO       ||--o{ FATO_ATENDIMENTO  : ""
+    DIM_PROCEDIMENTO   ||--o{ FATO_ATENDIMENTO  : ""
+    DIM_PACIENTE_ANON  ||--o{ FATO_ATENDIMENTO  : ""
+
+    DIM_TEMPO          ||--o{ FATO_FATURAMENTO  : ""
+    DIM_UNIDADE        ||--o{ FATO_FATURAMENTO  : ""
+    DIM_CONVENIO       ||--o{ FATO_FATURAMENTO  : ""
+    DIM_PROCEDIMENTO   ||--o{ FATO_FATURAMENTO  : ""
+
+    DIM_TEMPO          ||--o{ FATO_FINANCEIRO   : ""
+    DIM_UNIDADE        ||--o{ FATO_FINANCEIRO   : ""
+    DIM_CONVENIO       ||--o{ FATO_FINANCEIRO   : ""
+
+    DIM_TEMPO          ||--o{ FATO_LOGISTICA    : ""
+    DIM_UNIDADE        ||--o{ FATO_LOGISTICA    : ""

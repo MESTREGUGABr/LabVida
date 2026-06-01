@@ -1,0 +1,47 @@
+%% ERP LabVida — Modelo Entidade-Relacionamento CONCEITUAL
+%% Entrega 02 — visão de alto nível (entidades e relacionamentos principais)
+%% Renderize em https://mermaid.live ou via mermaid-cli
+erDiagram
+    PACIENTE              ||--o{ ORDEM_SERVICO        : "solicita"
+    MEDICO                ||--o{ ORDEM_SERVICO        : "solicita"
+    CONVENIO              ||--o{ ORDEM_SERVICO        : "cobre"
+    UNIDADE               ||--o{ ORDEM_SERVICO        : "registra em"
+    CONVENIO              ||--o{ PROCEDIMENTO_VALOR    : "negocia"
+    PROCEDIMENTO          ||--o{ PROCEDIMENTO_VALOR    : "tem preço"
+
+    ORDEM_SERVICO         ||--|{ OS_ITEM              : "contém"
+    PROCEDIMENTO          ||--o{ OS_ITEM              : "é solicitado em"
+    ORDEM_SERVICO         ||--o{ AUTORIZACAO_CONVENIO : "exige"
+    ORDEM_SERVICO         ||--|{ AMOSTRA             : "gera"
+    AMOSTRA               ||--|| COLETA              : "é coletada em"
+
+    AMOSTRA               }o--o{ MALOTE              : "transportada em"
+    AMOSTRA               ||--o{ AMOSTRA_MOVIMENTACAO : "movimenta"
+    MALOTE                ||--o{ PROTOCOLO_RECEBIMENTO : "é recebido por"
+
+    OS_ITEM               ||--o| RESULTADO           : "produz"
+    EQUIPAMENTO           ||--o{ RESULTADO           : "origina"
+    OS_ITEM               ||--o| LAUDO               : "consolidado em"
+    LAUDO                 ||--o{ RESULTADO_AUDITORIA  : "registra alteração"
+
+    LAUDO                 ||--o{ GUIA_ITEM           : "é faturado em"
+    LOTE_FATURAMENTO      ||--|{ GUIA_TISS           : "agrupa"
+    GUIA_TISS             ||--|{ GUIA_ITEM           : "contém"
+    GUIA_ITEM             ||--o{ GLOSA               : "pode sofrer"
+
+    LOTE_FATURAMENTO      ||--o{ TITULO_RECEBER       : "gera"
+    TITULO_RECEBER        ||--o{ MOVIMENTO_CAIXA      : "baixa em"
+    TITULO_PAGAR          ||--o{ MOVIMENTO_CAIXA      : "baixa em"
+
+    FORNECEDOR            ||--o{ PEDIDO_COMPRA        : "atende"
+    SOLICITACAO_COMPRA    ||--o{ PEDIDO_COMPRA        : "origina"
+    PEDIDO_COMPRA         ||--|{ PEDIDO_ITEM          : "contém"
+    PEDIDO_COMPRA         ||--o{ TITULO_PAGAR         : "gera"
+    PEDIDO_COMPRA         ||--o{ RECEBIMENTO_INSUMO   : "é recebido em"
+    INSUMO_MATERIAL       ||--o{ PEDIDO_ITEM          : "é comprado em"
+    INSUMO_MATERIAL       ||--o{ ESTOQUE_MOVIMENTO    : "movimenta"
+
+    USUARIO               ||--o{ COLETA              : "executa"
+    USUARIO               ||--o{ LAUDO               : "libera"
+    PERFIL                ||--o{ USUARIO             : "classifica"
+    USUARIO               ||--o{ AUDITORIA_LOG        : "produz"

@@ -1,0 +1,364 @@
+%% ERP LabVida — Modelo Entidade-Relacionamento LÓGICO
+%% Entrega 02 — atributos, PKs (PK), FKs (FK), tipos PostgreSQL e cardinalidades
+%% Renderize em https://mermaid.live ou via mermaid-cli
+erDiagram
+
+    %% ===================== CADASTRO =====================
+    PACIENTE {
+        uuid id PK
+        varchar cpf UK "criptografado (LGPD)"
+        varchar nome
+        date data_nascimento
+        varchar sexo
+        varchar contato "criptografado"
+        timestamptz criado_em
+    }
+    MEDICO {
+        uuid id PK
+        varchar nome
+        varchar crm UK
+        varchar uf_crm
+        boolean responsavel_tecnico
+    }
+    CONVENIO {
+        uuid id PK
+        varchar nome
+        varchar registro_ans
+        varchar status "ATIVO|INATIVO"
+    }
+    PROCEDIMENTO {
+        uuid id PK
+        varchar codigo_tuss UK
+        varchar nome
+        varchar setor
+    }
+    PROCEDIMENTO_VALOR {
+        uuid id PK
+        uuid procedimento_id FK
+        uuid convenio_id FK
+        numeric valor
+        date vigencia_inicio
+    }
+    UNIDADE {
+        uuid id PK
+        varchar nome
+        varchar tipo "CENTRAL|COLETA"
+        varchar endereco
+    }
+    SETOR {
+        uuid id PK
+        uuid unidade_id FK
+        varchar nome
+    }
+
+    %% ================ ATENDIMENTO / COLETA ================
+    ORDEM_SERVICO {
+        uuid id PK
+        varchar codigo_os UK "identificador único"
+        uuid paciente_id FK
+        uuid medico_id FK
+        uuid convenio_id FK
+        uuid unidade_id FK
+        varchar status
+        timestamptz aberta_em
+    }
+    OS_ITEM {
+        uuid id PK
+        uuid ordem_servico_id FK
+        uuid procedimento_id FK
+        numeric valor_negociado
+        varchar status
+    }
+    AUTORIZACAO_CONVENIO {
+        uuid id PK
+        uuid ordem_servico_id FK
+        varchar numero_guia
+        varchar status "VALIDA|NEGADA|PENDENTE"
+        date validade
+    }
+    AMOSTRA {
+        uuid id PK
+        uuid ordem_servico_id FK
+        varchar codigo_barras UK
+        varchar tipo_material
+        varchar status
+    }
+    COLETA {
+        uuid id PK
+        uuid amostra_id FK
+        uuid coletor_id FK
+        timestamptz coletada_em
+    }
+    OS_STATUS_HISTORICO {
+        uuid id PK
+        uuid ordem_servico_id FK
+        varchar status
+        timestamptz ocorrido_em
+        uuid usuario_id FK
+    }
+
+    %% ===================== LOGÍSTICA =====================
+    MALOTE {
+        uuid id PK
+        uuid unidade_origem_id FK
+        uuid unidade_destino_id FK
+        uuid responsavel_id FK
+        timestamptz saida_em
+        varchar status
+    }
+    MALOTE_AMOSTRA {
+        uuid id PK
+        uuid malote_id FK
+        uuid amostra_id FK
+    }
+    AMOSTRA_MOVIMENTACAO {
+        uuid id PK
+        uuid amostra_id FK
+        varchar status "COLETADA|EM_TRANSITO|RECEBIDA"
+        timestamptz ocorrido_em
+    }
+    PROTOCOLO_RECEBIMENTO {
+        uuid id PK
+        uuid malote_id FK
+        uuid recebedor_id FK
+        boolean integridade_ok
+        timestamptz recebido_em
+    }
+
+    %% ==================== LABORATORIAL ===================
+    EQUIPAMENTO {
+        uuid id PK
+        uuid setor_id FK
+        varchar nome
+        varchar protocolo "HL7|ASTM"
+    }
+    VALOR_REFERENCIA {
+        uuid id PK
+        uuid procedimento_id FK
+        numeric minimo
+        numeric maximo
+        varchar unidade_medida
+    }
+    RESULTADO {
+        uuid id PK
+        uuid os_item_id FK
+        uuid equipamento_id FK
+        varchar valor
+        varchar status "AGUARDANDO_REVISAO|VALIDADO"
+        timestamptz importado_em
+    }
+    LAUDO {
+        uuid id PK
+        uuid os_item_id FK
+        uuid responsavel_tecnico_id FK
+        varchar status "EM_REVISAO|LIBERADO"
+        timestamptz liberado_em
+        varchar assinatura_digital
+    }
+    RESULTADO_AUDITORIA {
+        uuid id PK
+        uuid laudo_id FK
+        uuid usuario_id FK
+        varchar valor_anterior
+        varchar valor_novo
+        timestamptz ocorrido_em
+    }
+
+    %% ==================== FATURAMENTO ====================
+    LOTE_FATURAMENTO {
+        uuid id PK
+        uuid convenio_id FK
+        varchar status "ABERTO|FECHADO"
+        timestamptz fechado_em
+    }
+    GUIA_TISS {
+        uuid id PK
+        uuid lote_faturamento_id FK
+        varchar numero
+        varchar status_pre_auditoria
+        text xml_tiss
+    }
+    GUIA_ITEM {
+        uuid id PK
+        uuid guia_tiss_id FK
+        uuid laudo_id FK
+        uuid procedimento_id FK
+        numeric valor_faturado
+    }
+    GLOSA {
+        uuid id PK
+        uuid guia_item_id FK
+        varchar motivo
+        numeric valor_glosado
+        uuid unidade_origem_id FK
+    }
+
+    %% ===================== FINANCEIRO ====================
+    TITULO_RECEBER {
+        uuid id PK
+        uuid lote_faturamento_id FK
+        numeric valor
+        date vencimento
+        varchar status "ABERTO|BAIXADO"
+    }
+    TITULO_PAGAR {
+        uuid id PK
+        uuid pedido_compra_id FK
+        numeric valor
+        date vencimento
+        varchar status
+    }
+    MOVIMENTO_CAIXA {
+        uuid id PK
+        uuid titulo_receber_id FK
+        uuid titulo_pagar_id FK
+        varchar tipo "ENTRADA|SAIDA"
+        numeric valor
+        timestamptz ocorrido_em
+    }
+    CONCILIACAO_PAGAMENTO {
+        uuid id PK
+        uuid titulo_receber_id FK
+        numeric valor_recebido
+        boolean divergencia
+    }
+
+    %% ====================== COMPRAS ======================
+    FORNECEDOR {
+        uuid id PK
+        varchar nome
+        varchar cnpj UK
+        varchar status
+    }
+    SOLICITACAO_COMPRA {
+        uuid id PK
+        uuid solicitante_id FK
+        varchar status
+        timestamptz criada_em
+    }
+    PEDIDO_COMPRA {
+        uuid id PK
+        uuid solicitacao_compra_id FK
+        uuid fornecedor_id FK
+        varchar status "APROVADO|PENDENTE"
+        numeric valor_total
+    }
+    PEDIDO_ITEM {
+        uuid id PK
+        uuid pedido_compra_id FK
+        uuid insumo_material_id FK
+        integer quantidade
+        numeric valor_unitario
+    }
+    RECEBIMENTO_INSUMO {
+        uuid id PK
+        uuid pedido_compra_id FK
+        timestamptz recebido_em
+        boolean conferido
+    }
+    INSUMO_MATERIAL {
+        uuid id PK
+        varchar nome
+        varchar finalidade
+        integer quantidade_estoque
+    }
+    ESTOQUE_MOVIMENTO {
+        uuid id PK
+        uuid insumo_material_id FK
+        varchar tipo "ENTRADA|SAIDA"
+        integer quantidade
+        timestamptz ocorrido_em
+    }
+
+    %% ============ SEGURANÇA / TRANSVERSAL ===============
+    USUARIO {
+        uuid id PK
+        uuid perfil_id FK
+        varchar login UK
+        varchar senha_hash
+        boolean ativo
+    }
+    PERFIL {
+        uuid id PK
+        varchar nome
+    }
+    PERMISSAO {
+        uuid id PK
+        varchar codigo UK
+        varchar descricao
+    }
+    PERFIL_PERMISSAO {
+        uuid id PK
+        uuid perfil_id FK
+        uuid permissao_id FK
+    }
+    AUDITORIA_LOG {
+        uuid id PK
+        uuid usuario_id FK
+        varchar entidade
+        varchar acao
+        jsonb dados
+        timestamptz ocorrido_em "append-only"
+    }
+
+    %% ==================== RELACIONAMENTOS ====================
+    PERFIL                ||--o{ USUARIO              : ""
+    PERFIL                ||--o{ PERFIL_PERMISSAO     : ""
+    PERMISSAO             ||--o{ PERFIL_PERMISSAO     : ""
+    UNIDADE               ||--o{ SETOR               : ""
+    SETOR                 ||--o{ EQUIPAMENTO         : ""
+
+    PACIENTE              ||--o{ ORDEM_SERVICO        : ""
+    MEDICO                ||--o{ ORDEM_SERVICO        : ""
+    CONVENIO              ||--o{ ORDEM_SERVICO        : ""
+    UNIDADE               ||--o{ ORDEM_SERVICO        : ""
+    CONVENIO              ||--o{ PROCEDIMENTO_VALOR    : ""
+    PROCEDIMENTO          ||--o{ PROCEDIMENTO_VALOR    : ""
+    PROCEDIMENTO          ||--o{ VALOR_REFERENCIA     : ""
+
+    ORDEM_SERVICO         ||--|{ OS_ITEM              : ""
+    PROCEDIMENTO          ||--o{ OS_ITEM              : ""
+    ORDEM_SERVICO         ||--o{ AUTORIZACAO_CONVENIO : ""
+    ORDEM_SERVICO         ||--|{ AMOSTRA             : ""
+    ORDEM_SERVICO         ||--o{ OS_STATUS_HISTORICO  : ""
+    AMOSTRA               ||--|| COLETA              : ""
+    USUARIO               ||--o{ COLETA              : ""
+    USUARIO               ||--o{ OS_STATUS_HISTORICO  : ""
+
+    AMOSTRA               ||--o{ MALOTE_AMOSTRA       : ""
+    MALOTE                ||--o{ MALOTE_AMOSTRA       : ""
+    AMOSTRA               ||--o{ AMOSTRA_MOVIMENTACAO : ""
+    MALOTE                ||--o{ PROTOCOLO_RECEBIMENTO : ""
+    UNIDADE               ||--o{ MALOTE              : ""
+    USUARIO               ||--o{ MALOTE              : ""
+    USUARIO               ||--o{ PROTOCOLO_RECEBIMENTO : ""
+
+    OS_ITEM               ||--o| RESULTADO           : ""
+    EQUIPAMENTO           ||--o{ RESULTADO           : ""
+    OS_ITEM               ||--o| LAUDO               : ""
+    USUARIO               ||--o{ LAUDO               : ""
+    LAUDO                 ||--o{ RESULTADO_AUDITORIA  : ""
+    USUARIO               ||--o{ RESULTADO_AUDITORIA  : ""
+
+    CONVENIO              ||--o{ LOTE_FATURAMENTO     : ""
+    LOTE_FATURAMENTO      ||--|{ GUIA_TISS           : ""
+    GUIA_TISS             ||--|{ GUIA_ITEM           : ""
+    LAUDO                 ||--o{ GUIA_ITEM           : ""
+    PROCEDIMENTO          ||--o{ GUIA_ITEM           : ""
+    GUIA_ITEM             ||--o{ GLOSA               : ""
+    UNIDADE               ||--o{ GLOSA               : ""
+
+    LOTE_FATURAMENTO      ||--o{ TITULO_RECEBER       : ""
+    TITULO_RECEBER        ||--o{ MOVIMENTO_CAIXA      : ""
+    TITULO_PAGAR          ||--o{ MOVIMENTO_CAIXA      : ""
+    TITULO_RECEBER        ||--o{ CONCILIACAO_PAGAMENTO : ""
+
+    FORNECEDOR            ||--o{ PEDIDO_COMPRA        : ""
+    SOLICITACAO_COMPRA    ||--o{ PEDIDO_COMPRA        : ""
+    USUARIO               ||--o{ SOLICITACAO_COMPRA   : ""
+    PEDIDO_COMPRA         ||--|{ PEDIDO_ITEM          : ""
+    PEDIDO_COMPRA         ||--o{ TITULO_PAGAR         : ""
+    PEDIDO_COMPRA         ||--o{ RECEBIMENTO_INSUMO   : ""
+    INSUMO_MATERIAL       ||--o{ PEDIDO_ITEM          : ""
+    INSUMO_MATERIAL       ||--o{ ESTOQUE_MOVIMENTO    : ""
+    USUARIO               ||--o{ AUDITORIA_LOG        : ""
