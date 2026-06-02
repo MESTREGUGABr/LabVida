@@ -1,0 +1,145 @@
+%% ERP LabVida - MER (estilo Chen) em Mermaid
+%% Entidades = retangulos | Relacionamentos = losangos | Atributos = ovais (aproximado)
+%% Renderize no GitHub ou em https://mermaid.live
+
+flowchart LR
+  %% ===================== ENTIDADES (retangulos) =====================
+  PAC[Paciente]
+  MED[Medico]
+  CONV[Convenio]
+  UNI[Unidade]
+  OS[OrdemServico]
+  OSI[OS_Item]
+  PROC[Procedimento]
+  AMO[Amostra]
+  COL[Coleta]
+  MAL[Malote]
+  PR[ProtocoloRecebimento]
+  RES[Resultado]
+  LAU[Laudo]
+  GUIA[GuiaTISS]
+  LOTE[LoteFaturamento]
+  TIT[TituloReceber]
+  USR[Usuario]
+  PERF[Perfil]
+
+  %% ===================== ATRIBUTOS (ovais) =====================
+  PAC_ID((id))
+  PAC_CPF(cpf)
+  PAC_NOME(nome)
+  PAC_NASC(data_nascimento)
+  PAC --- PAC_ID
+  PAC --- PAC_CPF
+  PAC --- PAC_NOME
+  PAC --- PAC_NASC
+
+  MED_ID((id))
+  MED_CRM(crm)
+  MED_NOME(nome)
+  MED --- MED_ID
+  MED --- MED_CRM
+  MED --- MED_NOME
+
+  OS_ID((id))
+  OS_COD(codigo_os)
+  OS_STATUS(status)
+  OS --- OS_ID
+  OS --- OS_COD
+  OS --- OS_STATUS
+
+  AMO_ID((id))
+  AMO_COD(codigo_barras)
+  AMO_TIPO(tipo_material)
+  AMO --- AMO_ID
+  AMO --- AMO_COD
+  AMO --- AMO_TIPO
+
+  LAU_ID((id))
+  LAU_STATUS(status)
+  LAU_LIB(liberado_em)
+  LAU --- LAU_ID
+  LAU --- LAU_STATUS
+  LAU --- LAU_LIB
+
+  LOTE_ID((id))
+  LOTE_STATUS(status)
+  LOTE --- LOTE_ID
+  LOTE --- LOTE_STATUS
+
+  TIT_ID((id))
+  TIT_VAL(valor)
+  TIT_VENC(vencimento)
+  TIT --- TIT_ID
+  TIT --- TIT_VAL
+  TIT --- TIT_VENC
+
+  USR_ID((id))
+  USR_LOGIN(login)
+  USR_ATIVO(ativo)
+  USR --- USR_ID
+  USR --- USR_LOGIN
+  USR --- USR_ATIVO
+
+  %% ===================== RELACIONAMENTOS (losangos) =====================
+  R_SOLICITA{solicita}
+  PAC -->|1| R_SOLICITA -->|N| OS
+
+  R_SOLICITA2{solicita}
+  MED -->|1| R_SOLICITA2 -->|N| OS
+
+  R_COBRE{cobre}
+  CONV -->|1| R_COBRE -->|N| OS
+
+  R_REGISTRA{registra_em}
+  UNI -->|1| R_REGISTRA -->|N| OS
+
+  R_CONTEM{contem}
+  OS -->|1| R_CONTEM -->|N| OSI
+
+  R_SOLICITA_PROC{e_solicitado}
+  PROC -->|1| R_SOLICITA_PROC -->|N| OSI
+
+  R_GERA{gera}
+  OS -->|1| R_GERA -->|N| AMO
+
+  R_COLETA{e_coletada_em}
+  AMO -->|1| R_COLETA -->|1| COL
+
+  R_EXECUTA{executa}
+  USR -->|1| R_EXECUTA -->|N| COL
+
+  R_TRANSPORTA{transportada_em}
+  AMO -->|N| R_TRANSPORTA -->|N| MAL
+
+  R_RECEBE{e_recebido_por}
+  MAL -->|1| R_RECEBE -->|0..1| PR
+
+  R_CONFERE{confere}
+  USR -->|1| R_CONFERE -->|N| PR
+
+  R_PRODUZ{produz}
+  OSI -->|1| R_PRODUZ -->|0..N| RES
+
+  R_CONSOLIDA{consolidado_em}
+  RES -->|0..N| R_CONSOLIDA -->|0..1| LAU
+
+  R_LIBERA{libera}
+  USR -->|1| R_LIBERA -->|N| LAU
+
+  R_FATURA{faturado_em}
+  LAU -->|N| R_FATURA -->|1| GUIA
+
+  R_AGRUPA{agrupa}
+  LOTE -->|1| R_AGRUPA -->|N| GUIA
+
+  R_GERA_TIT{gera}
+  LOTE -->|1| R_GERA_TIT -->|N| TIT
+
+  R_CLASSIFICA{classifica}
+  PERF -->|1| R_CLASSIFICA -->|N| USR
+
+  %% ===================== ESTILO (aproxima Chen) =====================
+  classDef entity fill:#ffffff,stroke:#111111,stroke-width:1px,color:#111111;
+  classDef rel fill:#ffffff,stroke:#111111,stroke-width:1px,color:#111111;
+  class PAC,MED,CONV,UNI,OS,OSI,PROC,AMO,COL,MAL,PR,RES,LAU,GUIA,LOTE,TIT,USR,PERF entity;
+  class R_SOLICITA,R_SOLICITA2,R_COBRE,R_REGISTRA,R_CONTEM,R_SOLICITA_PROC,R_GERA,R_COLETA,R_EXECUTA,R_TRANSPORTA,R_RECEBE,R_CONFERE,R_PRODUZ,R_CONSOLIDA,R_LIBERA,R_FATURA,R_AGRUPA,R_GERA_TIT,R_CLASSIFICA rel;

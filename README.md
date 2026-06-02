@@ -55,6 +55,7 @@ LabVida/
     ├── diagramas/                  → Diagramas Mermaid (.mmd) da modelagem de dados
     │   ├── MER-conceitual.mmd
     │   ├── MER-logico.mmd
+    │   ├── MER(usado no relatorio).mmd
     │   └── BI-esquema-estrela.mmd
     └── Templates/                  → Template padrão dos documentos da equipe
 ```
