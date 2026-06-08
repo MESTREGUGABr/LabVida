@@ -1,20 +1,20 @@
-# Entrega 03 - Integracao Organizacional do ERP LabVida
+# Entrega 03 - Integração Organizacional do ERP LabVida
 
-**Disciplina:** Sistemas de Informacao e Tecnologias (SIT)  
-**Projeto:** ERP LabVida - Laboratorio de Analises Clinicas  
+**Disciplina:** Sistemas de Informação e Tecnologias (SIT)  
+**Projeto:** ERP LabVida - Laboratório de Análises Clínicas  
 **Equipe:** Aline Fernanda Soares Silva · Clauderson Branco Xavier · Gustavo Ferreira Wanderley · Victor Alexandre Saraiva Pimentel  
 **Garanhuns - PE · 2026**
 
 ---
 
-## 1. Visao Geral da Integracao
+## 1. Visão Geral da Integração
 
-O ERP LabVida e organizado em modulos especializados, mas integrados por um fluxo operacional comum. A **Ordem de Servico (OS)** e a entidade central do processo, pois nasce no atendimento, acompanha os exames solicitados, vincula as amostras coletadas, conecta-se ao laudo laboratorial e habilita o faturamento.
+O ERP LabVida é organizado em módulos especializados, mas integrados por um fluxo operacional comum. A **Ordem de Serviço (OS)** é a entidade central do processo, pois nasce no atendimento, acompanha os exames solicitados, vincula as amostras coletadas, conecta-se ao laudo laboratorial e habilita o faturamento.
 
 ```mermaid
 flowchart LR
     CAD[Cadastro] --> AT[Atendimento e Coleta]
-    AT --> LOG[Logistica de Amostras]
+    AT --> LOG[Logística de Amostras]
     LOG --> LAB[Laboratorial]
     LAB --> FAT[Faturamento TISS/TUSS]
     FAT --> FIN[Financeiro]
@@ -29,69 +29,69 @@ flowchart LR
     COM -. eventos .-> BI
 ```
 
-Esse fluxo demonstra que cada setor possui uma responsabilidade propria, mas nenhum opera isoladamente. O cadastro fornece dados confiaveis para o atendimento; o atendimento gera a OS; a coleta gera amostras rastreaveis; a logistica garante a cadeia de custodia; o laboratorio produz resultados e laudos; o faturamento transforma laudos liberados em guias TISS; o financeiro acompanha os recebimentos; e o BI consolida os eventos para apoiar a gestao.
+Esse fluxo demonstra que cada setor possui uma responsabilidade própria, mas nenhum opera isoladamente. O cadastro fornece dados confiáveis para o atendimento; o atendimento gera a OS; a coleta gera amostras rastreáveis; a logística garante a cadeia de custódia; o laboratório produz resultados e laudos; o faturamento transforma laudos liberados em guias TISS; o financeiro acompanha os recebimentos; e o BI consolida os eventos para apoiar a gestão.
 
 ---
 
-## 2. Modulos e Responsabilidades Integradas
+## 2. Módulos e Responsabilidades Integradas
 
-| Modulo | Responsabilidade principal | Informacoes que recebe | Informacoes que produz |
+| Módulo | Responsabilidade principal | Informações que recebe | Informações que produz |
 |---|---|---|---|
-| Cadastro | Manter dados de pacientes, medicos, convenios, procedimentos, unidades e setores | Dados administrativos e contratuais | Base unica para atendimento, faturamento e BI |
-| Atendimento e Coleta | Abrir OS, validar convenio, registrar exames solicitados e coletar amostras | Paciente, medico, convenio, procedimento e unidade | OS, itens de OS, autorizacao, amostra e evento de coleta |
-| Logistica de Amostras | Transportar amostras entre unidades e laboratorio central | Amostras coletadas e unidade de origem | Malote, movimentacoes e protocolo de recebimento |
-| Laboratorial | Processar exames, importar resultados, revisar e liberar laudos | Amostras recebidas, OS e procedimentos | Resultado, revisao tecnica e laudo liberado |
-| Faturamento | Gerar guias, lotes, XML TISS e controlar glosas | Laudos liberados, convenio, TUSS e valores contratados | Guia TISS, guia item, lote de faturamento e glosa |
-| Financeiro | Controlar contas a receber, contas a pagar, caixa e conciliacao | Lotes fechados, compras aprovadas e pagamentos | Titulos, movimentos financeiros e divergencias |
-| Compras e Estoque | Comprar, receber e controlar insumos laboratoriais | Demandas internas e fornecedores | Pedido de compra, entrada de estoque e titulo a pagar |
-| Auditoria | Registrar eventos sensiveis e acoes dos usuarios | Alteracoes operacionais e acessos | Trilha de auditoria corporativa |
-| BI | Consolidar dados para decisao gerencial | Eventos de todos os modulos | Indicadores, dashboards e relatorios gerenciais |
+| Cadastro | Manter dados de pacientes, médicos, convênios, procedimentos, unidades e setores | Dados administrativos e contratuais | Base única para atendimento, faturamento e BI |
+| Atendimento e Coleta | Abrir OS, validar convênio, registrar exames solicitados e coletar amostras | Paciente, médico, convênio, procedimento e unidade | OS, itens de OS, autorização, amostra e evento de coleta |
+| Logística de Amostras | Transportar amostras entre unidades e laboratório central | Amostras coletadas e unidade de origem | Malote, movimentações e protocolo de recebimento |
+| Laboratorial | Processar exames, importar resultados, revisar e liberar laudos | Amostras recebidas, OS e procedimentos | Resultado, revisão técnica e laudo liberado |
+| Faturamento | Gerar guias, lotes, XML TISS e controlar glosas | Laudos liberados, convênio, TUSS e valores contratados | Guia TISS, guia item, lote de faturamento e glosa |
+| Financeiro | Controlar contas a receber, contas a pagar, caixa e conciliação | Lotes fechados, compras aprovadas e pagamentos | Títulos, movimentos financeiros e divergências |
+| Compras e Estoque | Comprar, receber e controlar insumos laboratoriais | Demandas internas e fornecedores | Pedido de compra, entrada de estoque e título a pagar |
+| Auditoria | Registrar eventos sensíveis e ações dos usuários | Alterações operacionais e acessos | Trilha de auditoria corporativa |
+| BI | Consolidar dados para decisão gerencial | Eventos de todos os módulos | Indicadores, dashboards e relatórios gerenciais |
 
 ---
 
-## 3. Comunicacao Entre Modulos
+## 3. Comunicação Entre Módulos
 
-A comunicacao entre os modulos ocorre por meio de uma base relacional integrada e por eventos operacionais. A base de dados garante a unicidade e a consistencia das informacoes; os eventos representam os impactos automaticos que fazem um setor reagir a uma acao realizada em outro.
+A comunicação entre os módulos ocorre por meio de uma base relacional integrada e por eventos operacionais. A base de dados garante a unicidade e a consistência das informações; os eventos representam os impactos automáticos que fazem um setor reagir a uma ação realizada em outro.
 
-| Evento operacional | Modulo de origem | Modulo impactado | Efeito organizacional |
+| Evento operacional | Módulo de origem | Módulo impactado | Efeito organizacional |
 |---|---|---|---|
-| Paciente cadastrado | Cadastro | Atendimento | Paciente fica disponivel para abertura de OS |
-| OS aberta | Atendimento | Coleta, Faturamento, BI | Exames passam a existir como demanda operacional e futura cobranca |
-| Convenio validado | Atendimento | Faturamento | Guia/autorizacao passa a compor o processo TISS |
-| Coleta registrada | Coleta | Logistica | Amostra gera pendencia de transporte e rastreamento |
-| Amostra enviada em malote | Logistica | Laboratorial | Laboratorio central recebe previsao de processamento |
-| Amostra recebida e conferida | Logistica | Laboratorial | Exame e liberado para execucao tecnica |
-| Resultado importado | Laboratorial | Revisao tecnica, Auditoria | Resultado fica pendente de validacao e auditavel |
-| Laudo liberado | Laboratorial | Faturamento | Item faturavel e criado ou habilitado para pre-auditoria TISS/TUSS |
-| Lote de faturamento fechado | Faturamento | Financeiro | Titulo a receber e gerado automaticamente |
-| Pagamento conciliado | Financeiro | BI, Gestao | Receita, divergencias e inadimplencia sao atualizadas |
-| Compra aprovada | Compras | Financeiro, Estoque | Gera previsao de pagamento e acompanhamento de recebimento |
-| Insumo recebido | Compras/Estoque | Laboratorial, BI | Estoque e atualizado e disponibilidade operacional aumenta |
+| Paciente cadastrado | Cadastro | Atendimento | Paciente fica disponível para abertura de OS |
+| OS aberta | Atendimento | Coleta, Faturamento, BI | Exames passam a existir como demanda operacional e futura cobrança |
+| Convênio validado | Atendimento | Faturamento | Guia/autorização passa a compor o processo TISS |
+| Coleta registrada | Coleta | Logística | Amostra gera pendência de transporte e rastreamento |
+| Amostra enviada em malote | Logística | Laboratorial | Laboratório central recebe previsão de processamento |
+| Amostra recebida e conferida | Logística | Laboratorial | Exame é liberado para execução técnica |
+| Resultado importado | Laboratorial | Revisão técnica, Auditoria | Resultado fica pendente de validação e auditável |
+| Laudo liberado | Laboratorial | Faturamento | Item faturável é criado ou habilitado para pré-auditoria TISS/TUSS |
+| Lote de faturamento fechado | Faturamento | Financeiro | Título a receber é gerado automaticamente |
+| Pagamento conciliado | Financeiro | BI, Gestão | Receita, divergências e inadimplência são atualizadas |
+| Compra aprovada | Compras | Financeiro, Estoque | Gera previsão de pagamento e acompanhamento de recebimento |
+| Insumo recebido | Compras/Estoque | Laboratorial, BI | Estoque é atualizado e disponibilidade operacional aumenta |
 
-Essa comunicacao evita redigitacao, reduz inconsistencias e substitui controles paralelos por uma cadeia unica de informacao.
+Essa comunicação evita redigitação, reduz inconsistências e substitui controles paralelos por uma cadeia única de informação.
 
 ---
 
-## 4. Fluxo Ponta a Ponta da Informacao
+## 4. Fluxo Ponta a Ponta da Informação
 
-O fluxo principal do ERP LabVida acompanha a jornada de um exame desde a chegada do paciente ate a entrada financeira e a geracao de indicadores.
+O fluxo principal do ERP LabVida acompanha a jornada de um exame desde a chegada do paciente até a entrada financeira e a geração de indicadores.
 
-### 4.1 Entrada da informacao
+### 4.1 Entrada da informação
 
-O processo inicia no **Cadastro** e no **Atendimento**. O paciente, o medico solicitante, o convenio, o plano, a unidade e os procedimentos sao selecionados a partir de cadastros previamente controlados. Com isso, a OS nao e preenchida com texto livre: ela referencia dados unicos e padronizados.
+O processo inicia no **Cadastro** e no **Atendimento**. O paciente, o médico solicitante, o convênio, o plano, a unidade e os procedimentos são selecionados a partir de cadastros previamente controlados. Com isso, a OS não é preenchida com texto livre: ela referencia dados únicos e padronizados.
 
 Entidades envolvidas:
 
 - Pessoa/Paciente.
-- Profissional de Saude/Medico solicitante.
-- Convenio e plano.
-- Procedimento com codigo TUSS.
+- Profissional de Saúde/Médico solicitante.
+- Convênio e plano.
+- Procedimento com código TUSS.
 - Unidade de atendimento.
-- Ordem de Servico e itens da OS.
+- Ordem de Serviço e itens da OS.
 
 ### 4.2 Processamento operacional
 
-A OS gera amostras identificadas por codigo de barras ou QR Code. A coleta registra quem coletou, quando coletou e a qual OS a amostra pertence. Em seguida, a logistica organiza o transporte por malotes e registra cada movimentacao da amostra ate o recebimento no laboratorio central.
+A OS gera amostras identificadas por código de barras ou QR Code. A coleta registra quem coletou, quando coletou e a qual OS a amostra pertence. Em seguida, a logística organiza o transporte por malotes e registra cada movimentação da amostra até o recebimento no laboratório central.
 
 Entidades envolvidas:
 
@@ -99,25 +99,25 @@ Entidades envolvidas:
 - Coleta.
 - Malote.
 - Malote-amostra.
-- Amostra movimentacao.
+- Amostra movimentação.
 - Protocolo de recebimento.
 
-### 4.3 Processamento tecnico
+### 4.3 Processamento técnico
 
-Quando a amostra e recebida e conferida, o modulo laboratorial pode executar o exame. O resultado pode ser importado de equipamentos laboratoriais ou registrado por usuario autorizado. Depois, passa por revisao tecnica e e consolidado em laudo. O laudo so pode ser liberado por responsavel tecnico habilitado.
+Quando a amostra é recebida e conferida, o módulo laboratorial pode executar o exame. O resultado pode ser importado de equipamentos laboratoriais ou registrado por usuário autorizado. Depois, passa por revisão técnica e é consolidado em laudo. O laudo só pode ser liberado por responsável técnico habilitado.
 
 Entidades envolvidas:
 
 - Equipamento.
 - Resultado.
-- Resultado revisao.
+- Resultado revisão.
 - Resultado auditoria.
 - Laudo.
-- Responsavel tecnico.
+- Responsável técnico.
 
 ### 4.4 Processamento administrativo e financeiro
 
-A liberacao do laudo gera impacto direto no faturamento. O sistema identifica o procedimento, o convenio, o codigo TUSS e o valor contratado, criando ou habilitando o item de guia TISS. Apos a pre-auditoria e o fechamento do lote de faturamento, o financeiro recebe automaticamente o titulo a receber.
+A liberação do laudo gera impacto direto no faturamento. O sistema identifica o procedimento, o convênio, o código TUSS e o valor contratado, criando ou habilitando o item de guia TISS. Após a pré-auditoria e o fechamento do lote de faturamento, o financeiro recebe automaticamente o título a receber.
 
 Entidades envolvidas:
 
@@ -125,28 +125,28 @@ Entidades envolvidas:
 - Guia item.
 - Lote de faturamento.
 - Glosa.
-- Titulo a receber.
+- Título a receber.
 - Movimento financeiro.
-- Conciliacao de pagamento.
+- Conciliação de pagamento.
 
-### 4.5 Processamento analitico
+### 4.5 Processamento analítico
 
-Os eventos registrados ao longo do processo alimentam a camada de BI por ETL. A gestao passa a visualizar indicadores como produtividade por unidade, tempo medio entre coleta e laudo, taxa de glosa por convenio, receita por procedimento, divergencias financeiras e consumo de insumos.
+Os eventos registrados ao longo do processo alimentam a camada de BI por ETL. A gestão passa a visualizar indicadores como produtividade por unidade, tempo médio entre coleta e laudo, taxa de glosa por convênio, receita por procedimento, divergências financeiras e consumo de insumos.
 
 Entidades e estruturas envolvidas:
 
 - Fato atendimento.
-- Fato logistica.
+- Fato logística.
 - Fato laboratorial.
 - Fato faturamento.
 - Fato financeiro.
-- Dimensoes de tempo, unidade, convenio, procedimento e paciente anonimizado.
+- Dimensões de tempo, unidade, convênio, procedimento e paciente anonimizado.
 
 ---
 
-## 5. Impacto das Operacoes Entre Setores
+## 5. Impacto das Operações Entre Setores
 
-A principal evidencia de integracao organizacional e que uma acao em um setor muda automaticamente a situacao de outros setores.
+A principal evidência de integração organizacional é que uma ação em um setor muda automaticamente a situação de outros setores.
 
 ### 5.1 Exemplo 1: Registro de coleta
 
@@ -155,33 +155,33 @@ Quando o setor de coleta registra uma amostra:
 | Etapa | Impacto |
 |---|---|
 | Coleta registra amostra vinculada a OS | A amostra passa ao status `COLETADA` |
-| Sistema cria movimentacao da amostra | A cadeia de custodia passa a existir |
-| Logistica recebe pendencia de transporte | A amostra deve ser incluida em malote |
-| BI recebe evento operacional | Indicadores de volume de coleta e produtividade sao atualizados |
-| Auditoria registra usuario, data e acao | A operacao fica rastreavel |
+| Sistema cria movimentação da amostra | A cadeia de custódia passa a existir |
+| Logística recebe pendência de transporte | A amostra deve ser incluída em malote |
+| BI recebe evento operacional | Indicadores de volume de coleta e produtividade são atualizados |
+| Auditoria registra usuário, data e ação | A operação fica rastreável |
 
-### 5.2 Exemplo 2: Recebimento de amostra no laboratorio central
+### 5.2 Exemplo 2: Recebimento de amostra no laboratório central
 
-Quando a logistica registra o recebimento:
-
-| Etapa | Impacto |
-|---|---|
-| Malote e conferido | Integridade da amostra e validada |
-| Amostra passa ao status `RECEBIDA` | Laboratorio pode iniciar processamento |
-| Protocolo de recebimento e salvo | Cadeia de custodia e completada para aquela etapa |
-| Laboratorial recebe demanda tecnica | Resultado pode ser produzido ou importado |
-| BI mede tempo de transporte | Indicador logistico e atualizado |
-
-### 5.3 Exemplo 3: Liberacao de laudo
-
-Quando o responsavel tecnico libera um laudo:
+Quando a logística registra o recebimento:
 
 | Etapa | Impacto |
 |---|---|
-| Laudo muda para `LIBERADO` | Resultado fica disponivel como produto tecnico final |
-| Auditoria registra responsavel tecnico e assinatura | Responsabilidade tecnica e comprovada |
-| Faturamento recebe item elegivel | Guia TISS/TUSS pode ser gerada ou pre-auditada |
-| BI atualiza tempo coleta-laudo | Indicador de eficiencia laboratorial e recalculado |
+| Malote é conferido | Integridade da amostra é validada |
+| Amostra passa ao status `RECEBIDA` | Laboratório pode iniciar processamento |
+| Protocolo de recebimento é salvo | Cadeia de custódia é completada para aquela etapa |
+| Laboratorial recebe demanda técnica | Resultado pode ser produzido ou importado |
+| BI mede tempo de transporte | Indicador logístico é atualizado |
+
+### 5.3 Exemplo 3: Liberação de laudo
+
+Quando o responsável técnico libera um laudo:
+
+| Etapa | Impacto |
+|---|---|
+| Laudo muda para `LIBERADO` | Resultado fica disponível como produto técnico final |
+| Auditoria registra responsável técnico e assinatura | Responsabilidade técnica é comprovada |
+| Faturamento recebe item elegível | Guia TISS/TUSS pode ser gerada ou pré-auditada |
+| BI atualiza tempo coleta-laudo | Indicador de eficiência laboratorial é recalculado |
 | Paciente/solicitante pode acessar laudo conforme regra | Atendimento conclui a demanda assistencial |
 
 ### 5.4 Exemplo 4: Fechamento de lote de faturamento
@@ -191,31 +191,31 @@ Quando o faturamento fecha um lote:
 | Etapa | Impacto |
 |---|---|
 | Lote muda para `FECHADO` | Itens faturados ficam consolidados |
-| XML TISS e guias sao preparados | Envio ao convenio fica padronizado |
-| Financeiro recebe titulo a receber | Receita prevista passa a compor o contas a receber |
-| BI atualiza receita e glosas | Gestao acompanha desempenho por convenio |
+| XML TISS e guias são preparados | Envio ao convênio fica padronizado |
+| Financeiro recebe título a receber | Receita prevista passa a compor o contas a receber |
+| BI atualiza receita e glosas | Gestão acompanha desempenho por convênio |
 
 ---
 
 ## 6. Rastreabilidade Organizacional
 
-A rastreabilidade no ERP LabVida permite reconstruir o caminho da informacao e identificar quem realizou cada acao, quando ela ocorreu e qual entidade foi afetada.
+A rastreabilidade no ERP LabVida permite reconstruir o caminho da informação e identificar quem realizou cada ação, quando ela ocorreu e qual entidade foi afetada.
 
-| Objeto rastreado | Como e rastreado | Finalidade |
+| Objeto rastreado | Como é rastreado | Finalidade |
 |---|---|---|
-| Ordem de Servico | Codigo unico da OS e historico de status | Acompanhar o ciclo completo do atendimento |
-| Amostra | Codigo de barras/QR e movimentacoes | Garantir cadeia de custodia |
-| Malote | Origem, destino, responsavel e recebimento | Controlar transporte entre unidades |
-| Resultado | Status, equipamento, revisor e auditoria de alteracoes | Preservar confiabilidade tecnica |
-| Laudo | Responsavel tecnico, assinatura digital e data de liberacao | Comprovar validade clinica |
-| Guia TISS | Numero, lote, procedimento e laudo associado | Rastrear cobranca ao convenio |
-| Titulo financeiro | Lote de origem, valor, vencimento e baixa | Rastrear receita ou obrigacao financeira |
-| Auditoria corporativa | Usuario, entidade, acao, data/hora e dados alterados | Atender governanca, LGPD e controle interno |
+| Ordem de Serviço | Código único da OS e histórico de status | Acompanhar o ciclo completo do atendimento |
+| Amostra | Código de barras/QR e movimentações | Garantir cadeia de custódia |
+| Malote | Origem, destino, responsável e recebimento | Controlar transporte entre unidades |
+| Resultado | Status, equipamento, revisor e auditoria de alterações | Preservar confiabilidade técnica |
+| Laudo | Responsável técnico, assinatura digital e data de liberação | Comprovar validade clínica |
+| Guia TISS | Número, lote, procedimento e laudo associado | Rastrear cobrança ao convênio |
+| Título financeiro | Lote de origem, valor, vencimento e baixa | Rastrear receita ou obrigação financeira |
+| Auditoria corporativa | Usuário, entidade, ação, data/hora e dados alterados | Atender governança, LGPD e controle interno |
 
 Exemplo de rastreamento completo:
 
 ```text
-Paciente -> OS -> Item da OS -> Amostra -> Coleta -> Malote -> Recebimento -> Resultado -> Laudo -> Guia TISS -> Lote -> Titulo a Receber -> Conciliacao -> BI
+Paciente -> OS -> Item da OS -> Amostra -> Coleta -> Malote -> Recebimento -> Resultado -> Laudo -> Guia TISS -> Lote -> Título a Receber -> Conciliação -> BI
 ```
 
 Com esse encadeamento, a LabVida consegue responder perguntas gerenciais e operacionais como:
@@ -223,112 +223,110 @@ Com esse encadeamento, a LabVida consegue responder perguntas gerenciais e opera
 - Qual unidade abriu a OS?
 - Quem coletou a amostra?
 - Em qual malote a amostra foi transportada?
-- Quando a amostra chegou ao laboratorio central?
+- Quando a amostra chegou ao laboratório central?
 - Qual equipamento produziu o resultado?
 - Quem revisou e liberou o laudo?
 - Qual guia TISS cobrou o exame?
-- O convenio pagou integralmente ou houve glosa?
+- O convênio pagou integralmente ou houve glosa?
 
 ---
 
-## 7. Circulacao dos Dados
+## 7. Circulação dos Dados
 
-A circulacao dos dados no ERP segue uma cadeia controlada de entrada, validacao, processamento, consolidacao e analise.
+A circulação dos dados no ERP segue uma cadeia controlada de entrada, validação, processamento, consolidação e análise.
 
-| Fase | Dados principais | Modulo responsavel | Resultado |
+| Fase | Dados principais | Módulo responsável | Resultado |
 |---|---|---|---|
-| Entrada cadastral | Paciente, medico, convenio, procedimento, unidade | Cadastro | Dados padronizados e reutilizaveis |
-| Solicitacao | OS, itens da OS, autorizacao | Atendimento | Demanda formal de exames |
-| Identificacao fisica | Amostra, etiqueta, coletor | Coleta | Material biologico vinculado a OS |
-| Transporte | Malote, movimentacoes, recebimento | Logistica | Cadeia de custodia documentada |
-| Analise | Resultado, equipamento, valores de referencia | Laboratorial | Resultado tecnico validavel |
-| Validacao | Revisao, laudo, assinatura | Laboratorial | Laudo liberado |
-| Cobranca | Guia TISS, guia item, lote | Faturamento | Receita faturada por convenio |
-| Controle economico | Titulo, baixa, conciliacao | Financeiro | Receita recebida ou pendente |
-| Analise gerencial | Fatos, dimensoes, indicadores | BI | Apoio a decisao estrategica |
+| Entrada cadastral | Paciente, médico, convênio, procedimento, unidade | Cadastro | Dados padronizados e reutilizáveis |
+| Solicitação | OS, itens da OS, autorização | Atendimento | Demanda formal de exames |
+| Identificação física | Amostra, etiqueta, coletor | Coleta | Material biológico vinculado a OS |
+| Transporte | Malote, movimentações, recebimento | Logística | Cadeia de custódia documentada |
+| Análise | Resultado, equipamento, valores de referência | Laboratorial | Resultado técnico validável |
+| Validação | Revisão, laudo, assinatura | Laboratorial | Laudo liberado |
+| Cobrança | Guia TISS, guia item, lote | Faturamento | Receita faturada por convênio |
+| Controle econômico | Título, baixa, conciliação | Financeiro | Receita recebida ou pendente |
+| Análise gerencial | Fatos, dimensões, indicadores | BI | Apoio à decisão estratégica |
 
-Essa circulacao evita que cada setor tenha seu proprio cadastro, sua propria planilha ou sua propria versao da verdade. O dado nasce uma vez, e os demais modulos o consomem conforme sua responsabilidade.
+Essa circulação evita que cada setor tenha seu próprio cadastro, sua própria planilha ou sua própria versão da verdade. O dado nasce uma vez, e os demais módulos o consomem conforme sua responsabilidade.
 
 ---
 
-## 8. Regras de Negocio que Moldam a Integracao
+## 8. Regras de Negócio que Moldam a Integração
 
-As regras de negocio definem os limites e os impactos das operacoes dentro do ERP. Elas garantem que o fluxo integrado seja consistente com as diretrizes da LabVida.
+As regras de negócio definem os limites e os impactos das operações dentro do ERP. Elas garantem que o fluxo integrado seja consistente com as diretrizes da LabVida.
 
-| Regra de negocio | Modulos envolvidos | Impacto no processo |
+| Regra de negócio | Módulos envolvidos | Impacto no processo |
 |---|---|---|
-| Paciente deve ter identificacao unica | Cadastro, Atendimento | Evita duplicidade de OS e inconsistencia historica |
-| Convenio deve estar ativo para autorizar OS | Cadastro, Atendimento, Faturamento | Impede atendimento conveniado sem elegibilidade |
-| Procedimento deve existir no catalogo TUSS | Cadastro, Atendimento, Faturamento | Garante cobranca padronizada em TISS/TUSS |
-| OS deve possuir codigo unico | Atendimento, Coleta, Laboratorio, Faturamento | Permite rastrear todo o ciclo operacional |
-| Amostra deve estar vinculada a uma OS | Coleta, Logistica, Laboratorio | Evita amostra sem origem identificada |
-| Amostra so pode ser processada apos recebimento | Logistica, Laboratorio | Protege a cadeia de custodia |
-| Resultado alterado deve gerar auditoria | Laboratorio, Auditoria | Impede perda de historico clinico |
-| Laudo so pode ser liberado por responsavel tecnico | Laboratorio, Auditoria | Garante responsabilidade tecnica |
-| Laudo liberado habilita faturamento | Laboratorio, Faturamento | Impede cobranca antes da conclusao tecnica |
-| Lote fechado gera titulo a receber | Faturamento, Financeiro | Integra cobranca e controle financeiro |
-| Compra aprovada gera titulo a pagar | Compras, Financeiro | Integra suprimentos e contas a pagar |
-| Dados sensiveis devem ser protegidos | Todos, Auditoria, BI | Atende LGPD e reduz risco de vazamento |
-| BI deve usar dados anonimizados de pacientes | BI, Cadastro, Atendimento | Permite analise sem exposicao indevida |
+| Paciente deve ter identificação única | Cadastro, Atendimento | Evita duplicidade de OS e inconsistência histórica |
+| Convênio deve estar ativo para autorizar OS | Cadastro, Atendimento, Faturamento | Impede atendimento conveniado sem elegibilidade |
+| Procedimento deve existir no catálogo TUSS | Cadastro, Atendimento, Faturamento | Garante cobrança padronizada em TISS/TUSS |
+| OS deve possuir código único | Atendimento, Coleta, Laboratório, Faturamento | Permite rastrear todo o ciclo operacional |
+| Amostra deve estar vinculada a uma OS | Coleta, Logística, Laboratório | Evita amostra sem origem identificada |
+| Amostra só pode ser processada após recebimento | Logística, Laboratório | Protege a cadeia de custódia |
+| Resultado alterado deve gerar auditoria | Laboratório, Auditoria | Impede perda de histórico clínico |
+| Laudo só pode ser liberado por responsável técnico | Laboratório, Auditoria | Garante responsabilidade técnica |
+| Laudo liberado habilita faturamento | Laboratório, Faturamento | Impede cobrança antes da conclusão técnica |
+| Lote fechado gera título a receber | Faturamento, Financeiro | Integra cobrança e controle financeiro |
+| Compra aprovada gera título a pagar | Compras, Financeiro | Integra suprimentos e contas a pagar |
+| Dados sensíveis devem ser protegidos | Todos, Auditoria, BI | Atende LGPD e reduz risco de vazamento |
+| BI deve usar dados anonimizados de pacientes | BI, Cadastro, Atendimento | Permite análise sem exposição indevida |
 
 ---
 
-## 9. Consistencia e Unicidade dos Dados
+## 9. Consistência e Unicidade dos Dados
 
-A integracao organizacional depende de uma base unica de dados. Por isso, o ERP LabVida evita que setores diferentes mantenham informacoes duplicadas ou divergentes.
+A integração organizacional depende de uma base única de dados. Por isso, o ERP LabVida evita que setores diferentes mantenham informações duplicadas ou divergentes.
 
-Principios adotados:
+Princípios adotados:
 
-- A OS e a entidade-espinha do fluxo operacional.
-- O paciente, o convenio, o procedimento e a unidade sao referenciados por identificadores unicos.
-- O codigo TUSS padroniza os procedimentos faturaveis.
-- A amostra possui identificador proprio, mas sempre vinculado a uma OS.
-- O laudo se conecta ao item da OS e ao responsavel tecnico.
-- A guia TISS referencia o laudo liberado, evitando cobranca indevida.
-- O titulo a receber referencia o lote de faturamento, garantindo origem financeira clara.
-- A auditoria registra alteracoes sensiveis sem sobrescrever historico.
+- A OS é a entidade-espinha do fluxo operacional.
+- O paciente, o convênio, o procedimento e a unidade são referenciados por identificadores únicos.
+- O código TUSS padroniza os procedimentos faturáveis.
+- A amostra possui identificador próprio, mas sempre vinculado a uma OS.
+- O laudo se conecta ao item da OS e ao responsável técnico.
+- A guia TISS referencia o laudo liberado, evitando cobrança indevida.
+- O título a receber referencia o lote de faturamento, garantindo origem financeira clara.
+- A auditoria registra alterações sensíveis sem sobrescrever histórico.
 - O BI consome dados consolidados, sem alterar a base operacional.
 
-Com isso, o sistema assegura uma unica versao da verdade para os setores da LabVida.
+Com isso, o sistema assegura uma única versão da verdade para os setores da LabVida.
 
 ---
 
-## 10. Cenario Integrado Demonstrativo
+## 10. Cenário Integrado Demonstrativo
 
-Para demonstrar a integracao, considere o seguinte cenario:
+Para demonstrar a integração, considere o seguinte cenário:
 
 1. Um paciente chega a uma unidade de coleta da LabVida.
-2. O atendente localiza ou cadastra o paciente, seleciona o medico solicitante, o convenio e os procedimentos.
-3. O sistema valida se o convenio esta ativo e se os procedimentos possuem codigo TUSS.
-4. A OS e aberta e passa a concentrar os exames solicitados.
-5. A coleta identifica a amostra com codigo de barras e registra o coletor.
-6. A logistica inclui a amostra em um malote para o laboratorio central.
-7. O laboratorio central recebe o malote, confere a integridade e libera a amostra para analise.
-8. O equipamento laboratorial gera o resultado, que passa por revisao tecnica.
-9. O responsavel tecnico libera o laudo com assinatura digital.
-10. A liberacao do laudo cria uma pendencia no faturamento para pre-auditoria TISS/TUSS.
-11. O faturamento gera a guia TISS, agrupa os itens em lote e fecha a cobranca.
-12. O fechamento do lote gera automaticamente um titulo a receber no financeiro.
-13. O pagamento do convenio e conciliado; se houver divergencia, registra-se glosa.
+2. O atendente localiza ou cadastra o paciente, seleciona o médico solicitante, o convênio e os procedimentos.
+3. O sistema valida se o convênio está ativo e se os procedimentos possuem código TUSS.
+4. A OS é aberta e passa a concentrar os exames solicitados.
+5. A coleta identifica a amostra com código de barras e registra o coletor.
+6. A logística inclui a amostra em um malote para o laboratório central.
+7. O laboratório central recebe o malote, confere a integridade e libera a amostra para análise.
+8. O equipamento laboratorial gera o resultado, que passa por revisão técnica.
+9. O responsável técnico libera o laudo com assinatura digital.
+10. A liberação do laudo cria uma pendência no faturamento para pré-auditoria TISS/TUSS.
+11. O faturamento gera a guia TISS, agrupa os itens em lote e fecha a cobrança.
+12. O fechamento do lote gera automaticamente um título a receber no financeiro.
+13. O pagamento do convênio é conciliado; se houver divergência, registra-se glosa.
 14. Todos os eventos alimentam o BI, gerando indicadores de tempo de atendimento, produtividade, glosa, receita e desempenho por unidade.
 
-Esse cenario mostra que uma informacao registrada no inicio do processo continua sendo aproveitada e enriquecida pelos demais setores, sem redigitacao e sem perda de rastreabilidade.
+Esse cenário mostra que uma informação registrada no início do processo continua sendo aproveitada e enriquecida pelos demais setores, sem redigitação e sem perda de rastreabilidade.
 
 ---
 
-## 11. Indicadores Gerenciais Gerados Pela Integracao
+## 11. Indicadores Gerenciais Gerados Pela Integração
 
-A integracao dos modulos permite que a diretoria acompanhe indicadores que nao seriam confiaveis em um sistema fragmentado.
+A integração dos módulos permite que a diretoria acompanhe indicadores que não seriam confiáveis em um sistema fragmentado.
 
 | Indicador | Dados de origem | Utilidade gerencial |
 |---|---|---|
-| Tempo medio entre coleta e laudo | Coleta, movimentacao de amostra, resultado e laudo | Avaliar eficiencia operacional |
+| Tempo médio entre coleta e laudo | Coleta, movimentação de amostra, resultado e laudo | Avaliar eficiência operacional |
 | Produtividade por unidade | OS, coletas e laudos | Comparar desempenho entre unidades |
-| Taxa de glosa por convenio | Guia TISS, guia item e glosa | Melhorar contratos e reduzir perdas |
-| Receita por procedimento | Procedimento, guia item e titulo a receber | Avaliar rentabilidade de exames |
-| Inadimplencia e divergencias | Titulo a receber e conciliacao | Apoiar controle financeiro |
-| Consumo de insumos por setor | Estoque, compras e laboratorio | Planejar compras e evitar ruptura |
-| Volume de exames por periodo | OS item, procedimento e tempo | Prever demanda e escala de equipes |
-| Ocorrencias de auditoria | Auditoria corporativa e usuarios | Monitorar riscos e conformidade |
-
-
+| Taxa de glosa por convênio | Guia TISS, guia item e glosa | Melhorar contratos e reduzir perdas |
+| Receita por procedimento | Procedimento, guia item e título a receber | Avaliar rentabilidade de exames |
+| Inadimplência e divergências | Título a receber e conciliação | Apoiar controle financeiro |
+| Consumo de insumos por setor | Estoque, compras e laboratório | Planejar compras e evitar ruptura |
+| Volume de exames por período | OS item, procedimento e tempo | Prever demanda e escala de equipes |
+| Ocorrências de auditoria | Auditoria corporativa e usuários | Monitorar riscos e conformidade |
