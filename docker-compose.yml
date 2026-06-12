@@ -1,0 +1,60 @@
+services:
+  app:
+    build: .
+    command: >
+      sh -c "alembic upgrade head &&
+      streamlit run app.py --server.address=0.0.0.0 --server.port=8501"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://labvida:labvida@postgres:5432/labvida}
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-labvida}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-labvida}
+      POSTGRES_DB: ${POSTGRES_DB:-labvida}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app_test:
+    build: .
+    profiles: ["test"]
+    command: sh -c "alembic upgrade head && pytest"
+    environment:
+      DATABASE_URL: postgresql+psycopg://labvida:labvida@postgres_test:5432/labvida_test
+    volumes:
+      - .:/app
+    depends_on:
+      postgres_test:
+        condition: service_healthy
+
+  postgres_test:
+    image: postgres:16-alpine
+    profiles: ["test"]
+    environment:
+      POSTGRES_USER: labvida
+      POSTGRES_PASSWORD: labvida
+      POSTGRES_DB: labvida_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
