@@ -3,12 +3,10 @@
 Projeto acadêmico da disciplina **Sistemas de Informação e Tecnologias (SIT)** —
 Bacharelado em Ciência da Computação, **UFAPE** (Garanhuns - PE, 2026).
 
-O **LabVida** é a modelagem de um ERP para uma rede regional de laboratórios de análises clínicas
+O **LabVida** é um ERP acadêmico para uma rede regional de laboratórios de análises clínicas
 (um laboratório central + quatro unidades de coleta). O projeto parte de um diagnóstico organizacional
 real — baixa integração entre sistemas, logística manual de amostras, faturamento de convênios crítico,
 ausência de indicadores gerenciais — e propõe uma arquitetura de ERP integrada para resolvê-lo.
-
-> ⚠️ Projeto de **modelagem** (organizacional, técnica e de dados). Não há implementação de código nesta fase.
 
 ## Equipe
 
@@ -43,15 +41,28 @@ Cadastro → Atendimento e Coleta → Logística de Amostras → Laboratorial �
 
 ```
 LabVida/
+├── app.py                         → Página inicial do Streamlit
+├── alembic.ini                    → Configuração do Alembic
+├── alembic/                       → Migrations do banco
+├── docker-compose.yml             → App, PostgreSQL e serviços de teste
+├── Dockerfile                     → Imagem Python/Streamlit
+├── Makefile                       → Comandos comuns do projeto
+├── mise.toml                      → Versão Python para desenvolvimento local
+├── requirements.txt               → Dependências Python
+├── tests/                         → Testes automatizados
+├── CONTEXT.md                     → Glossário de domínio
 ├── README.md
 ├── LICENSE
 └── docs/
+    ├── adr/                       → Decisões arquiteturais
     ├── Entrega 1/                  → Modelagem organizacional do ERP
     │   ├── -1ª Entrega- SI - LabVida.pdf
     │   └── Entrega-01-Complemento-Arquitetura-Tecnica.md
     ├── Entrega 2/                  → Modelagem da base de dados
     │   ├── Entrega-02-Modelagem-BD.md
     │   └── PLANEJAMENTO-Entrega-02.md
+    ├── Entrega 3/                  → Integração organizacional
+    │   └── Entrega-03-Integracao-Organizacional.md
     ├── diagramas/                  → Diagramas Mermaid (.mmd) da modelagem de dados
     │   ├── MER-conceitual.mmd
     │   ├── MER-logico.mmd
@@ -59,6 +70,62 @@ LabVida/
     │   └── BI-esquema-estrela.mmd
     └── Templates/                  → Template padrão dos documentos da equipe
 ```
+
+## Stack de implementação
+
+- **Python 3.12**
+- **Streamlit**
+- **PostgreSQL**
+- **Docker Compose**
+- **SQLAlchemy**
+- **Alembic**
+- **Pydantic**
+- **pytest**
+
+## Como executar
+
+Suba o LabVida com Docker Compose:
+
+```bash
+docker compose up -d
+```
+
+Acesse:
+
+```text
+http://localhost:8501
+```
+
+Também é possível usar o Makefile:
+
+```bash
+make up
+```
+
+## Comandos comuns
+
+```bash
+make help
+make up
+make down
+make restart
+make build
+make logs
+make test
+make migrate
+make revision msg="criar tabela paciente"
+make clean
+```
+
+## Testes
+
+Execute todos os testes com:
+
+```bash
+make test
+```
+
+Esse comando sobe um PostgreSQL de teste, aplica as migrations, executa o pytest e remove o banco de teste ao final.
 
 ## Entregas
 
@@ -85,15 +152,12 @@ Arquivos `.mmd` ([Mermaid](https://mermaid.js.org/)) — renderizam direto no Gi
 - [MER Lógico](docs/diagramas/MER-logico.mmd) — tabelas, atributos, PKs, FKs e cardinalidades
 - [BI — Esquema Estrela](docs/diagramas/BI-esquema-estrela.mmd) — modelo dimensional (fatos e dimensões)
 
-## Tecnologias de referência
+### Entrega 03 — Integração organizacional
+Detalha como os módulos do ERP LabVida se integram por meio do fluxo operacional da Ordem de Serviço,
+eventos entre setores, rastreabilidade organizacional e impactos automáticos entre atendimento, coleta,
+logística, laboratório, faturamento, financeiro, compras, auditoria e BI.
 
-Stack adotada na modelagem técnica (sem implementação nesta fase):
-
-- **Banco de dados:** PostgreSQL (base operacional OLTP) + Data Warehouse (BI / OLAP)
-- **Backend:** API REST em camadas (controllers → services → repositories)
-- **Mensageria:** fila de eventos para os impactos automáticos entre módulos
-- **Integrações:** padrão TISS (convênios), interfaceamento HL7/ASTM (equipamentos)
-- **Segurança:** autenticação + RBAC, criptografia de dados sensíveis, auditoria append-only (LGPD)
+- [Documento da Entrega 03 — Integração Organizacional](docs/Entrega%203/Entrega-03-Integracao-Organizacional.md)
 
 ## Licença
 
