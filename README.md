@@ -47,8 +47,6 @@ LabVida/
 ├── src/
 │   ├── __init__.py
 │   └── auth.py                    → Autenticacao OAuth 2.0 / OIDC com Auth0
-├── .streamlit/
-│   └── secrets.toml.example       → Template de credenciais Auth0
 ├── alembic.ini                    → Configuracao do Alembic
 ├── alembic/                       → Migrations do banco
 ├── docker-compose.yml             → App, PostgreSQL e servicos de teste
@@ -100,21 +98,22 @@ d) Em **Connections**, desative `Username-Password-Authentication` e mantenha ap
 
 e) Copie **Domain**, **Client ID** e **Client Secret**
 
-f) Crie o arquivo `.streamlit/secrets.toml` a partir do template:
+f) Copie `.env.example` para `.env`:
 
 ```bash
-copy .streamlit\secrets.toml.example .streamlit\secrets.toml
+copy .env.example .env
 ```
 
-g) Preencha com suas credenciais:
+g) Preencha as variaveis de Auth0 no `.env`:
 
-```toml
-[auth0]
-domain = "SEU_DOMINIO.auth0.com"
-client_id = "SEU_CLIENT_ID"
-client_secret = "SEU_CLIENT_SECRET"
-redirect_uri = "http://localhost:8501"
+```dotenv
+AUTH0_DOMAIN=SEU_DOMINIO.auth0.com
+AUTH0_CLIENT_ID=SEU_CLIENT_ID
+AUTH0_CLIENT_SECRET=SEU_CLIENT_SECRET
+APP_BASE_URL=http://localhost:8501
 ```
+
+O mesmo `.env` e usado no desenvolvimento local e pelo Docker Compose. Variaveis de ambiente do shell sobrescrevem valores do `.env`.
 
 ### 2. Criar ambiente virtual e instalar dependencias
 
@@ -146,6 +145,8 @@ Suba o LabVida com Docker Compose:
 ```bash
 docker compose up -d
 ```
+
+O Docker Compose le o `.env` automaticamente.
 
 Acesse:
 

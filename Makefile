@@ -28,8 +28,7 @@ logs:
 
 test:
 	docker compose --profile test up -d postgres_test
-	docker compose --profile test run --rm app_test
-	docker compose --profile test rm -sfv postgres_test
+	@trap 'docker compose --profile test rm -sfv postgres_test' EXIT; docker compose --profile test run --rm app_test
 
 clean-test:
 	docker compose --profile test rm -sfv postgres_test app_test

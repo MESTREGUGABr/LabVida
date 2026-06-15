@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 
 from streamlit.testing.v1 import AppTest
@@ -6,9 +5,11 @@ from streamlit.testing.v1 import AppTest
 PROJECT_ROOT = Path(__file__).parent.parent
 
 
-def test_login_page_renders() -> None:
-    if str(PROJECT_ROOT) not in sys.path:
-        sys.path.insert(0, str(PROJECT_ROOT))
+def test_login_page_renders(monkeypatch) -> None:
+    monkeypatch.setenv("AUTH0_DOMAIN", "labvida-test.auth0.com")
+    monkeypatch.setenv("AUTH0_CLIENT_ID", "test-client-id")
+    monkeypatch.setenv("AUTH0_CLIENT_SECRET", "test-client-secret")
+    monkeypatch.setenv("APP_BASE_URL", "http://localhost:8501")
 
     app = AppTest.from_file(str(PROJECT_ROOT / "app.py"))
     app.run()
@@ -21,9 +22,6 @@ def test_login_page_renders() -> None:
 
 
 def test_home_page_redirects_when_not_logged_in() -> None:
-    if str(PROJECT_ROOT) not in sys.path:
-        sys.path.insert(0, str(PROJECT_ROOT))
-
     app = AppTest.from_file(str(PROJECT_ROOT / "pages" / "home.py"))
     app.run()
 

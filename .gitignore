@@ -4,7 +4,6 @@
 Excalidraw/
 
 .env
-.streamlit/secrets.toml
 .venv/
 venv/
 __pycache__/

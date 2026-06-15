@@ -6,6 +6,10 @@ services:
       streamlit run app.py --server.address=0.0.0.0 --server.port=8501"
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://labvida:labvida@postgres:5432/labvida}
+      AUTH0_DOMAIN: ${AUTH0_DOMAIN:?AUTH0_DOMAIN is required}
+      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID:?AUTH0_CLIENT_ID is required}
+      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET:?AUTH0_CLIENT_SECRET is required}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8501}
     ports:
       - "8501:8501"
     volumes:
@@ -37,6 +41,10 @@ services:
     command: sh -c "alembic upgrade head && pytest"
     environment:
       DATABASE_URL: postgresql+psycopg://labvida:labvida@postgres_test:5432/labvida_test
+      AUTH0_DOMAIN: labvida-test.auth0.com
+      AUTH0_CLIENT_ID: test-client-id
+      AUTH0_CLIENT_SECRET: test-client-secret
+      APP_BASE_URL: http://localhost:8501
     volumes:
       - .:/app
     depends_on:

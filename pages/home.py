@@ -1,17 +1,7 @@
 import streamlit as st
 
-from src.auth import AuthConfig, build_logout_url
-
-
-def _get_config() -> AuthConfig:
-    return AuthConfig(
-        domain=st.secrets["auth0"]["domain"],
-        client_id=st.secrets["auth0"]["client_id"],
-        client_secret=st.secrets["auth0"]["client_secret"],
-        redirect_uri=st.secrets.get("auth0", {}).get(
-            "redirect_uri", "http://localhost:8501"
-        ),
-    )
+from src.auth import build_logout_url
+from src.config import get_auth_config
 
 
 def main() -> None:
@@ -37,7 +27,7 @@ def main() -> None:
 
     if st.button("Sair"):
         st.session_state.clear()
-        config = _get_config()
+        config = get_auth_config()
         logout_url = build_logout_url(config)
         st.markdown(
             f'<meta http-equiv="refresh" content="0; url={logout_url}">',
