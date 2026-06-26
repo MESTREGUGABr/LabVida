@@ -8,6 +8,10 @@ Glossario de dominio do ERP LabVida. Define linguagem comum para o laboratorio, 
 ERP academico para uma rede regional de laboratorios de analises clinicas, composta por laboratorio central e unidades de coleta.
 _Evitar_: sistema, plataforma, app.
 
+**Cadastro**:
+Area do LabVida que mantem dados basicos e referenciais necessarios para iniciar e sustentar o fluxo operacional.
+_Evitar_: modulo inicial, base de dados, tela de cadastro.
+
 **Ordem de Servico (OS)**:
 Entidade central do fluxo operacional; representa o atendimento de um paciente e agrupa os exames solicitados.
 _Evitar_: pedido, atendimento, ordem.
@@ -15,6 +19,14 @@ _Evitar_: pedido, atendimento, ordem.
 **Paciente**:
 Pessoa atendida pelo laboratorio e vinculada a uma ou mais Ordens de Servico.
 _Evitar_: cliente, usuario.
+
+**CPF do Paciente**:
+Identificador civil usado pelo laboratorio para reconhecer um paciente de forma unica no Cadastro.
+_Evitar_: documento, identificador generico.
+
+**Telefone do Paciente**:
+Meio de contato telefonico usado pelo laboratorio para comunicacoes operacionais com o paciente.
+_Evitar_: contato.
 
 **Amostra**:
 Material biologico coletado de um paciente para realizacao de exames, rastreado durante coleta, transporte e processamento.
