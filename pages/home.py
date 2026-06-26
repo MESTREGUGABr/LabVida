@@ -22,6 +22,7 @@ def main() -> None:
     st.divider()
 
     st.write("Bem-vindo ao LabVida!")
+    st.page_link("pages/cadastro_pacientes.py", label="Cadastro de Pacientes")
 
     st.divider()
 
