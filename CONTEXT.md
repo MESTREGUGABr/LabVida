@@ -45,7 +45,7 @@ Documento final de resultado de exame, validado e liberado por responsavel tecni
 _Evitar_: resultado, relatorio.
 
 **Convenio**:
-Entidade pagadora ou intermediadora que autoriza e remunera atendimentos conforme regras contratadas.
+Entidade pagadora ou intermediadora vinculada a Ordens de Servico para identificar quem autoriza ou remunera exames. Um convenio pode estar ativo ou inativo; convenios inativos permanecem reconheciveis pelo laboratorio para preservar historico.
 _Evitar_: plano, seguradora.
 
 **Guia TISS**:
