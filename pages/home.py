@@ -25,6 +25,17 @@ def main() -> None:
     st.page_link("pages/cadastro_pacientes.py", label="Cadastro de Pacientes")
     st.page_link("pages/cadastro_convenios.py", label="Cadastro de Convênios")
 
+    st.subheader("Cadastro")
+    st.page_link("pages/cadastro_pacientes.py", label="Pacientes", icon=":material/person:")
+    st.page_link("pages/cadastro_medicos.py", label="Médicos", icon=":material/stethoscope:")
+    st.page_link("pages/cadastro_convenios.py", label="Convênios", icon=":material/contract:")
+    st.page_link("pages/cadastro_procedimentos.py", label="Procedimentos", icon=":material/labs:")
+    st.page_link("pages/cadastro_unidades.py", label="Unidades e Setores", icon=":material/apartment:")
+
+    st.subheader("Atendimento e Coleta")
+    st.page_link("pages/atendimento_os.py", label="Ordens de Serviço", icon=":material/receipt_long:")
+    st.page_link("pages/atendimento_coleta.py", label="Registro de Coleta", icon=":material/science:")
+
     st.divider()
 
     if st.button("Sair"):

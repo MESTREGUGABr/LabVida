@@ -4,6 +4,14 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from src.cadastro import models  # noqa: F401
+from src.cadastro.convenio import models as convenio_models  # noqa: F401
+from src.cadastro.medico import models as medico_models  # noqa: F401
+from src.cadastro.procedimento import models as procedimento_models  # noqa: F401
+from src.cadastro.unidade import models as unidade_models  # noqa: F401
+from src.atendimento.amostra import models as amostra_models  # noqa: F401
+from src.atendimento.autorizacao import models as autorizacao_models  # noqa: F401
+from src.atendimento.ordem_servico import models as ordem_servico_models  # noqa: F401
+from src.usuario import models as usuario_models  # noqa: F401
 from src.config import get_database_url
 from src.db import Base
 

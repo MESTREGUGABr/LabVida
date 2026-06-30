@@ -36,7 +36,10 @@ def main() -> None:
 
     if resultado_pacientes.erros or resultado_convenios.erros:
         sys.exit(1)
+from src.seeder.cadastros import main as seed_cadastros
+from src.seeder.pacientes import main as seed_pacientes
 
 
 if __name__ == "__main__":
-    main()
+    seed_cadastros()
+    seed_pacientes()
