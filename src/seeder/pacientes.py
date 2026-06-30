@@ -106,12 +106,16 @@ def _gerar_telefone() -> str:
 
 def _reportar_resultado(resultado: SeederResult) -> None:
     print("Seeder finalizado")
+    reportar_resultado_pacientes(resultado)
+
+
+def reportar_resultado_pacientes(resultado: SeederResult) -> None:
     print(f"Pacientes criados: {resultado.pacientes_criados}")
 
     if not resultado.erros:
-        print("Erros: 0")
+        print("Erros em Pacientes: 0")
         return
 
-    print(f"Erros: {len(resultado.erros)}")
+    print(f"Erros em Pacientes: {len(resultado.erros)}")
     for erro in resultado.erros:
         print(f"- {erro}")
