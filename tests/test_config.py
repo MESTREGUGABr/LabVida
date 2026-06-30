@@ -1,6 +1,8 @@
 from pathlib import Path
 
-from src.config import get_auth_config
+import pytest
+
+from src.config import get_auth_config, get_database_url
 
 
 def test_auth_config_loads_from_dotenv(monkeypatch, tmp_path: Path) -> None:
@@ -23,6 +25,16 @@ def test_auth_config_loads_from_dotenv(monkeypatch, tmp_path: Path) -> None:
     assert config.client_id == "test-client-id"
     assert config.client_secret == "test-client-secret"
     assert config.redirect_uri == "http://localhost:8501"
+
+
+def test_auth_config_rejeita_variavel_obrigatoria_ausente(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("AUTH0_DOMAIN", raising=False)
+    monkeypatch.delenv("AUTH0_CLIENT_ID", raising=False)
+    monkeypatch.delenv("AUTH0_CLIENT_SECRET", raising=False)
+
+    with pytest.raises(RuntimeError, match="AUTH0_DOMAIN environment variable is required"):
+        get_auth_config()
 
 
 def test_auth_config_prefers_environment_over_dotenv(
@@ -48,3 +60,31 @@ def test_auth_config_prefers_environment_over_dotenv(
     assert config.client_id == "env-client-id"
     assert config.client_secret == "env-client-secret"
     assert config.redirect_uri == "http://env.localhost:8501"
+
+
+def test_database_url_loads_from_dotenv(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    (tmp_path / ".env").write_text(
+        "DATABASE_URL=postgresql+psycopg://labvida:labvida@postgres:5432/labvida\n"
+    )
+
+    assert get_database_url() == "postgresql+psycopg://labvida:labvida@postgres:5432/labvida"
+
+
+def test_database_url_prefers_environment_over_dotenv(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://env/db")
+
+    (tmp_path / ".env").write_text("DATABASE_URL=postgresql+psycopg://dotenv/db\n")
+
+    assert get_database_url() == "postgresql+psycopg://env/db"
+
+
+def test_database_url_rejeita_variavel_obrigatoria_ausente(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    with pytest.raises(RuntimeError, match="DATABASE_URL environment variable is required"):
+        get_database_url()

@@ -1,23 +1,18 @@
 from logging.config import fileConfig
-import os
 
 from alembic import context
 from sqlalchemy import engine_from_config, pool
+
+from src.cadastro import models  # noqa: F401
+from src.config import get_database_url
+from src.db import Base
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-target_metadata = None
-
-
-def get_database_url() -> str:
-    database_url = os.environ.get("DATABASE_URL")
-    if not database_url:
-        raise RuntimeError("DATABASE_URL environment variable is required")
-    return database_url
-
+target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     context.configure(

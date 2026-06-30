@@ -1,4 +1,4 @@
-.PHONY: help up down restart build logs test clean-test clean migrate revision
+.PHONY: help up down restart build logs test clean-test clean migrate revision seeder
 
 help:
 	@echo Comandos disponiveis:
@@ -9,7 +9,8 @@ help:
 	@echo   make logs      Acompanha logs do app
 	@echo   make test      Sobe banco de teste, roda testes e remove dados de teste
 	@echo   make migrate   Aplica migrations no banco principal
-	@echo   make revision  Cria migration vazia: make revision msg="mensagem"
+	@echo   make revision  Cria migration via autogenerate: make revision msg="mensagem"
+	@echo   make seeder    Limpa o banco e cria Pacientes de exemplo
 	@echo   make clean     Para app e banco removendo volumes
 
 up:
@@ -43,4 +44,8 @@ revision:
 ifndef msg
 	$(error Use: make revision msg="mensagem")
 endif
-	docker compose run --rm app alembic revision -m "$(msg)"
+	docker compose run --rm app alembic revision --autogenerate -m "$(msg)"
+
+seeder:
+	docker compose up -d postgres
+	docker compose run --rm app sh -c "alembic upgrade head && python -m src.seeder"
