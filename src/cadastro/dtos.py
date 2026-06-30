@@ -5,8 +5,11 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from src.cadastro.validators import (
+    normalizar_cnpj_convenio,
     normalizar_cpf_paciente,
+    normalizar_nome_convenio,
     normalizar_nome_paciente,
+    normalizar_telefone_convenio,
     normalizar_telefone_paciente,
 )
 
@@ -92,3 +95,75 @@ class PacienteRead(BaseModel):
     data_nascimento: date
     telefone: str
     sexo: SexoPaciente = Field(default=SexoPaciente.NAO_INFORMADO)
+
+
+class ConvenioCreate(BaseModel):
+    nome: str
+    cnpj: str | None = None
+    telefone: str | None = None
+    email: str | None = None
+
+    @field_validator("nome")
+    @classmethod
+    def _normalizar_nome(cls, nome: str) -> str:
+        return normalizar_nome_convenio(nome)
+
+    @field_validator("cnpj")
+    @classmethod
+    def _normalizar_cnpj(cls, cnpj: str | None) -> str | None:
+        return normalizar_cnpj_convenio(cnpj) if cnpj else None
+
+    @field_validator("telefone")
+    @classmethod
+    def _normalizar_telefone(cls, telefone: str | None) -> str | None:
+        return normalizar_telefone_convenio(telefone) if telefone else None
+
+    @field_validator("email")
+    @classmethod
+    def _normalizar_email(cls, email: str | None) -> str | None:
+        return email.strip().lower() if email else None
+
+
+class ConvenioUpdate(BaseModel):
+    nome: str | None = None
+    cnpj: str | None = None
+    telefone: str | None = None
+    email: str | None = None
+    ativo: bool | None = None
+
+    @field_validator("nome")
+    @classmethod
+    def _normalizar_nome(cls, nome: str | None) -> str | None:
+        return normalizar_nome_convenio(nome) if nome is not None else None
+
+    @field_validator("cnpj")
+    @classmethod
+    def _normalizar_cnpj(cls, cnpj: str | None) -> str | None:
+        return normalizar_cnpj_convenio(cnpj) if cnpj else None
+
+    @field_validator("telefone")
+    @classmethod
+    def _normalizar_telefone(cls, telefone: str | None) -> str | None:
+        return normalizar_telefone_convenio(telefone) if telefone else None
+
+    @field_validator("email")
+    @classmethod
+    def _normalizar_email(cls, email: str | None) -> str | None:
+        return email.strip().lower() if email else None
+
+    @model_validator(mode="after")
+    def _validar_nao_vazio(self) -> "ConvenioUpdate":
+        if not self.model_fields_set:
+            raise ValueError("Informe ao menos um campo para atualizar")
+        return self
+
+
+class ConvenioRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    nome: str
+    cnpj: str | None = None
+    telefone: str | None = None
+    email: str | None = None
+    ativo: bool

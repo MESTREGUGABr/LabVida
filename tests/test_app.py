@@ -35,3 +35,12 @@ def test_cadastro_pacientes_redirects_when_not_logged_in(monkeypatch) -> None:
     app.run()
 
     assert not app.exception
+
+
+def test_cadastro_convenios_redirects_when_not_logged_in(monkeypatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", "postgresql+psycopg://labvida:labvida@postgres:5432/labvida")
+
+    app = AppTest.from_file(str(PROJECT_ROOT / "pages" / "cadastro_convenios.py"))
+    app.run()
+
+    assert not app.exception

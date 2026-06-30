@@ -22,6 +22,27 @@ def normalizar_nome_paciente(nome: str) -> str:
     return nome_normalizado
 
 
+def normalizar_nome_convenio(nome: str) -> str:
+    nome_normalizado = " ".join(nome.strip().split())
+    if not (2 <= len(nome_normalizado) <= 120):
+        raise ValueError("Nome do Convênio inválido")
+    return nome_normalizado
+
+
+def normalizar_cnpj_convenio(cnpj: str) -> str:
+    cnpj_normalizado = re.sub(r"\D", "", cnpj)
+    if not _cnpj_valido(cnpj_normalizado):
+        raise ValueError("CNPJ do Convênio inválido")
+    return cnpj_normalizado
+
+
+def normalizar_telefone_convenio(telefone: str) -> str:
+    telefone_normalizado = re.sub(r"\D", "", telefone)
+    if len(telefone_normalizado) not in (10, 11):
+        raise ValueError("Telefone do Convênio inválido")
+    return telefone_normalizado
+
+
 def _cpf_valido(cpf: str) -> bool:
     if len(cpf) != 11 or len(set(cpf)) == 1:
         return False
@@ -33,6 +54,22 @@ def _cpf_valido(cpf: str) -> bool:
 
 
 def _calcular_digito_cpf(digitos: list[int], pesos: range) -> int:
+    soma = sum(digito * peso for digito, peso in zip(digitos, pesos))
+    resto = soma % 11
+    return 0 if resto < 2 else 11 - resto
+
+
+def _cnpj_valido(cnpj: str) -> bool:
+    if len(cnpj) != 14 or len(set(cnpj)) == 1:
+        return False
+
+    digitos = [int(digito) for digito in cnpj]
+    primeiro = _calcular_digito_cnpj(digitos[:12], [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+    segundo = _calcular_digito_cnpj(digitos[:13], [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+    return digitos[12] == primeiro and digitos[13] == segundo
+
+
+def _calcular_digito_cnpj(digitos: list[int], pesos: list[int]) -> int:
     soma = sum(digito * peso for digito, peso in zip(digitos, pesos))
     resto = soma % 11
     return 0 if resto < 2 else 11 - resto
