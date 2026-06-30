@@ -2,6 +2,8 @@ import streamlit as st
 
 from src.auth import AuthConfig, build_login_url, exchange_code, fetch_user
 from src.config import get_auth_config
+from src.db import session_scope
+from src.usuario.service import sincronizar_usuario
 
 
 def main() -> None:
@@ -24,7 +26,10 @@ def main() -> None:
         try:
             tokens = exchange_code(config, code, code_verifier)
             user = fetch_user(config, tokens["access_token"])
+            with session_scope() as session:
+                usuario = sincronizar_usuario(session, user.email, user.name)
             st.session_state["user"] = {
+                "id": str(usuario.id),
                 "name": user.name,
                 "email": user.email,
                 "picture": user.picture,

@@ -1,0 +1,2 @@
+class OrdemServicoInexistente(Exception):
+    pass
