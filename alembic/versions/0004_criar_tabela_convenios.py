@@ -27,7 +27,10 @@ def upgrade() -> None:
         sa.Column("cnpj", sa.String(length=14), nullable=True),
         sa.Column("telefone", sa.String(length=11), nullable=True),
         sa.Column("email", sa.String(length=254), nullable=True),
+        sa.Column("registro_ans", sa.String(length=20), nullable=True),
         sa.Column("ativo", sa.Boolean(), nullable=False),
+        sa.Column("status", sa.String(length=7), nullable=False),
+        sa.CheckConstraint("status IN ('ATIVO','INATIVO')", name="ck_convenio_status"),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_convenios_nome_normalizado"), "convenios", ["nome_normalizado"], unique=True)

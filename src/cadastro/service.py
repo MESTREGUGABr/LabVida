@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from src.cadastro.convenio.dtos import StatusConvenio
 from src.cadastro.dtos import ConvenioCreate, ConvenioRead, ConvenioUpdate, PacienteCreate, PacienteRead, PacienteUpdate
 from src.cadastro.errors import (
     CnpjConvenioDuplicado,
@@ -91,6 +92,7 @@ def criar_convenio(session: Session, dto: ConvenioCreate) -> ConvenioRead:
         telefone=dto.telefone,
         email=dto.email,
         ativo=True,
+        status=StatusConvenio.ATIVO,
     )
     repository.salvar_convenio(session, convenio)
     session.commit()
@@ -131,6 +133,7 @@ def atualizar_convenio(session: Session, convenio_id: UUID, dto: ConvenioUpdate)
         convenio.email = dto.email
     if "ativo" in dto.model_fields_set:
         convenio.ativo = dto.ativo
+        convenio.status = StatusConvenio.ATIVO if dto.ativo else StatusConvenio.INATIVO
 
     session.commit()
     session.refresh(convenio)
@@ -140,6 +143,7 @@ def atualizar_convenio(session: Session, convenio_id: UUID, dto: ConvenioUpdate)
 def inativar_convenio(session: Session, convenio_id: UUID) -> None:
     convenio = _obter_convenio_ou_falhar(session, convenio_id)
     convenio.ativo = False
+    convenio.status = StatusConvenio.INATIVO
     session.commit()
 
 

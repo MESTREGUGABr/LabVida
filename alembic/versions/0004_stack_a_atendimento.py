@@ -1,7 +1,7 @@
 """stack A — usuario minimo, cadastros e atendimento/coleta
 
 Revision ID: 0004_stack_a_atendimento
-Revises: 0003_criar_tabela_pacientes
+Revises: 0004_criar_tabela_convenios
 Create Date: 2026-06-30
 """
 
@@ -13,7 +13,7 @@ from sqlalchemy.dialects import postgresql
 
 
 revision: str = "0004_stack_a_atendimento"
-down_revision: str | None = "0003_criar_tabela_pacientes"
+down_revision: str | None = "0004_criar_tabela_convenios"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -55,16 +55,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index(op.f("ix_setores_unidade_id"), "setores", ["unidade_id"], unique=False)
-
-    op.create_table(
-        "convenios",
-        sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
-        sa.Column("nome", sa.String(length=120), nullable=False),
-        sa.Column("registro_ans", sa.String(length=20), nullable=True),
-        sa.Column("status", sa.String(length=7), nullable=False),
-        sa.CheckConstraint("status IN ('ATIVO','INATIVO')", name="ck_convenio_status"),
-        sa.PrimaryKeyConstraint("id"),
-    )
 
     op.create_table(
         "procedimentos",
@@ -267,8 +257,6 @@ def downgrade() -> None:
 
     op.drop_index(op.f("ix_procedimentos_codigo_tuss"), table_name="procedimentos")
     op.drop_table("procedimentos")
-
-    op.drop_table("convenios")
 
     op.drop_index(op.f("ix_setores_unidade_id"), table_name="setores")
     op.drop_table("setores")

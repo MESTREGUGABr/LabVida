@@ -11,7 +11,9 @@ from src.cadastro.convenio.models import Convenio
 def criar_convenio(session: Session, dto: ConvenioCreate) -> ConvenioRead:
     convenio = Convenio(
         nome=dto.nome,
+        nome_normalizado=dto.nome.casefold(),
         registro_ans=dto.registro_ans,
+        ativo=True,
         status=StatusConvenio.ATIVO,
     )
     repository.salvar(session, convenio)
@@ -32,6 +34,7 @@ def alternar_status(session: Session, convenio_id: UUID, ativo: bool) -> Conveni
     convenio = repository.obter_por_id(session, convenio_id)
     if convenio is None:
         raise ConvenioNaoEncontrado("Convênio não encontrado")
+    convenio.ativo = ativo
     convenio.status = StatusConvenio.ATIVO if ativo else StatusConvenio.INATIVO
     session.commit()
     session.refresh(convenio)
