@@ -47,6 +47,16 @@ def registrar_coleta(session: Session, dto: ColetaCreate) -> AmostraRead:
         session, Coleta(amostra_id=amostra.id, coletor_id=coletor.id)
     )
 
+    from src.logistica.recebimento.models import AmostraMovimentacao
+    mov = AmostraMovimentacao(
+        amostra_id=amostra.id,
+        status=StatusAmostra.COLETADA,
+        usuario_id=coletor.id,
+        unidade_id=ordem.unidade_id,
+        observacao="Coleta realizada na unidade",
+    )
+    session.add(mov)
+
     if ordem.status != StatusOrdemServico.COLETADA:
         os_service.registrar_transicao(session, ordem, StatusOrdemServico.COLETADA, coletor.id)
 
@@ -57,6 +67,10 @@ def registrar_coleta(session: Session, dto: ColetaCreate) -> AmostraRead:
 
 def listar_amostras(session: Session, ordem_servico_id: UUID) -> list[AmostraRead]:
     return [AmostraRead.model_validate(a) for a in repository.listar_por_os(session, ordem_servico_id)]
+
+
+def listar_amostras_coletadas(session: Session) -> list[AmostraRead]:
+    return [AmostraRead.model_validate(a) for a in repository.listar_por_status(session, StatusAmostra.COLETADA)]
 
 
 def _gerar_codigo_barras(session: Session) -> str:

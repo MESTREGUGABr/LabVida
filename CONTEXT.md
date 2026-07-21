@@ -40,6 +40,14 @@ _Evitar_: retirada, recebimento.
 Agrupamento logistico de amostras transportadas entre unidade de coleta e laboratorio central.
 _Evitar_: pacote, remessa.
 
+**Cadeia de Custódia**:
+Registro ordenado e auditavel das movimentacoes, responsaveis e localizacoes de uma Amostra desde a Coleta ate a analise e liberacao do Laudo.
+_Evitar_: historico de rastreio, rastro.
+
+**Protocolo de Recebimento**:
+Registro formal de conferencia fisica e de integridade de um Malote e de suas Amostras na entrada do laboratorio central.
+_Evitar_: checagem, recebimento simples.
+
 **Laudo**:
 Documento final de resultado de exame, validado e liberado por responsavel tecnico.
 _Evitar_: resultado, relatorio.

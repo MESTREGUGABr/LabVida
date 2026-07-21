@@ -36,6 +36,10 @@ def main() -> None:
     st.page_link("pages/atendimento_os.py", label="Ordens de Serviço", icon=":material/receipt_long:")
     st.page_link("pages/atendimento_coleta.py", label="Registro de Coleta", icon=":material/science:")
 
+    st.subheader("Logística de Amostras")
+    st.page_link("pages/logistica_malotes.py", label="Gestão de Malotes", icon=":material/local_shipping:")
+    st.page_link("pages/logistica_recebimento.py", label="Recepção Central", icon=":material/inventory:")
+
     st.divider()
 
     if st.button("Sair"):
