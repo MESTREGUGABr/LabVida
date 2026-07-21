@@ -40,6 +40,11 @@ def main() -> None:
     st.page_link("pages/logistica_malotes.py", label="Gestão de Malotes", icon=":material/local_shipping:")
     st.page_link("pages/logistica_recebimento.py", label="Recepção Central", icon=":material/inventory:")
 
+    st.subheader("Laboratorial")
+    st.page_link("pages/laboratorio_cadastros.py", label="Cadastros Laboratoriais", icon=":material/settings:")
+    st.page_link("pages/laboratorio_resultados.py", label="Resultados de Exames", icon=":material/biotech:")
+    st.page_link("pages/laboratorio_laudos.py", label="Emissão de Laudos", icon=":material/description:")
+
     st.divider()
 
     if st.button("Sair"):
