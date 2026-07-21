@@ -1,0 +1,191 @@
+diff --git a/CONTEXT.md b/CONTEXT.md
+index 37997ed..5037843 100644
+--- a/CONTEXT.md
++++ b/CONTEXT.md
+@@ -67,3 +67,11 @@ _Evitar_: erro de pagamento, desconto.
+ **BI**:
+ Camada analitica que consolida dados operacionais em indicadores, dashboards e relatorios gerenciais.
+ _Evitar_: relatorio, dashboard.
++
++**Resultado**:
++Valor bruto ou interpretacao tecnica inicial importada de um equipamento laboratorial referente a um parametro de exame.
++_Evitar_: laudo, exame.
++
++**Analito**:
++Componente especifico ou grandeza medida individualmente dentro de um exame maior (ex: Leucocitos dentro de um Hemograma). Possui valor de referencia e resultado proprios.
++_Evitar_: parametro, sub-exame, item.
+diff --git a/alembic/env.py b/alembic/env.py
+index 2524eba..795d1c4 100644
+--- a/alembic/env.py
++++ b/alembic/env.py
+@@ -12,6 +12,9 @@ from src.atendimento.amostra import models as amostra_models  # noqa: F401
+ from src.atendimento.autorizacao import models as autorizacao_models  # noqa: F401
+ from src.atendimento.ordem_servico import models as ordem_servico_models  # noqa: F401
+ from src.usuario import models as usuario_models  # noqa: F401
++from src.laboratorial import models as laboratorial_models  # noqa: F401
++from src.logistica.malote import models as malote_models  # noqa: F401
++from src.logistica.recebimento import models as recebimento_models  # noqa: F401
+ from src.config import get_database_url
+ from src.db import Base
+ 
+diff --git a/alembic/versions/8bcf3cdc149e_add_laboratorial_models.py b/alembic/versions/8bcf3cdc149e_add_laboratorial_models.py
+new file mode 100644
+index 0000000..3d35eeb
+--- /dev/null
++++ b/alembic/versions/8bcf3cdc149e_add_laboratorial_models.py
+@@ -0,0 +1,25 @@
++"""add laboratorial models
++
++Revision ID: 8bcf3cdc149e
++Revises: 0005_stack_b_logistica
++Create Date: 2026-07-21 14:35:58.372930
++
++"""
++from typing import Sequence, Union
++
++from alembic import op
++import sqlalchemy as sa
++
++
++revision: str = '8bcf3cdc149e'
++down_revision: Union[str, None] = '0005_stack_b_logistica'
++branch_labels: Union[str, Sequence[str], None] = None
++depends_on: Union[str, Sequence[str], None] = None
++
++
++def upgrade() -> None:
++    pass
++
++
++def downgrade() -> None:
++    pass
+diff --git a/docs/adr/0003-granularizacao-analitos-laboratorial.md b/docs/adr/0003-granularizacao-analitos-laboratorial.md
+new file mode 100644
+index 0000000..c5330e0
+--- /dev/null
++++ b/docs/adr/0003-granularizacao-analitos-laboratorial.md
+@@ -0,0 +1,9 @@
++---
++status: accepted
++---
++
++# Granularizacao de Analitos no Modulo Laboratorial
++
++Decidimos modelar os resultados laboratoriais com granularidade de **Analito** (multiplas linhas na tabela `resultado` para um unico `os_item_id`) em vez de consolida-los em um unico payload JSON. Alem disso, adicionamos a coluna `valor_esperado_texto` (varchar) na tabela `valor_referencia` para dar suporte pleno a testes qualitativos (ex: "Nao Reagente").
++
++Isso desvia da arquitetura inicial (Entrega 02) que sugeria uma relacao mais simples e agrupada entre o resultado e o exame. O *trade-off* de adicionar essa complexidade no banco de dados e justificado pela obrigatoriedade de permitir auditoria clinica *append-only* (tabela `resultado_auditoria`) restrita exatamente ao parametro especifico que o medico retificou, alem de permitir regras de negocio distintas (matematicas vs. textuais) na avaliacao de cada componente do exame.
+diff --git a/src/laboratorial/__init__.py b/src/laboratorial/__init__.py
+new file mode 100644
+index 0000000..bd1aec3
+--- /dev/null
++++ b/src/laboratorial/__init__.py
+@@ -0,0 +1,21 @@
++from .models import (
++    Equipamento,
++    Laudo,
++    ProtocoloEquipamento,
++    Resultado,
++    ResultadoAuditoria,
++    StatusLaudo,
++    StatusResultado,
++    ValorReferencia,
++)
++
++__all__ = [
++    "Equipamento",
++    "Laudo",
++    "ProtocoloEquipamento",
++    "Resultado",
++    "ResultadoAuditoria",
++    "StatusLaudo",
++    "StatusResultado",
++    "ValorReferencia",
++]
+diff --git a/src/laboratorial/models.py b/src/laboratorial/models.py
+new file mode 100644
+index 0000000..a6b77d0
+--- /dev/null
++++ b/src/laboratorial/models.py
+@@ -0,0 +1,82 @@
++import enum
++import uuid
++from datetime import datetime, timezone
++
++from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Numeric, String, Text
++from sqlalchemy.dialects.postgresql import UUID
++from sqlalchemy.orm import Mapped, mapped_column, relationship
++
++from src.db import Base
++
++
++class StatusResultado(enum.Enum):
++    AGUARDANDO_REVISAO = "AGUARDANDO_REVISAO"
++    REVISADO = "REVISADO"
++
++
++class StatusLaudo(enum.Enum):
++    RASCUNHO = "RASCUNHO"
++    LIBERADO = "LIBERADO"
++
++
++class ProtocoloEquipamento(enum.Enum):
++    HL7 = "HL7"
++    ASTM = "ASTM"
++
++
++class Equipamento(Base):
++    __tablename__ = "equipamentos"
++
++    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
++    setor_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)  # FK para setor (Cadastro)
++    nome: Mapped[str] = mapped_column(String(120), nullable=False)
++    protocolo: Mapped[ProtocoloEquipamento] = mapped_column(Enum(ProtocoloEquipamento, name="protocolo_equipamento"), nullable=False)
++    ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
++
++
++class ValorReferencia(Base):
++    __tablename__ = "valores_referencia"
++
++    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
++    procedimento_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)  # FK para procedimento (Cadastro)
++    analito: Mapped[str] = mapped_column(String(120), nullable=False)
++    minimo: Mapped[float | None] = mapped_column(Numeric(10, 4), nullable=True)
++    maximo: Mapped[float | None] = mapped_column(Numeric(10, 4), nullable=True)
++    valor_esperado_texto: Mapped[str | None] = mapped_column(String(120), nullable=True)
++    unidade_medida: Mapped[str | None] = mapped_column(String(50), nullable=True)
++
++
++class Resultado(Base):
++    __tablename__ = "resultados"
++
++    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
++    os_item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)  # FK para os_item (Atendimento)
++    equipamento_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("equipamentos.id"), nullable=True)
++    analito: Mapped[str] = mapped_column(String(120), nullable=False)
++    valor: Mapped[str] = mapped_column(String(255), nullable=False)
++    status: Mapped[StatusResultado] = mapped_column(Enum(StatusResultado, name="status_resultado"), nullable=False, default=StatusResultado.AGUARDANDO_REVISAO)
++    importado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
++
++
++class Laudo(Base):
++    __tablename__ = "laudos"
++
++    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
++    os_item_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, unique=True)  # FK para os_item
++    responsavel_tecnico_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)  # FK para medico responsavel
++    status: Mapped[StatusLaudo] = mapped_column(Enum(StatusLaudo, name="status_laudo"), nullable=False, default=StatusLaudo.RASCUNHO)
++    liberado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
++    assinatura_digital: Mapped[str | None] = mapped_column(Text, nullable=True)
++
++
++class ResultadoAuditoria(Base):
++    __tablename__ = "resultados_auditoria"
++
++    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
++    resultado_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("resultados.id"), nullable=False, index=True)
++    usuario_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)  # FK para usuario
++    valor_anterior: Mapped[str] = mapped_column(String(255), nullable=False)
++    valor_novo: Mapped[str] = mapped_column(String(255), nullable=False)
++    ocorrido_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=lambda: datetime.now(timezone.utc))
++
++    resultado = relationship("Resultado")
