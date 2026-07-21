@@ -4,8 +4,9 @@ from decimal import Decimal
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from src.cadastro.procedimento.models import Procedimento
 from src.db import Base
 
 
@@ -46,6 +47,9 @@ class OsItem(Base):
     )
     valor_negociado: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+
+    ordem_servico: Mapped["OrdemServico"] = relationship("OrdemServico")
+    procedimento: Mapped[Procedimento] = relationship("Procedimento")
 
 
 class OsStatusHistorico(Base):
