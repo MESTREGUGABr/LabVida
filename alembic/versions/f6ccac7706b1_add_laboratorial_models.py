@@ -32,7 +32,8 @@ def upgrade() -> None:
         sa.Column('analito', sa.String(120), nullable=False),
         sa.Column('minimo', sa.Numeric(10, 4), nullable=True),
         sa.Column('maximo', sa.Numeric(10, 4), nullable=True),
-        sa.Column('valor_esperado_texto', sa.String(255), nullable=True)
+        sa.Column('valor_esperado_texto', sa.String(255), nullable=True),
+        sa.Column('unidade_medida', sa.String(50), nullable=True)
     )
     op.create_table(
         'resultados',
