@@ -36,6 +36,7 @@ def main() -> None:
 
     if resultado_pacientes.erros or resultado_convenios.erros:
         sys.exit(1)
+from src.seeder.atendimento import main as seed_atendimento
 from src.seeder.cadastros import main as seed_cadastros
 from src.seeder.pacientes import main as seed_pacientes
 
@@ -43,3 +44,4 @@ from src.seeder.pacientes import main as seed_pacientes
 if __name__ == "__main__":
     seed_cadastros()
     seed_pacientes()
+    seed_atendimento()
