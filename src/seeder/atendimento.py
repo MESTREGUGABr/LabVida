@@ -37,7 +37,7 @@ def executar_seeder_atendimento() -> dict[str, int]:
     contagem = {"ordens_servico": 0, "amostras": 0, "malotes": 0, "recebimentos": 0}
 
     with session_scope() as session:
-        if os_repository.listar_os(session):
+        if os_repository.listar(session):
             return contagem
 
         pacientes = listar_pacientes(session)
