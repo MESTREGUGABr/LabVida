@@ -2,7 +2,7 @@ import random
 from dataclasses import dataclass, field
 
 from faker import Faker
-from sqlalchemy import delete
+from sqlalchemy import select
 
 from src.cadastro.dtos import ConvenioCreate
 from src.cadastro.models import Convenio
@@ -22,17 +22,13 @@ class ConvenioSeederResult:
 def executar_seeder_convenios(quantidade: int) -> ConvenioSeederResult:
     resultado = ConvenioSeederResult()
 
-    try:
-        with session_scope() as session:
-            session.execute(delete(Convenio))
-            session.commit()
-    except Exception as error:
-        resultado.erros.append(f"Erro ao limpar Convênios: {error}")
-        return resultado
+    with session_scope() as session:
+        convenios_existentes = list(session.scalars(select(Convenio)))
+        nomes_usados = {c.nome.casefold() for c in convenios_existentes}
+        cnpjs_usados = {c.cnpj for c in convenios_existentes if c.cnpj}
 
-    nomes_usados: set[str] = set()
-    cnpjs_usados: set[str] = set()
-    for indice in range(1, quantidade + 1):
+    a_criar = max(0, quantidade - len(convenios_existentes))
+    for indice in range(1, a_criar + 1):
         try:
             dto = _gerar_convenio(nomes_usados, cnpjs_usados)
             with session_scope() as session:

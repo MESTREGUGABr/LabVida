@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from faker import Faker
-from sqlalchemy import delete
+from sqlalchemy import select
 
 from src.cadastro.dtos import PacienteCreate, SexoPaciente
 from src.cadastro.models import Paciente
@@ -25,16 +25,12 @@ class SeederResult:
 def executar_seeder_pacientes(quantidade: int) -> SeederResult:
     resultado = SeederResult()
 
-    try:
-        with session_scope() as session:
-            session.execute(delete(Paciente))
-            session.commit()
-    except Exception as error:
-        resultado.erros.append(f"Erro ao limpar Pacientes: {error}")
-        return resultado
+    with session_scope() as session:
+        pacientes_existentes = list(session.scalars(select(Paciente)))
+        cpfs_usados = {p.cpf for p in pacientes_existentes}
 
-    cpfs_usados: set[str] = set()
-    for indice in range(1, quantidade + 1):
+    a_criar = max(0, quantidade - len(cpfs_usados))
+    for indice in range(1, a_criar + 1):
         try:
             dto = _gerar_paciente(cpfs_usados)
             with session_scope() as session:
