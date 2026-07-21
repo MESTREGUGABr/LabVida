@@ -18,8 +18,8 @@ from src.atendimento.ordem_servico.dtos import OrdemServicoCreate, OsItemInput
 from src.atendimento.ordem_servico.service import abrir_os
 from src.cadastro.convenio.repository import listar_ativos as listar_convenios
 from src.cadastro.medico.repository import listar_ativos as listar_medicos
-from src.cadastro.paciente.repository import listar_ativos as listar_pacientes
 from src.cadastro.procedimento.repository import listar_ativos as listar_procedimentos
+from src.cadastro.service import listar_pacientes_ativos as listar_pacientes
 from src.cadastro.unidade.repository import listar_unidades_ativas
 from src.db import session_scope
 from src.logistica.malote.dtos import MaloteCreate
