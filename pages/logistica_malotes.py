@@ -1,7 +1,7 @@
 import streamlit as st
 
 from src.atendimento.amostra.service import listar_amostras_coletadas
-from src.cadastro.unidade.service import listar_unidades
+from src.cadastro.unidade.service import listar_unidades_ativas
 from src.db import session_scope
 from src.logistica.malote.dtos import MaloteCreate, StatusMalote
 from src.logistica.malote.errors import LogisticaError
@@ -25,7 +25,7 @@ def main() -> None:
     usuario_id = usuario_id_logado()
 
     with session_scope() as session:
-        unidades = listar_unidades(session)
+        unidades = listar_unidades_ativas(session)
         unidades_coleta = [u for u in unidades if u.tipo == "COLETA"]
         unidades_central = [u for u in unidades if u.tipo == "CENTRAL"]
         amostras_coletadas = listar_amostras_coletadas(session)

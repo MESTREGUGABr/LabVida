@@ -1,6 +1,6 @@
 import streamlit as st
 
-from src.cadastro.unidade.service import listar_unidades
+from src.cadastro.unidade.service import listar_unidades_ativas
 from src.db import session_scope
 from src.logistica.malote.service import listar_malotes_em_transito_para_unidade, obter_malote
 from src.logistica.recebimento.dtos import ProtocoloRecebimentoCreate
@@ -19,7 +19,7 @@ def main() -> None:
     usuario_id = usuario_id_logado()
 
     with session_scope() as session:
-        unidades = listar_unidades(session)
+        unidades = listar_unidades_ativas(session)
         unidades_central = [u for u in unidades if u.tipo == "CENTRAL"] or unidades
 
     origem_opcoes = {u.nome: u.id for u in unidades_central}
