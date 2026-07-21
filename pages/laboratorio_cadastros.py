@@ -4,8 +4,8 @@ from sqlalchemy.orm import Session
 from src.db import session_scope
 from src.laboratorial.dtos import EquipamentoCreate, ProtocoloEquipamento, ValorReferenciaCreate
 from src.laboratorial.service import LaboratorialService
-from src.cadastro.unidade.service import listar_unidades, listar_setores
-from src.cadastro.procedimento.service import listar_procedimentos
+from src.cadastro.unidade.service import listar_unidades_ativas as listar_unidades, listar_setores_ativos as listar_setores
+from src.cadastro.procedimento.service import listar_procedimentos_ativas as listar_procedimentos
 
 st.set_page_config(page_title="Cadastros Laboratoriais", page_icon="⚙️", layout="wide")
 

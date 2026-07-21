@@ -16,3 +16,6 @@ def obter_por_email(session: Session, email: str) -> Usuario | None:
 
 def salvar(session: Session, usuario: Usuario) -> None:
     session.add(usuario)
+
+def listar(session: Session) -> list[Usuario]:
+    return list(session.scalars(select(Usuario)).all())

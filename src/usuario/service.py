@@ -35,3 +35,6 @@ def obter_usuario_por_id(session: Session, usuario_id: UUID) -> UsuarioRead:
     if usuario is None:
         raise UsuarioNaoEncontrado("Usuário não encontrado")
     return UsuarioRead.model_validate(usuario)
+
+def listar_usuarios(session: Session) -> list[UsuarioRead]:
+    return [UsuarioRead.model_validate(u) for u in repository.listar(session)]
