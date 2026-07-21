@@ -67,3 +67,11 @@ _Evitar_: erro de pagamento, desconto.
 **BI**:
 Camada analitica que consolida dados operacionais em indicadores, dashboards e relatorios gerenciais.
 _Evitar_: relatorio, dashboard.
+
+**Resultado**:
+Valor bruto ou interpretacao tecnica inicial importada de um equipamento laboratorial referente a um parametro de exame.
+_Evitar_: laudo, exame.
+
+**Analito**:
+Componente especifico ou grandeza medida individualmente dentro de um exame maior (ex: Leucocitos dentro de um Hemograma). Possui valor de referencia e resultado proprios.
+_Evitar_: parametro, sub-exame, item.

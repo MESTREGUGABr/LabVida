@@ -12,6 +12,9 @@ from src.atendimento.amostra import models as amostra_models  # noqa: F401
 from src.atendimento.autorizacao import models as autorizacao_models  # noqa: F401
 from src.atendimento.ordem_servico import models as ordem_servico_models  # noqa: F401
 from src.usuario import models as usuario_models  # noqa: F401
+from src.laboratorial import models as laboratorial_models  # noqa: F401
+from src.logistica.malote import models as malote_models  # noqa: F401
+from src.logistica.recebimento import models as recebimento_models  # noqa: F401
 from src.config import get_database_url
 from src.db import Base
 
