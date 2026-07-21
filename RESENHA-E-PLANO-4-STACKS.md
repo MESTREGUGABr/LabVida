@@ -350,9 +350,9 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
   operacional e técnico).
 - **Itens a desenvolver:**
   - ✅ **Malote + movimentação de amostra** (`COLETADA → EM_TRANSITO → RECEBIDA`) = cadeia de custódia; `protocolo_recebimento` com conferência de integridade + transição da OS para `EM_ANALISE`.
-  - 🔴 **Resultado** (registro/importação simulada) → `AGUARDANDO_REVISAO`; **liberação de laudo** apenas por responsável técnico (gate por perfil) + `resultado_auditoria` **append-only**.
-  - 🟡 **Valor de referência** para validar resultado fora da faixa.
-  - 🟢 Tela de "esteira" da bancada (fila de amostras recebidas a processar).
+  - ✅ **Resultado** (registro/importação simulada) → `AGUARDANDO_REVISAO`; **liberação de laudo** apenas por responsável técnico (gate por perfil) + `resultado_auditoria` **append-only**.
+  - ✅ **Valor de referência** para validar resultado fora da faixa.
+  - ✅ Tela de "esteira" da bancada (fila de amostras recebidas a processar).
 - **Dependências:** recebe amostras da Stack A; ao liberar laudo, **destrava o faturável** da Stack C;
   consome perfil "responsável técnico" do RBAC (Stack D).
 
