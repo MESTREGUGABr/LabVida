@@ -45,6 +45,10 @@ def main() -> None:
     st.page_link("pages/laboratorio_resultados.py", label="Resultados de Exames", icon=":material/biotech:")
     st.page_link("pages/laboratorio_laudos.py", label="Emissão de Laudos", icon=":material/description:")
 
+    st.subheader("Faturamento")
+    st.page_link("pages/faturamento_guias.py", label="Faturamento de Guias TISS", icon=":material/receipt:")
+    st.page_link("pages/faturamento_glosas.py", label="Controle de Glosas", icon=":material/cancel:")
+
     st.divider()
 
     if st.button("Sair"):
