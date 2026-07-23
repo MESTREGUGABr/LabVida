@@ -67,8 +67,7 @@ def adicionar_guia_item(session: Session, lote_id: UUID, dto: GuiaItemCreate) ->
         raise LaudoNaoLiberado("Apenas laudos com status LIBERADO podem ser faturados")
 
     convenio_do_laudo = _convenio_do_laudo(session, laudo)
-    is_particular = _lote_is_particular(session, lote)
-    if not _conv_ok(convenio_do_laudo, lote.convenio_id, is_particular):
+    if convenio_do_laudo is None or convenio_do_laudo != lote.convenio_id:
         raise ConvenioNaoConfereComLaudo(
             "O convênio do laudo não confere com o convênio do lote de faturamento"
         )
@@ -133,8 +132,6 @@ def adicionar_itens_ao_lote(session: Session, lote_id: UUID, itens: list[GuiaIte
 
     guia = _obter_ou_criar_guia(session, lote)
 
-    is_particular = _lote_is_particular(session, lote)
-
     for dto in itens:
         if dto.valor_faturado <= 0:
             raise ValorFaturadoInvalido(f"Valor faturado inválido: {dto.valor_faturado}")
@@ -145,7 +142,7 @@ def adicionar_itens_ao_lote(session: Session, lote_id: UUID, itens: list[GuiaIte
         if laudo is None or laudo.status != StatusLaudo.LIBERADO:
             raise LaudoNaoLiberado(f"Laudo {dto.laudo_id} não está liberado")
         convenio_do_laudo = _convenio_do_laudo(session, laudo)
-        if not _conv_ok(convenio_do_laudo, lote.convenio_id, is_particular):
+        if convenio_do_laudo is None or convenio_do_laudo != lote.convenio_id:
             raise ConvenioNaoConfereComLaudo(
                 f"Convênio do laudo {dto.laudo_id} não confere com o convênio do lote"
             )
@@ -167,12 +164,12 @@ def listar_lotes(session: Session) -> list[LoteFaturamentoRead]:
     return [LoteFaturamentoRead.model_validate(l) for l in repository.listar_lotes(session)]
 
 
-def contar_laudos_pendentes(session: Session, convenio_id: UUID, incluir_sem_convenio: bool = False) -> int:
-    return repository.contar_laudos_pendentes_por_convenio(session, convenio_id, incluir_sem_convenio)
+def contar_laudos_pendentes(session: Session, convenio_id: UUID) -> int:
+    return repository.contar_laudos_pendentes_por_convenio(session, convenio_id)
 
 
-def listar_laudos_pendentes_por_convenio(session: Session, convenio_id: UUID, incluir_sem_convenio: bool = False) -> list[dict]:
-    return repository.listar_laudos_liberados_por_convenio(session, convenio_id, incluir_sem_convenio)
+def listar_laudos_pendentes_por_convenio(session: Session, convenio_id: UUID) -> list[dict]:
+    return repository.listar_laudos_liberados_por_convenio(session, convenio_id)
 
 
 def _convenio_do_laudo(session: Session, laudo: Laudo) -> UUID | None:
@@ -209,16 +206,3 @@ def _gerar_codigo_lote(session: Session) -> str:
 
 def _gerar_codigo_tiss(session: Session) -> str:
     return f"TISS-{uuid.uuid4().hex[:12].upper()}"
-
-
-def _lote_is_particular(session: Session, lote: LoteFaturamento) -> bool:
-    c = convenio_repository.obter_por_id(session, lote.convenio_id)
-    if c is None:
-        return False
-    return (c.registro_ans or "") == "000000"
-
-
-def _conv_ok(convenio_do_laudo: UUID | None, lote_convenio_id: UUID, is_particular: bool) -> bool:
-    if convenio_do_laudo is None:
-        return is_particular
-    return convenio_do_laudo == lote_convenio_id
