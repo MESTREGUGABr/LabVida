@@ -7,7 +7,7 @@ from src.atendimento.ordem_servico.models import OsItem
 from src.laboratorial.dtos import LaudoCreate, LaudoUpdate
 from src.laboratorial.models import StatusLaudo, StatusResultado
 from src.laboratorial.service import LaboratorialService
-from src.usuario.service import listar_usuarios
+from src.cadastro.medico.service import listar_medicos_ativos
 
 st.set_page_config(page_title="Emissão de Laudos", page_icon="📝", layout="wide")
 
@@ -68,10 +68,17 @@ with session_scope() as session:
                     st.success(f"Laudo liberado em {laudo.liberado_em.strftime('%d/%m/%Y %H:%M')}")
                     st.write(f"**Assinatura Digital:** {laudo.assinatura_digital or 'Sem assinatura'}")
                 else:
-                    usuarios = listar_usuarios(session)
-                    user_opts = {u.nome: u.id for u in usuarios}
+                    medicos = [medico for medico in listar_medicos_ativos(session) if medico.responsavel_tecnico]
+                    medico_opts = {
+                        f"{medico.nome} · CRM {medico.crm}/{medico.uf_crm}": medico.id
+                        for medico in medicos
+                    }
+
+                    if not medico_opts:
+                        st.warning("Nenhum médico responsável técnico ativo está cadastrado.")
+                        st.stop()
                     
-                    responsavel = st.selectbox("Responsável Técnico (Biomédico/Médico)", options=list(user_opts.keys()))
+                    responsavel = st.selectbox("Responsável Técnico", options=list(medico_opts.keys()))
                     assinatura = st.text_input("Assinatura Digital (Hash/Chave)")
                     
                     if st.button("Salvar e LIBERAR Laudo", type="primary"):
@@ -80,7 +87,7 @@ with session_scope() as session:
                             service.atualizar_laudo(
                                 laudo.id, 
                                 LaudoUpdate(
-                                    responsavel_tecnico_id=user_opts[responsavel],
+                                    responsavel_tecnico_id=medico_opts[responsavel],
                                     assinatura_digital=assinatura if assinatura else None
                                 )
                             )
