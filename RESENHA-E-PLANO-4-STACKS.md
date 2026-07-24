@@ -4,8 +4,8 @@
 > depois **como já está**, depois **como a gente desenvolve** e, no fim, **a divisão das 4 trilhas
 > (stacks)** com dono, escopo e itens a fazer. Pode copiar e mandar no grupo.
 >
-> **Última atualização:** 2026-06-30 — **Stack A concluída** (cadastros completos + atendimento/coleta com
-> a OS como espinha) sobre a fundação de dados. 47 testes verdes. Ver §4 (estado atual) e §10 (changelog).
+> **Última atualização:** 2026-07-24 — **Stacks A e B concluídas** (cadastros, atendimento/coleta,
+> logística e laboratorial). 71 testes verdes. Ver §4 (estado atual) e §10 (changelog).
 >
 > Fontes vivas no repo: `README.md` (visão + como rodar), `CONTEXT.md` (glossário de domínio),
 > `docs/Entrega 1/Entrega-01-Complemento-Arquitetura-Tecnica.md` (camadas/arquitetura técnica),
@@ -25,14 +25,13 @@
   camadas Controller → Service → Repository, auditoria *append-only*, rastreabilidade clínica (cadeia de
   custódia), RBAC e separação operacional/analítica (OLTP/OLAP). Isso dá **consistência e
   rastreabilidade ponta a ponta** num protótipo acadêmico.
-- **Onde está:** **fundação + Stack A inteira no ar.** Login Google (Auth0/PKCE), infra Docker + Alembic +
-  pytest, **modelagem completa no papel** (Entregas 02 e 03), **fundação de dados** (`src/db.py`) e a
-  **Stack A completa**: cadastros (paciente, médico, convênio, procedimento + valor, unidade + setor) e
-  **atendimento/coleta** com a **Ordem de Serviço como entidade-espinha** (abertura com validações, itens,
-  autorização de convênio, registro de coleta gerando amostra/cadeia de custódia e transição de status).
-  Tudo em fatias verticais (migration → model → repository → service → DTO/validação → tela → testes), com
-  **47 testes verdes**. Falta implementar as Stacks **B** (logística/laboratorial), **C** (faturamento/
-  financeiro/compras) e o transversal pleno da **D** (RBAC/auditoria/BI).
+- **Onde está:** **fundação + Stacks A e B funcionais.** Login Google (Auth0/PKCE), infra Docker + Alembic
+  + pytest, **modelagem completa no papel** (Entregas 02 e 03), **fundação de dados** (`src/db.py`), a
+  **Stack A completa** (cadastros, atendimento/coleta e OS) e a **Stack B completa** (malotes, cadeia de
+  custódia, recebimento, equipamentos, valores de referência, resultados e laudos). Tudo em fatias
+  verticais (migration → model → repository → service → DTO/validação → tela → testes), com **71 testes
+  verdes**. Falta implementar a Stack **C** (faturamento/financeiro/compras) e o transversal pleno da
+  **D** (RBAC/auditoria/BI).
 - **Contexto:** projeto da disciplina **Sistemas de Informação e Tecnologias (SIT)** — Ciência da
   Computação, **UFAPE** (Garanhuns-PE, 2026). Equipe de 4.
 - **O plano:** evoluir o produto dividindo o trabalho em **4 stacks verticais** (cada pessoa dona de um
@@ -98,7 +97,9 @@ e é o que as stacks devem **preservar** ao implementar:
   (associar cada ação a uma identidade). Ligar perfil→permissão é item de backlog (Stack D).
 - **Eventos/impactos automáticos:** a Entrega 03 descreve o barramento de eventos; na implementação
   atual eles serão **transições de estado em service + persistência** (não há fila/mensageria no protótipo).
-- **ETL/BI, criptografia LGPD, integrações TISS/equipamentos:** desenhados, ainda não implementados.
+- **ETL/BI, criptografia LGPD e integrações externas TISS/HL7/ASTM:** desenhados, ainda não implementados.
+  Equipamentos e protocolos existem no domínio laboratorial, mas a integração real com analisadores está
+  fora do escopo do protótipo.
 
 ---
 
@@ -186,7 +187,8 @@ Regra de ouro: **transacional → uma transação no banco (service)**; **analí
 
 ## 4. Estado atual — o que JÁ está pronto
 
-**Fundação concretizada + 1ª fatia vertical (Cadastro de Pacientes) no ar; os outros 7 módulos a construir.**
+**Fundação concretizada + Stacks A e B implementadas. Permanecem as Stacks C e D e algumas melhorias de
+segurança, integração e operação.**
 
 ### 4.1 Já funciona (código)
 
@@ -201,17 +203,20 @@ Regra de ouro: **transacional → uma transação no banco (service)**; **analí
 | **Atendimento / OS** ⭐⭐ | **abertura da Ordem de Serviço** (espinha): `codigo_os` único, itens, validação de paciente/unidade/médico/convênio ativo e valor; `os_status_historico`; autorização de convênio | `src/atendimento/ordem_servico/*`, `src/atendimento/autorizacao/*`, `pages/atendimento_os.py` |
 | **Coleta / cadeia de custódia** ⭐⭐ | registro de coleta gera **amostra** (código de barras, status COLETADA) + vincula coletor + transiciona a OS — tudo numa transação | `src/atendimento/amostra/*`, `pages/atendimento_coleta.py` |
 | **`usuario` mínima** ⭐⭐ | identidade do Auth0 sincronizada em `usuarios` no login (ator de coleta/histórico) — base enxuta que a Stack D estende | `src/usuario/*`, `app.py` |
+| **Logística / cadeia de custódia** ⭐⭐⭐ | malote, associação de amostras, despacho, movimentações `COLETADA → EM_TRANSITO → RECEBIDA/REJEITADA`, protocolo de recebimento e transição da OS para `EM_ANALISE` | `src/logistica/*`, `pages/logistica_*.py` |
+| **Laboratorial** ⭐⭐⭐ | cadastro de equipamentos e valores de referência; registro/auditoria de resultados; criação e liberação de laudos | `src/laboratorial/*`, `pages/laboratorio_*.py` |
 | **Migration `0004`** ⭐⭐ | 13 tabelas da Stack A encadeadas na head `0003` (CHECK de domínios de status, FKs, índices únicos) | `alembic/versions/0004_*.py` |
+| **Migration Stack B** ⭐⭐⭐ | tabelas de logística e laboratorial encadeadas após Stack A | `alembic/versions/0005_stack_b_logistica.py`, `alembic/versions/f6ccac7706b1_add_laboratorial_models.py` |
 | **Seeder de cadastros** ⭐⭐ | popula unidades/convênios/procedimentos+valores/médicos (insere se vazio) p/ abrir OS na demo | `src/seeder/cadastros.py` |
 | **Guarda de sessão** ⭐⭐ | helper `exigir_login()` reutilizado pelas telas novas (provisório até o shell da Stack D) | `src/ui.py` |
 | **1ª migration** ⭐ | cria tabela `pacientes` (PK `uuid`, CPF `unique`, enum `sexo_paciente`, flag `ativo`) | `alembic/versions/0003_*.py` |
 | **Seeder de pacientes** ⭐ | popula Pacientes de exemplo com **Faker** (CPF válido, telefone, sexo) — `make seeder` | `src/seeder/*` |
 | **Infra Docker** | `docker-compose` (app + Postgres 16 + serviços de teste), `Dockerfile` (Python 3.12-slim, não-root) | `docker-compose.yml`, `Dockerfile` |
 | **Migrations** | Alembic configurado, **autogenerate ligado** (`env.py` lê `Base.metadata`); aplica no boot | `alembic/`, `alembic.ini` |
-| **Testes** | pytest: `AppTest` (login/home) + **dtos/validators (unit)** + **service (integração via Postgres de teste)** | `tests/`, `tests/cadastro/*` |
+| **Testes** | pytest: `AppTest` (login/home) + DTOs/validators (unit) + services (integração via Postgres de teste), incluindo o fluxo ponta a ponta de logística | `tests/`, `tests/cadastro/*`, `tests/atendimento/*`, `tests/logistica/*` |
 | **Automação** | `Makefile` (`up/down/test/migrate/revision/seeder/clean`) | `Makefile` |
 
-> ⭐ = entregue na leva da fundação + Cadastro de Pacientes. ⭐⭐ = entregue agora, na **Stack A completa**.
+> ⭐ = fundação/Cadastro de Pacientes. ⭐⭐ = Stack A. ⭐⭐⭐ = Stack B.
 
 ### 4.2 Já modelado (papel — base para implementar)
 
@@ -221,13 +226,13 @@ Regra de ouro: **transacional → uma transação no banco (service)**; **analí
   cenário integrado demonstrativo, indicadores gerenciais.
 - **Arquitetura técnica** (Entrega 01 — complemento): camadas, módulo *core* (ciclo da OS), hierarquia
   arquitetural (operacional/analítica/estratégica/compartilhada).
-- **Glossário de domínio** (`CONTEXT.md`) e **2 ADRs** (stack; autenticação/RBAC mínimo).
+- **Glossário de domínio** (`CONTEXT.md`) e **3 ADRs** (stack; autenticação/RBAC mínimo; granularidade de
+  analitos laboratoriais).
 
 ### 4.3 Ainda NÃO existe (é o trabalho das stacks)
 
-- **Stack B — Logística & Laboratorial:** malote, `amostra_movimentacao` (cadeia de custódia completa),
-  `protocolo_recebimento`, equipamento, resultado, **laudo** e `resultado_auditoria`. A coleta da Stack A
-  já deixa a amostra em `COLETADA` como **ponto de integração** para a Stack B abrir a pendência logística.
+- **Stack B — Logística & Laboratorial:** implementada. A coleta da Stack A deixa a amostra em `COLETADA`,
+  e o fluxo segue por malote, recebimento, processamento laboratorial, resultado e laudo.
 - **Stack C — Faturamento, Financeiro & Compras:** nada implementado.
 - **RBAC efetivo + auditoria (Stack D):** existe `usuario` **mínima** (e-mail/nome do Auth0), mas **sem
   perfil/permissão** (RBAC ainda **plano**) e **sem `auditoria_log`**. A guarda de sessão é o helper
@@ -236,8 +241,8 @@ Regra de ouro: **transacional → uma transação no banco (service)**; **analí
   no §3.2 continua pendente (decisão de adiar para a Stack D — ver risco em §8).
 - **BI/ETL** e **deploy**.
 
-> Em uma frase: **a fundação está no chão e a primeira ala completa (Stack A: cadastros + atendimento/
-> coleta com a OS) está de pé e testada. Faltam as alas B e C e o acabamento transversal da D.**
+> Em uma frase: **as alas A e B estão de pé e testadas. Faltam a ala C (ciclo econômico), o acabamento
+> transversal da D e o hardening das integrações e da segurança.**
 
 ---
 
@@ -321,7 +326,7 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
   *soft-delete*; CPF validado por dígito verificador e único; tela + service + repository + DTO + seeder +
   testes) — é o **template vertical** que o resto da stack replica. Restante modelado na Entrega 02
   (§5.1, §5.2) e Entrega 03.
-- **Itens a desenvolver:** **✅ Stack A concluída (47 testes verdes).**
+- **Itens concluídos:** **✅ Stack A concluída (47 testes da própria stack).**
   - ✅ **Paciente** — migration + CRUD + validação + seeder + testes (`src/cadastro/`).
   - ✅ **Demais cadastros**: médico (flag responsável técnico, CRM+UF único), convênio (`status`),
     procedimento (`codigo_tuss` único) + `procedimento_valor` por convênio, unidade (CENTRAL/COLETA) + setor.
@@ -346,15 +351,17 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
 - **Pastas/arquivos:** `pages/logistica*`, `pages/laboratorio*` · `src/models/{malote,malote_amostra,
   amostra_movimentacao,protocolo_recebimento,equipamento,resultado,laudo,resultado_auditoria}` ·
   repositories/services · migrations das tabelas 5.3 e 5.4.
-- **Já existe:** **nada implementado** — modelado na Entrega 02 (§5.3, §5.4) e Entrega 03 (processamento
-  operacional e técnico).
-- **Itens a desenvolver:**
+- **Já existe:** ✅ implementada nos commits `a51a75d` (logística) e `d4acede`/`09a289b` (laboratorial),
+  com ajustes posteriores de migration, UI e relacionamentos.
+- **Itens concluídos:**
   - ✅ **Malote + movimentação de amostra** (`COLETADA → EM_TRANSITO → RECEBIDA`) = cadeia de custódia; `protocolo_recebimento` com conferência de integridade + transição da OS para `EM_ANALISE`.
-  - ✅ **Resultado** (registro/importação simulada) → `AGUARDANDO_REVISAO`; **liberação de laudo** apenas por responsável técnico (gate por perfil) + `resultado_auditoria` **append-only**.
-  - ✅ **Valor de referência** para validar resultado fora da faixa.
-  - ✅ Tela de "esteira" da bancada (fila de amostras recebidas a processar).
-- **Dependências:** recebe amostras da Stack A; ao liberar laudo, **destrava o faturável** da Stack C;
-  consome perfil "responsável técnico" do RBAC (Stack D).
+  - ✅ **Resultado** (registro/importação simulada) → `AGUARDANDO_REVISAO`; liberação de laudo com exigência de responsável técnico e `resultado_auditoria` append-only.
+  - ✅ **Cadastro de valores de referência** para os analitos.
+  - ✅ Telas de logística, cadastros laboratoriais, resultados e laudos.
+- **Melhorias pendentes:** validação de vínculo do responsável técnico com cadastro de médico/RBAC, testes
+  específicos do service laboratorial e uma esteira operacional mais completa para a bancada.
+- **Dependências:** recebe amostras da Stack A; o laudo liberado é o ponto de integração com a Stack C;
+  a autorização por perfil ainda será consolidada pela Stack D.
 
 ### 🟧 Stack C — Faturamento, Financeiro & Compras
 **Dono sugerido:** Victor
@@ -366,6 +373,8 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
   fornecedor,pedido_compra,recebimento_insumo,insumo_material,estoque_movimento}` · migrations 5.5–5.7.
 - **Já existe:** **nada implementado** — modelado na Entrega 02 (§5.5–5.7) e Entrega 03 (cobrança e
   controle econômico).
+- **Situação da equipe:** em implementação por outro membro; os arquivos ainda não estão presentes neste
+  checkout.
 - **Itens a desenvolver:**
   - 🔴 **Faturamento:** montar `guia_item` **só a partir de laudo liberado**, agrupar em `lote_faturamento`,
     fechar lote → **gerar `titulo_receber`** (transação atômica).
@@ -387,6 +396,8 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
   pytest. ✅ **`src/db.py`** (engine/sessão/`Base`/`session_scope`) e a **1ª migration** já no ar; a
   **convenção repository/service** está firmada pelo pacote `src/cadastro/`. RBAC e BI **modelados**
   (Entrega 02 §5.8 e §9), ainda não implementados.
+- **Situação da equipe:** Stack 4 em implementação por outro membro; os arquivos de RBAC, auditoria e BI
+  ainda não estão presentes neste checkout.
 - **Itens a desenvolver:**
   - ✅ **Fundação de dados:** `src/db.py` + 1ª migration + convenção de pacote vertical (herdada por A/B/C).
   - 🔴 **`usuario` + auditoria:** ligar a identidade do Auth0 a uma tabela `usuario`; `auditoria_log`
@@ -421,25 +432,26 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
 - Fundação de dados: `src/db.py` + migration base + convenção de pacote vertical — **Stack D**.
 - **Stack A inteira**: cadastros (paciente/médico/convênio/procedimento+valor/unidade+setor), **abertura de
   OS** (espinha, com validações e histórico), **autorização de convênio** e **coleta** (amostra + cadeia de
-  custódia inicial + transição da OS). `usuario` **mínima** sincronizada do Auth0. 47 testes — **Stack A**.
+  custódia inicial + transição da OS). `usuario` **mínima** sincronizada do Auth0. 47 testes da stack — **Stack A**.
+- **Stack B inteira**: logística (malote, movimentação, recebimento e transição da OS) e laboratorial
+  (equipamentos, valores de referência, resultados, auditoria de resultados e laudos). 71 testes no total.
 
 **🔴 Alta (destrava todo o resto)**
 - `usuario` completo (perfil) + `auditoria_log` append-only ligados ao login Auth0 — **Stack D**.
-- **Logística**: malote + `amostra_movimentacao` (recebe a amostra `COLETADA` da Stack A) — **Stack B**.
-- **Liberação de laudo** (gate responsável técnico) + auditoria de resultado — **Stack B**.
 - **Faturamento**: laudo liberado → guia/lote → título a receber — **Stack C**.
 
 **🟡 Média**
 - RBAC efetivo (perfil→permissão) sucedendo o acesso plano — **Stack D**.
 - Glosa + conciliação faturado×recebido — **Stack C**.
 - Compras: pedido→título a pagar; recebimento→estoque — **Stack C**.
-- Valor de referência / validação de resultado — **Stack B**.
+- **Hardening laboratorial:** validação de responsável técnico/RBAC, validação do ciclo da amostra e testes
+  de service — **Stack B**.
 - BI (esquema estrela + ETL simples + primeiros dashboards) — **Stack D**.
 - Criptografia LGPD + anonimização no BI — **Stack D**.
 
 **🟢 Baixa / oportunístico**
 - Autorização de convênio detalhada; busca/paginação de OS e pacientes — **Stack A**.
-- Esteira de bancada; fluxo de caixa consolidado — **Stack B/C**.
+- Esteira de bancada completa; fluxo de caixa consolidado — **Stack B/C**.
 - Deploy + hardening de produção — **Stack D**.
 
 ---
@@ -449,8 +461,7 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
 - ✅ **Banco com schema inicial:** a 1ª migration (`pacientes`) já existe e aplica — o bloqueio de
   "banco vazio" da versão anterior **caiu**. A fundação (`db.py` + convenção) está disponível para A/B/C.
 - ✅ **Cadeia de migrations linear:** `0003` (base, pacientes) → `0004_stack_a_atendimento` (13 tabelas da
-  Stack A). A head atual é **`0004_stack_a_atendimento`** — a **próxima** migration (Stack B/C/D) deve
-  apontar `down_revision = "0004_stack_a_atendimento"`.
+  Stack A) → `0005_stack_b_logistica` → `f6ccac7706b1` (laboratorial). A head atual é **`f6ccac7706b1`**.
 - ⚠️ **Ordem das migrations:** com várias pessoas gerando migration na `main`, **combinar a head antes** —
   heads paralelas no Alembic dão dor de cabeça pra mesclar.
 - ℹ️ **`usuario` mínima invadiu a Stack D (combinado):** a Stack A criou `usuarios` (e-mail/nome do Auth0)
@@ -486,16 +497,24 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
 
 ---
 
-> **Próximo passo sugerido:** com a **Stack A pronta** (cadastros + OS + coleta), o caminho crítico agora é a
-> **Stack B**: receber a amostra `COLETADA` (malote + `amostra_movimentacao` + `protocolo_recebimento`),
-> registrar resultado e **liberar laudo** (gate de responsável técnico) — o que destrava a **Stack C**
-> (faturamento). Em paralelo, a **Stack D** estende a `usuario` mínima (perfil/RBAC), adiciona o
-> `auditoria_log` e decide a **cripto do CPF (LGPD)**. Toda nova migration parte de
-> `down_revision = "0004_stack_a_atendimento"`.
+> **Próximo passo sugerido:** as Stacks A e B estão implementadas. O caminho crítico de produto é a Stack C,
+> que transforma laudo liberado em faturamento e títulos financeiros. Em paralelo, a Stack D deve assumir
+> RBAC efetivo, auditoria operacional, navegação, BI e LGPD. Melhorias independentes disponíveis na Stack B
+> incluem a esteira de bancada, o gate real de responsável técnico e testes do service laboratorial. A head
+> atual do Alembic é `f6ccac7706b1`; qualquer nova migration deve partir dela.
 
 ---
 
 ## 10. Changelog da resenha
+
+- **2026-07-24** — Atualização para refletir o estado real do repositório: Stack B marcada como concluída,
+  incluídos logística e laboratorial no estado atual, head do Alembic atualizada para `f6ccac7706b1`,
+  total de testes atualizado para 71 e backlog reorganizado. A versão anterior afirmava incorretamente
+  que a Stack B ainda não existia.
+- **2026-07-21** — Implementada a logística da Stack B: malote, associação de amostras, cadeia de custódia,
+  recebimento central e transição da OS para `EM_ANALISE` (`a51a75d`). Implementado o módulo laboratorial:
+  equipamentos, valores de referência, resultados, auditoria e laudos (`d4acede`, `09a289b`), com correções
+  de migration e UI posteriores.
 
 - **2026-06-30 (2)** — **Stack A concluída.** Cadastros completos (médico/convênio/procedimento+valor/
   unidade+setor) e **atendimento/coleta** com a **OS como entidade-espinha**: abertura com validações
