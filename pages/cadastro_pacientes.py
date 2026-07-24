@@ -15,6 +15,8 @@ from src.cadastro.service import (
 )
 from src.db import session_scope
 
+DATA_MINIMA_DATE_INPUT = date(1000, 1, 1)
+
 
 def main() -> None:
     st.set_page_config(page_title="LabVida - Cadastro de Pacientes")
@@ -52,6 +54,7 @@ def _render_cadastro() -> None:
         data_nascimento = st.date_input(
             "Data de nascimento",
             value=None,
+            min_value=DATA_MINIMA_DATE_INPUT,
             max_value=date.today(),
             format="DD/MM/YYYY",
         )
@@ -152,6 +155,7 @@ def _render_form_edicao(paciente: PacienteRead) -> None:
         data_nascimento = st.date_input(
             "Data de nascimento",
             value=paciente.data_nascimento,
+            min_value=DATA_MINIMA_DATE_INPUT,
             max_value=date.today(),
             format="DD/MM/YYYY",
         )

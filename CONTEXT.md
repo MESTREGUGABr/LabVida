@@ -17,8 +17,12 @@ Entidade central do fluxo operacional; representa o atendimento de um paciente e
 _Evitar_: pedido, atendimento, ordem.
 
 **Paciente**:
-Pessoa atendida pelo laboratorio e vinculada a uma ou mais Ordens de Servico.
+Pessoa de qualquer idade atendida pelo laboratorio e vinculada a uma ou mais Ordens de Servico.
 _Evitar_: cliente, usuario.
+
+**Data de Nascimento do Paciente**:
+Data civil em que o Paciente nasceu; pode ser a data atual, mas nunca uma data futura.
+_Evitar_: idade, aniversario.
 
 **CPF do Paciente**:
 Identificador civil usado pelo laboratorio para reconhecer um paciente de forma unica no Cadastro.
