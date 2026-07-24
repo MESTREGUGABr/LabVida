@@ -180,7 +180,10 @@ class LaboratorialService:
             os_item_id=dto.os_item_id,
             responsavel_tecnico_id=dto.responsavel_tecnico_id,
         )
-        return self.repository.save_laudo(laudo)
+        laudo = self.repository.save_laudo(laudo)
+        self.repository.session.commit()
+        self.repository.session.refresh(laudo)
+        return laudo
 
     def atualizar_laudo(self, laudo_id: UUID, dto: LaudoUpdate) -> Laudo:
         laudo = self.repository.get_laudo(laudo_id)
@@ -201,7 +204,10 @@ class LaboratorialService:
             laudo.status = StatusLaudo.LIBERADO
             laudo.liberado_em = datetime.now(timezone.utc)
             
-        return self.repository.save_laudo(laudo)
+        laudo = self.repository.save_laudo(laudo)
+        self.repository.session.commit()
+        self.repository.session.refresh(laudo)
+        return laudo
 
     def obter_laudo_por_os_item(self, os_item_id: UUID) -> Laudo | None:
         return self.repository.get_laudo_by_os_item(os_item_id)

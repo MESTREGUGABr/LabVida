@@ -7,6 +7,11 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db import Base
+from src.atendimento.ordem_servico import models as ordem_servico_models  # noqa: F401
+from src.cadastro.medico import models as medico_models  # noqa: F401
+from src.cadastro.procedimento import models as procedimento_models  # noqa: F401
+from src.cadastro.unidade import models as unidade_models  # noqa: F401
+from src.usuario import models as usuario_models  # noqa: F401
 
 
 class StatusResultado(str, enum.Enum):

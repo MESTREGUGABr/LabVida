@@ -5,7 +5,7 @@
 > (stacks)** com dono, escopo e itens a fazer. Pode copiar e mandar no grupo.
 >
 > **Última atualização:** 2026-07-24 — **Stacks A e B concluídas** (cadastros, atendimento/coleta,
-> logística e laboratorial). 71 testes verdes. Ver §4 (estado atual) e §10 (changelog).
+> logística e laboratorial). 72 testes verdes. Ver §4 (estado atual) e §10 (changelog).
 >
 > Fontes vivas no repo: `README.md` (visão + como rodar), `CONTEXT.md` (glossário de domínio),
 > `docs/Entrega 1/Entrega-01-Complemento-Arquitetura-Tecnica.md` (camadas/arquitetura técnica),
@@ -434,7 +434,7 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
   OS** (espinha, com validações e histórico), **autorização de convênio** e **coleta** (amostra + cadeia de
   custódia inicial + transição da OS). `usuario` **mínima** sincronizada do Auth0. 47 testes da stack — **Stack A**.
 - **Stack B inteira**: logística (malote, movimentação, recebimento e transição da OS) e laboratorial
-  (equipamentos, valores de referência, resultados, auditoria de resultados e laudos). 71 testes no total.
+  (equipamentos, valores de referência, resultados, auditoria de resultados e laudos). 72 testes no total.
 
 **🔴 Alta (destrava todo o resto)**
 - `usuario` completo (perfil) + `auditoria_log` append-only ligados ao login Auth0 — **Stack D**.
@@ -509,7 +509,7 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
 
 - **2026-07-24** — Atualização para refletir o estado real do repositório: Stack B marcada como concluída,
   incluídos logística e laboratorial no estado atual, head do Alembic atualizada para `f6ccac7706b1`,
-  total de testes atualizado para 71 e backlog reorganizado. A versão anterior afirmava incorretamente
+  total de testes atualizado para 72 e backlog reorganizado. A versão anterior afirmava incorretamente
   que a Stack B ainda não existia.
 - **2026-07-21** — Implementada a logística da Stack B: malote, associação de amostras, cadeia de custódia,
   recebimento central e transição da OS para `EM_ANALISE` (`a51a75d`). Implementado o módulo laboratorial:
