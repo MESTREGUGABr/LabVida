@@ -1,8 +1,35 @@
+from collections.abc import Iterator
+from datetime import date
 from pathlib import Path
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
 PROJECT_ROOT = Path(__file__).parent.parent
+
+
+@pytest.fixture()
+def paciente_ativo() -> Iterator[None]:
+    from src.cadastro.dtos import PacienteCreate
+    from src.cadastro.models import Paciente
+    from src.cadastro.service import criar_paciente
+    from src.db import session_scope
+
+    with session_scope() as session:
+        session.query(Paciente).delete()
+        session.commit()
+        criar_paciente(
+            session,
+            PacienteCreate(
+                cpf="52998224725",
+                nome="Ana Maria",
+                data_nascimento=date(1996, 7, 18),
+                telefone="87999991234",
+            ),
+        )
+        yield
+        session.query(Paciente).delete()
+        session.commit()
 
 
 def test_login_page_renders(monkeypatch) -> None:
@@ -35,6 +62,22 @@ def test_cadastro_pacientes_redirects_when_not_logged_in(monkeypatch) -> None:
     app.run()
 
     assert not app.exception
+
+
+def test_cadastro_pacientes_substitui_janela_padrao_por_limite_tecnico() -> None:
+    app = AppTest.from_file(str(PROJECT_ROOT / "pages" / "cadastro_pacientes.py"))
+    app.session_state["user"] = {"sub": "test-user"}
+    app.run()
+
+    assert app.date_input[0].min == date(1000, 1, 1)
+
+
+def test_edicao_paciente_substitui_janela_padrao_por_limite_tecnico(paciente_ativo) -> None:
+    app = AppTest.from_file(str(PROJECT_ROOT / "pages" / "cadastro_pacientes.py"))
+    app.session_state["user"] = {"sub": "test-user"}
+    app.run()
+
+    assert app.date_input[1].min == date(1000, 1, 1)
 
 
 def test_cadastro_convenios_redirects_when_not_logged_in(monkeypatch) -> None:

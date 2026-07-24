@@ -20,12 +20,23 @@ def test_paciente_create_normaliza_dados_e_define_sexo_nao_informado() -> None:
     assert dto.sexo == SexoPaciente.NAO_INFORMADO
 
 
-def test_paciente_create_rejeita_data_nascimento_futura_ou_hoje() -> None:
-    with pytest.raises(ValidationError, match="Data de nascimento deve ser anterior à data atual"):
+def test_paciente_create_aceita_data_nascimento_hoje() -> None:
+    dto = PacienteCreate(
+        cpf="52998224725",
+        nome="Ana Maria",
+        data_nascimento=date.today(),
+        telefone="87999991234",
+    )
+
+    assert dto.data_nascimento == date.today()
+
+
+def test_paciente_create_rejeita_data_nascimento_futura() -> None:
+    with pytest.raises(ValidationError, match="Data de nascimento não pode ser futura"):
         PacienteCreate(
             cpf="52998224725",
             nome="Ana Maria",
-            data_nascimento=date.today(),
+            data_nascimento=date.today() + timedelta(days=1),
             telefone="87999991234",
         )
 
@@ -35,6 +46,17 @@ def test_paciente_update_parcial_normaliza_campos_enviados() -> None:
 
     assert dto.nome == "Ana Maria"
     assert dto.cpf is None
+
+
+def test_paciente_update_aceita_data_nascimento_hoje() -> None:
+    dto = PacienteUpdate(data_nascimento=date.today())
+
+    assert dto.data_nascimento == date.today()
+
+
+def test_paciente_update_rejeita_data_nascimento_futura() -> None:
+    with pytest.raises(ValidationError, match="Data de nascimento não pode ser futura"):
+        PacienteUpdate(data_nascimento=date.today() + timedelta(days=1))
 
 
 def test_paciente_update_rejeita_payload_vazio() -> None:

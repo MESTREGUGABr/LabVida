@@ -14,6 +14,12 @@ from src.cadastro.validators import (
 )
 
 
+def _validar_data_nascimento(data_nascimento: date) -> date:
+    if data_nascimento > date.today():
+        raise ValueError("Data de nascimento não pode ser futura")
+    return data_nascimento
+
+
 class SexoPaciente(StrEnum):
     MASCULINO = "MASCULINO"
     FEMININO = "FEMININO"
@@ -45,9 +51,7 @@ class PacienteCreate(BaseModel):
     @field_validator("data_nascimento")
     @classmethod
     def _validar_data_nascimento(cls, data_nascimento: date) -> date:
-        if data_nascimento >= date.today():
-            raise ValueError("Data de nascimento deve ser anterior à data atual")
-        return data_nascimento
+        return _validar_data_nascimento(data_nascimento)
 
 
 class PacienteUpdate(BaseModel):
@@ -75,9 +79,7 @@ class PacienteUpdate(BaseModel):
     @field_validator("data_nascimento")
     @classmethod
     def _validar_data_nascimento(cls, data_nascimento: date | None) -> date | None:
-        if data_nascimento is not None and data_nascimento >= date.today():
-            raise ValueError("Data de nascimento deve ser anterior à data atual")
-        return data_nascimento
+        return _validar_data_nascimento(data_nascimento) if data_nascimento is not None else None
 
     @model_validator(mode="after")
     def _validar_nao_vazio(self) -> "PacienteUpdate":
