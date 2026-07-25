@@ -8,15 +8,20 @@ from src.compras.fornecedor.service import criar_fornecedor
 from src.compras.insumo import repository as insumo_repository
 from src.compras.insumo.dtos import InsumoCreate
 from src.compras.insumo.service import criar_insumo
+from src.compras.pedido_compra import repository as pedido_repository
+from src.compras.pedido_compra.dtos import PedidoItemCreate, SolicitacaoCreate
+from src.compras.pedido_compra.service import aprovar_pedido, criar_solicitacao, receber_pedido
 from src.db import session_scope
+from src.usuario.repository import obter_por_email as obter_usuario
 
 
 def executar_seeder_compras() -> dict[str, int]:
-    contagem = {"fornecedores": 0, "insumos": 0}
+    contagem = {"fornecedores": 0, "insumos": 0, "pedidos": 0}
 
     with session_scope() as session:
         contagem["fornecedores"] = _seed_fornecedores(session)
         contagem["insumos"] = _seed_insumos(session)
+        contagem["pedidos"] = _seed_pedidos(session)
 
     return contagem
 
@@ -32,6 +37,7 @@ def _seed_fornecedores(session: Session) -> int:
     ]
     for dto in dados:
         criar_fornecedor(session, dto)
+    session.flush()
     return len(dados)
 
 
@@ -48,7 +54,57 @@ def _seed_insumos(session: Session) -> int:
     ]
     for dto in dados:
         criar_insumo(session, dto)
+    session.flush()
     return len(dados)
+
+
+def _seed_pedidos(session: Session) -> int:
+    existentes = pedido_repository.listar_pedidos(session)
+    if existentes:
+        return 0
+
+    fornecedores = fornecedor_repository.listar_ativos(session)
+    insumos = insumo_repository.listar_insumos(session)
+    if len(fornecedores) < 1 or len(insumos) < 2:
+        return 0
+
+    usuario = obter_usuario(session, "seeder@labvida.com.br")
+    if usuario is None:
+        usuario = obter_usuario(session, "coletor@labvida.test")
+    if usuario is None:
+        return 0
+
+    contagem = 0
+
+    pedido1 = criar_solicitacao(
+        session,
+        SolicitacaoCreate(
+            fornecedor_id=fornecedores[0].id,
+            itens=[
+                PedidoItemCreate(insumo_material_id=insumos[0].id, quantidade=10, valor_unitario=25.0),
+                PedidoItemCreate(insumo_material_id=insumos[1].id, quantidade=5, valor_unitario=80.0),
+            ],
+        ),
+        usuario.id,
+    )
+    aprovar_pedido(session, pedido1.id)
+    contagem += 1
+
+    pedido2 = criar_solicitacao(
+        session,
+        SolicitacaoCreate(
+            fornecedor_id=fornecedores[0].id,
+            itens=[
+                PedidoItemCreate(insumo_material_id=insumos[2].id, quantidade=100, valor_unitario=1.50),
+            ],
+        ),
+        usuario.id,
+    )
+    aprovar_pedido(session, pedido2.id)
+    receber_pedido(session, pedido2.id)
+    contagem += 1
+
+    return contagem
 
 
 def main() -> None:
