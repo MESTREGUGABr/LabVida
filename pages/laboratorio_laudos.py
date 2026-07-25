@@ -1,3 +1,5 @@
+import time
+
 import streamlit as st
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -58,9 +60,13 @@ with session_scope() as session:
             if not laudo:
                 st.info("Este exame ainda não tem Laudo. Clique abaixo para iniciar o Rascunho.")
                 if st.button("Criar Rascunho de Laudo", type="primary"):
-                    service.criar_laudo(LaudoCreate(os_item_id=item_selecionado.id))
-                    st.success("Laudo criado como Rascunho.")
-                    st.rerun()
+                    try:
+                        service.criar_laudo(LaudoCreate(os_item_id=item_selecionado.id))
+                        st.toast("Laudo criado como Rascunho.", icon="✅")
+                        time.sleep(2.5)
+                        st.rerun()
+                    except ValueError as e:
+                        st.error(str(e))
             else:
                 st.subheader(f"Status do Laudo: {laudo.status.value}")
                 
@@ -83,17 +89,16 @@ with session_scope() as session:
                     
                     if st.button("Salvar e LIBERAR Laudo", type="primary"):
                         try:
-                            # 1. Update with responsavel and assinatura
                             service.atualizar_laudo(
-                                laudo.id, 
+                                laudo.id,
                                 LaudoUpdate(
                                     responsavel_tecnico_id=medico_opts[responsavel],
-                                    assinatura_digital=assinatura if assinatura else None
+                                    assinatura_digital=assinatura if assinatura else None,
+                                    status=StatusLaudo.LIBERADO,
                                 )
                             )
-                            # 2. Update status to LIBERADO
-                            service.atualizar_laudo(laudo.id, LaudoUpdate(status=StatusLaudo.LIBERADO))
-                            st.success("Laudo LIBERADO com sucesso!")
+                            st.toast("Laudo LIBERADO com sucesso!", icon="✅")
+                            time.sleep(0.5)
                             st.rerun()
                         except ValueError as e:
                             st.error(str(e))

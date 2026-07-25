@@ -37,16 +37,47 @@ Cadastro → Atendimento e Coleta → Logistica de Amostras → Laboratorial →
 | **Compras** | Fornecedores, pedidos, recebimento de insumos, estoque |
 | **BI** | Dashboards e indicadores (read-only), alimentado por todos os modulos via ETL |
 
+## Status de implementacao
+
+| Modulo | Status |
+|---|---|
+| Cadastro | ✅ Concluido |
+| Atendimento e Coleta | ✅ Concluido |
+| Logistica de Amostras | ✅ Concluido |
+| Laboratorial | ✅ Concluido |
+| Faturamento | ✅ Concluido  |
+| Financeiro | ✅ Concluido  |
+| Compras | ✅ Concluido  |
+| BI | ⏳ Pendente |
+
 ## Estrutura do repositorio
 
 ```
 LabVida/
 ├── app.py                         → Tela de login (Google via Auth0)
 ├── pages/
-│   └── home.py                    → Home pos-login
+│   ├── home.py                    → Home pos-login
+│   ├── cadastro_*.py              → Cadastros (Pacientes, Convênios, Médicos, Procedimentos, Unidades)
+│   ├── atendimento_*.py           → Ordens de Serviço e Coleta
+│   ├── logistica_*.py             → Malotes e Recebimento
+│   ├── laboratorio_*.py           → Resultados e Laudos
+│   ├── faturamento_*.py           → Guias TISS e Glosas
+│   ├── financeiro_*.py            → Contas a Receber/Pagar e Fluxo de Caixa
+│   └── compras_*.py               → Fornecedores, Pedidos e Estoque
 ├── src/
-│   ├── __init__.py
-│   └── auth.py                    → Autenticacao OAuth 2.0 / OIDC com Auth0
+│   ├── auth.py                    → Autenticacao OAuth 2.0 / OIDC com Auth0
+│   ├── config.py                  → Carga de config (.env)
+│   ├── db.py                      → Engine SQLAlchemy + session_scope()
+│   ├── ui.py                      → Helpers Streamlit (exigir_login)
+│   ├── cadastro/                  → Pacientes, Convênios, Médicos, Procedimentos, Unidades
+│   ├── atendimento/               → Ordem de Serviço, Coleta e Amostra
+│   ├── logistica/                 → Malotes e Protocolo de Recebimento
+│   ├── laboratorial/              → Equipamentos, Resultados e Laudos
+│   ├── faturamento/               → Lotes de Faturamento, Guias TISS e Glosas
+│   ├── financeiro/                → Títulos a Receber/Pagar, Caixa e Conciliação
+│   ├── compras/                   → Fornecedores, Pedidos de Compra e Estoque
+│   ├── usuario/                   → Identidade do Auth0
+│   └── seeder/                    → Dados de exemplo (Faker)
 ├── alembic.ini                    → Configuracao do Alembic
 ├── alembic/                       → Migrations do banco
 ├── docker-compose.yml             → App, PostgreSQL e servicos de teste

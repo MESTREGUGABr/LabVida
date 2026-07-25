@@ -6,6 +6,7 @@ from sqlalchemy import DateTime, ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from src.cadastro.models import Paciente
 from src.cadastro.procedimento.models import Procedimento
 from src.db import Base
 

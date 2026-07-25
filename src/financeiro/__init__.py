@@ -1,0 +1,1 @@
+# Financeiro — Módulo Stack C

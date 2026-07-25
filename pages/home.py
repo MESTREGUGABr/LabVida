@@ -52,6 +52,19 @@ def main() -> None:
         icon=":material/science:",
     )
 
+    st.subheader("Faturamento")
+    st.page_link("pages/faturamento_guias.py", label="Faturamento de Guias TISS", icon=":material/receipt:")
+    st.page_link("pages/faturamento_glosas.py", label="Controle de Glosas", icon=":material/cancel:")
+
+    st.subheader("Financeiro")
+    st.page_link("pages/financeiro_contas.py", label="Contas a Receber e Pagar", icon=":material/payments:")
+    st.page_link("pages/financeiro_caixa.py", label="Fluxo de Caixa", icon=":material/account_balance:")
+
+    st.subheader("Compras")
+    st.page_link("pages/compras_fornecedores.py", label="Fornecedores", icon=":material/warehouse:")
+    st.page_link("pages/compras_pedidos.py", label="Pedidos de Compra", icon=":material/shopping_cart:")
+    st.page_link("pages/compras_estoque.py", label="Estoque", icon=":material/inventory_2:")
+
     st.divider()
 
     if st.button("Sair"):
