@@ -23,7 +23,7 @@ class StatusGuiaItem(StrEnum):
 
 
 class LoteFaturamentoCreate(BaseModel):
-    convenio_id: UUID
+    convenio_id: UUID | None = None
 
 
 class GuiaTissCreate(BaseModel):
@@ -65,7 +65,7 @@ class LoteFaturamentoRead(BaseModel):
 
     id: UUID
     codigo_lote: str
-    convenio_id: UUID
+    convenio_id: UUID | None = None
     status: StatusLote
     valor_total: float
     criado_em: datetime

@@ -33,9 +33,10 @@ def _agora() -> datetime:
 
 
 def criar_lote(session: Session, dto: LoteFaturamentoCreate) -> LoteFaturamentoRead:
-    convenio = convenio_repository.obter_por_id(session, dto.convenio_id)
-    if convenio is None or convenio.status != StatusConvenio.ATIVO:
-        raise ConvenioInvalidoParaLote("Convênio inválido ou inativo")
+    if dto.convenio_id is not None:
+        convenio = convenio_repository.obter_por_id(session, dto.convenio_id)
+        if convenio is None or convenio.status != StatusConvenio.ATIVO:
+            raise ConvenioInvalidoParaLote("Convênio inválido ou inativo")
 
     lote = LoteFaturamento(
         codigo_lote=_gerar_codigo_lote(session),
@@ -67,7 +68,7 @@ def adicionar_guia_item(session: Session, lote_id: UUID, dto: GuiaItemCreate) ->
         raise LaudoNaoLiberado("Apenas laudos com status LIBERADO podem ser faturados")
 
     convenio_do_laudo = _convenio_do_laudo(session, laudo)
-    if convenio_do_laudo is None or convenio_do_laudo != lote.convenio_id:
+    if convenio_do_laudo != lote.convenio_id:
         raise ConvenioNaoConfereComLaudo(
             "O convênio do laudo não confere com o convênio do lote de faturamento"
         )
@@ -142,7 +143,7 @@ def adicionar_itens_ao_lote(session: Session, lote_id: UUID, itens: list[GuiaIte
         if laudo is None or laudo.status != StatusLaudo.LIBERADO:
             raise LaudoNaoLiberado(f"Laudo {dto.laudo_id} não está liberado")
         convenio_do_laudo = _convenio_do_laudo(session, laudo)
-        if convenio_do_laudo is None or convenio_do_laudo != lote.convenio_id:
+        if convenio_do_laudo != lote.convenio_id:
             raise ConvenioNaoConfereComLaudo(
                 f"Convênio do laudo {dto.laudo_id} não confere com o convênio do lote"
             )
@@ -164,11 +165,11 @@ def listar_lotes(session: Session) -> list[LoteFaturamentoRead]:
     return [LoteFaturamentoRead.model_validate(l) for l in repository.listar_lotes(session)]
 
 
-def contar_laudos_pendentes(session: Session, convenio_id: UUID) -> int:
+def contar_laudos_pendentes(session: Session, convenio_id: UUID | None) -> int:
     return repository.contar_laudos_pendentes_por_convenio(session, convenio_id)
 
 
-def listar_laudos_pendentes_por_convenio(session: Session, convenio_id: UUID) -> list[dict]:
+def listar_laudos_pendentes_por_convenio(session: Session, convenio_id: UUID | None) -> list[dict]:
     return repository.listar_laudos_liberados_por_convenio(session, convenio_id)
 
 

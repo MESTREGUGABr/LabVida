@@ -147,7 +147,7 @@ def _conv_label(convs, lotes, lote_id):
         nome = convs.get(convenio_id)
         if nome:
             return f"Lote → {nome}"
-    return f"Lote: {str(lote_id)[:12]}..."
+    return "Lote (Particular)"
 
 
 

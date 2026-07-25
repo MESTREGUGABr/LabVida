@@ -1,3 +1,5 @@
+import time
+
 import streamlit as st
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -42,16 +44,20 @@ with session_scope() as session:
                     novo_valor = st.text_input("Atualizar Valor", value=res.valor, key=f"val_{res.id}")
                     
                     if st.button("Revisar e Salvar", key=f"btn_{res.id}", type="primary"):
-                        service.atualizar_resultado(
-                            res.id,
-                            ResultadoUpdate(
-                                valor=novo_valor,
-                                status=StatusResultado.REVISADO,
-                                usuario_id=user_opts[revisor]
+                        try:
+                            service.atualizar_resultado(
+                                res.id,
+                                ResultadoUpdate(
+                                    valor=novo_valor,
+                                    status=StatusResultado.REVISADO,
+                                    usuario_id=user_opts[revisor]
+                                )
                             )
-                        )
-                        st.success("Resultado atualizado com sucesso!")
-                        st.rerun()
+                            st.toast("Resultado atualizado com sucesso!", icon="✅")
+                            time.sleep(0.5)
+                            st.rerun()
+                        except ValueError as e:
+                            st.error(str(e))
                         
                     st.markdown("**Auditoria (Histórico):**")
                     auditoria = service.listar_auditoria_resultado(res.id)
@@ -72,13 +78,20 @@ with session_scope() as session:
                 digitador = st.selectbox("Usuário Digitador", options=list(user_opts.keys()))
                 
                 if st.form_submit_button("Registrar"):
-                    service.registrar_resultado(
-                        ResultadoCreate(
-                            os_item_id=item_selecionado.id,
-                            analito=novo_analito,
-                            valor=novo_valor,
-                            usuario_id=user_opts[digitador]
-                        )
-                    )
-                    st.success("Resultado inserido com sucesso!")
-                    st.rerun()
+                    if not novo_analito.strip() or not novo_valor.strip():
+                        st.error("Informe o analito e o valor encontrado.")
+                    else:
+                        try:
+                            service.registrar_resultado(
+                                ResultadoCreate(
+                                    os_item_id=item_selecionado.id,
+                                    analito=novo_analito.strip(),
+                                    valor=novo_valor.strip(),
+                                    usuario_id=user_opts[digitador]
+                                )
+                            )
+                            st.toast("Resultado inserido com sucesso!", icon="✅")
+                            time.sleep(0.5)
+                            st.rerun()
+                        except ValueError as e:
+                            st.error(str(e))

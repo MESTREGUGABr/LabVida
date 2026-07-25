@@ -65,7 +65,7 @@ def listar_itens_por_guia(session: Session, guia_tiss_id: UUID) -> list[GuiaItem
     return list(session.scalars(stmt).all())
 
 
-def contar_laudos_pendentes_por_convenio(session: Session, convenio_id: UUID) -> int:
+def contar_laudos_pendentes_por_convenio(session: Session, convenio_id: UUID | None) -> int:
     subquery_faturados = select(GuiaItem.laudo_id)
     stmt = (
         select(func.count(Laudo.id))
@@ -80,7 +80,7 @@ def contar_laudos_pendentes_por_convenio(session: Session, convenio_id: UUID) ->
     return session.execute(stmt).scalar_one()
 
 
-def listar_laudos_liberados_por_convenio(session: Session, convenio_id: UUID) -> list[dict]:
+def listar_laudos_liberados_por_convenio(session: Session, convenio_id: UUID | None) -> list[dict]:
     subquery_faturados = select(GuiaItem.laudo_id)
     stmt = (
         select(Laudo.id, Laudo.os_item_id, Laudo.status, Laudo.liberado_em, OsItem.procedimento_id)

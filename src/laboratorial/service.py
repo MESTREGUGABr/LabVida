@@ -4,6 +4,8 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from src.atendimento.ordem_servico.dtos import StatusOsItem
+from src.atendimento.ordem_servico.models import OsItem
 from src.laboratorial.dtos import (
     EquipamentoCreate,
     EquipamentoUpdate,
@@ -131,6 +133,8 @@ class LaboratorialService:
             valor_novo=dto.valor
         )
         self.repository.save_auditoria(auditoria)
+        self.repository.session.commit()
+        self.repository.session.refresh(resultado)
         return resultado
 
     def atualizar_resultado(self, resultado_id: UUID, dto: ResultadoUpdate) -> Resultado:
@@ -162,6 +166,8 @@ class LaboratorialService:
             )
             self.repository.save_auditoria(auditoria)
 
+        self.repository.session.commit()
+        self.repository.session.refresh(resultado)
         return resultado
 
     def listar_resultados_por_os_item(self, os_item_id: UUID) -> Sequence[Resultado]:
@@ -203,7 +209,11 @@ class LaboratorialService:
                 raise ValueError("Laudo precisa de um responsável técnico para ser liberado")
             laudo.status = StatusLaudo.LIBERADO
             laudo.liberado_em = datetime.now(timezone.utc)
-            
+
+            os_item = self.repository.session.get(OsItem, laudo.os_item_id)
+            if os_item:
+                os_item.status = StatusOsItem.RESULTADO_LIBERADO
+
         laudo = self.repository.save_laudo(laudo)
         self.repository.session.commit()
         self.repository.session.refresh(laudo)

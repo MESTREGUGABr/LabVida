@@ -17,8 +17,8 @@ class LoteFaturamento(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     codigo_lote: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
-    convenio_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("convenios.id"), nullable=False, index=True
+    convenio_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("convenios.id"), nullable=True, index=True
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="ABERTO")
     valor_total: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
