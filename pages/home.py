@@ -49,6 +49,10 @@ def main() -> None:
     st.page_link("pages/faturamento_guias.py", label="Faturamento de Guias TISS", icon=":material/receipt:")
     st.page_link("pages/faturamento_glosas.py", label="Controle de Glosas", icon=":material/cancel:")
 
+    st.subheader("Financeiro")
+    st.page_link("pages/financeiro_contas.py", label="Contas a Receber e Pagar", icon=":material/payments:")
+    st.page_link("pages/financeiro_caixa.py", label="Fluxo de Caixa", icon=":material/account_balance:")
+
     st.divider()
 
     if st.button("Sair"):

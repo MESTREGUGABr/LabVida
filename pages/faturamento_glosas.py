@@ -58,10 +58,17 @@ def _render_registrar_glosa() -> None:
                 st.write(f"**Procedimento:** {item['procedimento_nome']} | **Valor faturado:** R$ {item['valor_faturado']:.2f}")
                 st.caption(f"Unidade: {item['unidade_nome']}")
             with col_btn:
-                expandir = st.button("Registrar Glosa", key=f"btn_glosa_{guia_item_id}")
+                form_aberto = st.session_state.get(f"show_form_{guia_item_id}", False)
+                btn_label = "Fechar" if form_aberto else "Registrar Glosa"
+                if st.button(btn_label, key=f"btn_glosa_{guia_item_id}"):
+                    if form_aberto:
+                        st.session_state[f"show_form_{guia_item_id}"] = False
+                        st.rerun()
+                    else:
+                        st.session_state[f"show_form_{guia_item_id}"] = True
+                        st.rerun()
 
-            if expandir or st.session_state.get(f"show_form_{guia_item_id}", False):
-                st.session_state[f"show_form_{guia_item_id}"] = True
+            if st.session_state.get(f"show_form_{guia_item_id}", False):
 
                 motivo_opcoes = _MOTIVOS_PADRAO
                 motivo = st.selectbox("Motivo", options=motivo_opcoes, key=f"motivo_{guia_item_id}")
@@ -99,10 +106,6 @@ def _render_registrar_glosa() -> None:
                         st.error(str(e))
                     except GlosaError as e:
                         st.error(str(e))
-
-                if st.button("Cancelar", key=f"cancelar_{guia_item_id}"):
-                    st.session_state[f"show_form_{guia_item_id}"] = False
-                    st.rerun()
 
 
 def _render_listar_glosas() -> None:
