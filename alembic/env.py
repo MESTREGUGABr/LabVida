@@ -22,6 +22,8 @@ from src.financeiro.titulo_pagar import models as fin_pagar_models  # noqa: F401
 from src.financeiro.movimento_caixa import models as fin_caixa_models  # noqa: F401
 from src.financeiro.conciliacao_pagamento import models as fin_conciliacao_models  # noqa: F401
 from src.compras.pedido_compra import models as compras_pedido_models  # noqa: F401
+from src.compras.fornecedor import models as compras_fornecedor_models  # noqa: F401
+from src.compras.insumo import models as compras_insumo_models  # noqa: F401
 from src.config import get_database_url
 from src.db import Base
 

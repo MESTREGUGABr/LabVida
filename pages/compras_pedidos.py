@@ -1,0 +1,136 @@
+import streamlit as st
+
+from src.compras.fornecedor.service import listar_ativos as listar_fornecedores
+from src.compras.insumo.service import listar_insumos
+from src.compras.pedido_compra.dtos import PedidoItemCreate, SolicitacaoCreate
+from src.compras.pedido_compra.errors import PedidoError
+from src.compras.pedido_compra.service import (
+    aprovar_pedido,
+    cancelar_pedido,
+    criar_solicitacao,
+    listar_pedidos,
+    receber_pedido,
+)
+from src.db import session_scope
+from src.ui import exigir_login, usuario_id_logado
+
+
+def main() -> None:
+    st.set_page_config(page_title="LabVida - Pedidos de Compra", layout="wide")
+    exigir_login()
+
+    st.title("Pedidos de Compra")
+    st.caption("Solicitação, aprovação e recebimento de pedidos de insumos")
+
+    tab1, tab2 = st.tabs(["Novo Pedido", "Acompanhar"])
+
+    with tab1:
+        _render_novo_pedido()
+    with tab2:
+        _render_acompanhar()
+
+
+def _render_novo_pedido() -> None:
+    st.subheader("Novo Pedido de Compra")
+
+    with session_scope() as session:
+        fornecedores = listar_fornecedores(session)
+        insumos = listar_insumos(session)
+
+    if not fornecedores:
+        st.warning("Cadastre um fornecedor antes de criar pedidos.")
+        return
+    if not insumos:
+        st.warning("Cadastre um insumo antes de criar pedidos.")
+        return
+
+    forn_opcoes = {f.nome: f.id for f in fornecedores}
+    forn_label = st.selectbox("Fornecedor", options=list(forn_opcoes.keys()))
+    fornecedor_id = forn_opcoes[forn_label]
+
+    st.write("**Itens do Pedido**")
+    insumo_opcoes = {i.nome: i.id for i in insumos}
+
+    num_itens = st.number_input("Qtd de itens", 1, 10, 1, key="num_itens")
+    itens = []
+    for idx in range(num_itens):
+        col_a, col_b, col_c = st.columns([3, 1, 1])
+        with col_a:
+            insumo_label = st.selectbox(f"Insumo", options=list(insumo_opcoes.keys()), key=f"insumo_{idx}")
+        with col_b:
+            qtd = st.number_input("Qtd", min_value=0.001, value=1.0, step=1.0, key=f"qtd_{idx}")
+        with col_c:
+            valor = st.number_input("R$ Unit", min_value=0.01, value=10.0, step=1.0, key=f"vlr_{idx}")
+        itens.append(PedidoItemCreate(
+            insumo_material_id=insumo_opcoes[insumo_label],
+            quantidade=qtd,
+            valor_unitario=valor,
+        ))
+
+    if st.button("Criar Pedido (Rascunho)", type="primary"):
+        try:
+            dto = SolicitacaoCreate(fornecedor_id=fornecedor_id, itens=itens)
+            with session_scope() as session:
+                pedido = criar_solicitacao(session, dto, usuario_id_logado())
+            st.toast(f"Pedido criado em RASCUNHO! Total: R$ {pedido.valor_total:.2f}")
+            st.rerun()
+        except PedidoError as e:
+            st.error(str(e))
+
+
+def _render_acompanhar() -> None:
+    st.subheader("Pedidos")
+
+    with session_scope() as session:
+        pedidos = listar_pedidos(session)
+        fornecedores = listar_fornecedores(session)
+        forn_nomes = {f.id: f.nome for f in fornecedores}
+
+    if not pedidos:
+        st.info("Nenhum pedido registrado.")
+        return
+
+    for p in pedidos:
+        status_emoji = {"RASCUNHO": "📝", "APROVADO": "✅", "RECEBIDO": "📦", "CANCELADO": "❌"}
+        emoji = status_emoji.get(p.status, "❓")
+        total_itens = len(p.itens)
+
+        with st.container(border=True):
+            c1, c2 = st.columns([4, 1])
+            with c1:
+                st.write(f"{emoji} **Pedido** — R$ {p.valor_total:.2f} — {total_itens} itens")
+                st.caption(f"Status: {p.status} | Fornecedor: {forn_nomes.get(p.fornecedor_id, 'Desconhecido')} | Criado: {p.criado_em.strftime('%d/%m/%Y %H:%M')}")
+            with c2:
+                if p.status == "RASCUNHO":
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        if st.button("Aprovar", key=f"aprovar_{p.id}"):
+                            try:
+                                with session_scope() as session:
+                                    aprovar_pedido(session, p.id)
+                                st.toast("Pedido aprovado! Título a pagar gerado.")
+                                st.rerun()
+                            except PedidoError as e:
+                                st.error(str(e))
+                    with col_b:
+                        if st.button("Cancelar", key=f"cancelar_{p.id}"):
+                            try:
+                                with session_scope() as session:
+                                    cancelar_pedido(session, p.id)
+                                st.toast("Pedido cancelado.")
+                                st.rerun()
+                            except PedidoError as e:
+                                st.error(str(e))
+                elif p.status == "APROVADO":
+                    if st.button("Receber", key=f"receber_{p.id}"):
+                        try:
+                            with session_scope() as session:
+                                receber_pedido(session, p.id)
+                            st.toast("Pedido recebido! Estoque atualizado.")
+                            st.rerun()
+                        except PedidoError as e:
+                            st.error(str(e))
+
+
+if __name__ == "__main__":
+    main()
