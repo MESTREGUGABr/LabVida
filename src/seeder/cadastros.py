@@ -32,7 +32,7 @@ _UNIDADES = [
     ("Unidade de Coleta Boa Vista", TipoUnidade.COLETA, ["Coleta"]),
 ]
 
-_CONVENIOS = [("Unimed", "417033"), ("Bradesco Saúde", "005711"), ("Hapvida", "368253")]
+_CONVENIOS = [("Unimed", "417033"), ("Bradesco Saúde", "005711"), ("Hapvida", "368253"), ("Particular (Paciente)", "000000")]
 
 _PROCEDIMENTOS = [
     ("40302016", "Hemograma completo", "Hematologia"),

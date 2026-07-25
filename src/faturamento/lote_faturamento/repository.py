@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from src.atendimento.ordem_servico.models import OrdemServico, OsItem
@@ -65,32 +65,44 @@ def listar_itens_por_guia(session: Session, guia_tiss_id: UUID) -> list[GuiaItem
     return list(session.scalars(stmt).all())
 
 
-def contar_laudos_pendentes_por_convenio(session: Session, convenio_id: UUID) -> int:
+def contar_laudos_pendentes_por_convenio(session: Session, convenio_id: UUID, incluir_sem_convenio: bool = False) -> int:
     subquery_faturados = select(GuiaItem.laudo_id)
+    conditions = [
+        Laudo.status == StatusLaudo.LIBERADO,
+        Laudo.id.not_in(subquery_faturados),
+    ]
+    if incluir_sem_convenio:
+        conditions.append(
+            or_(OrdemServico.convenio_id == convenio_id, OrdemServico.convenio_id == None)
+        )
+    else:
+        conditions.append(OrdemServico.convenio_id == convenio_id)
     stmt = (
         select(func.count(Laudo.id))
         .join(OsItem, Laudo.os_item_id == OsItem.id)
         .join(OrdemServico, OsItem.ordem_servico_id == OrdemServico.id)
-        .where(
-            Laudo.status == StatusLaudo.LIBERADO,
-            Laudo.id.not_in(subquery_faturados),
-            OrdemServico.convenio_id == convenio_id,
-        )
+        .where(*conditions)
     )
     return session.execute(stmt).scalar_one()
 
 
-def listar_laudos_liberados_por_convenio(session: Session, convenio_id: UUID) -> list[dict]:
+def listar_laudos_liberados_por_convenio(session: Session, convenio_id: UUID, incluir_sem_convenio: bool = False) -> list[dict]:
     subquery_faturados = select(GuiaItem.laudo_id)
+    conditions = [
+        Laudo.status == StatusLaudo.LIBERADO,
+        Laudo.id.not_in(subquery_faturados),
+    ]
+    if incluir_sem_convenio:
+        conditions.append(
+            or_(OrdemServico.convenio_id == convenio_id, OrdemServico.convenio_id == None)
+        )
+    else:
+        conditions.append(OrdemServico.convenio_id == convenio_id)
     stmt = (
         select(Laudo.id, Laudo.os_item_id, Laudo.status, Laudo.liberado_em, OsItem.procedimento_id)
         .join(OsItem, Laudo.os_item_id == OsItem.id)
         .join(OrdemServico, OsItem.ordem_servico_id == OrdemServico.id)
-        .where(
-            Laudo.status == StatusLaudo.LIBERADO,
-            Laudo.id.not_in(subquery_faturados),
-            OrdemServico.convenio_id == convenio_id,
-        )
+        .where(*conditions)
     )
     results = session.execute(stmt).all()
     return [

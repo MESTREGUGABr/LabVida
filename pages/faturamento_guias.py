@@ -21,6 +21,10 @@ def _convenio_label(c) -> str:
     return f"{c.nome} ({ans})"
 
 
+def _is_particular(c) -> bool:
+    return (c.registro_ans or "") == "000000"
+
+
 def main() -> None:
     st.set_page_config(page_title="LabVida - Faturamento de Guias", layout="wide")
     exigir_login()
@@ -29,14 +33,15 @@ def main() -> None:
     st.caption("Criação de lotes por convênio, inclusão de laudos liberados e fechamento para cobrança")
 
     with session_scope() as session:
-        todos_convenios = {c.id: c.nome for c in listar_convenios(session)}
+        todos_convenios_list = listar_convenios(session)
+        todos_convenios = {c.id: c.nome for c in todos_convenios_list}
         convenios_ativos = listar_convenios_ativos(session)
         lotes = listar_lotes(session)
 
     st.divider()
     _render_novo_lote(convenios_ativos)
     st.divider()
-    _render_lotes_abertos(lotes, todos_convenios)
+    _render_lotes_abertos(lotes, todos_convenios, todos_convenios_list)
     st.divider()
     _render_historico(lotes, todos_convenios)
 
@@ -53,9 +58,10 @@ def _render_novo_lote(convenios_ativos) -> None:
         convenio_opcoes = {_convenio_label(c): c.id for c in convenios_ativos}
         convenio_label = st.selectbox("Convênio", options=list(convenio_opcoes.keys()), key="novo_lote_convenio")
         convenio_id = convenio_opcoes[convenio_label]
+        particular = _is_particular(next(c for c in convenios_ativos if c.id == convenio_id))
 
         with session_scope() as session:
-            pendentes = contar_laudos_pendentes(session, convenio_id)
+            pendentes = contar_laudos_pendentes(session, convenio_id, incluir_sem_convenio=particular)
         st.caption(f"{pendentes} laudos liberados pendentes de faturamento para este convênio")
 
     with col2:
@@ -71,10 +77,11 @@ def _render_novo_lote(convenios_ativos) -> None:
                 st.error(str(e))
 
 
-def _render_lotes_abertos(lotes, todos_convenios) -> None:
+def _render_lotes_abertos(lotes, todos_convenios, todos_convenios_list) -> None:
     st.subheader("Lotes Abertos")
 
     lotes_abertos = [l for l in lotes if l.status == "ABERTO"]
+    particular_map = {c.id: _is_particular(c) for c in todos_convenios_list}
 
     if not lotes_abertos:
         st.info("Nenhum lote ABERTO. Crie um lote na seção acima.")
@@ -88,8 +95,9 @@ def _render_lotes_abertos(lotes, todos_convenios) -> None:
             f"{lote.codigo_lote} — {nome_convenio} — {total_itens} itens — R$ {lote.valor_total:.2f}",
             expanded=total_itens == 0,
         ):
+            particular = particular_map.get(lote.convenio_id, False)
             with session_scope() as session:
-                laudos_pendentes = listar_laudos_pendentes_por_convenio(session, lote.convenio_id)
+                laudos_pendentes = listar_laudos_pendentes_por_convenio(session, lote.convenio_id, incluir_sem_convenio=particular)
 
             if not laudos_pendentes:
                 st.caption("Nenhum laudo liberado pendente para este convênio.")

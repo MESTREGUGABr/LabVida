@@ -3,11 +3,11 @@
 Idempotente: só insere se não houver lotes no banco.
 """
 
-from sqlalchemy.orm import Session
+import uuid
+from datetime import datetime, timezone
 
 from src.cadastro.convenio.repository import listar_ativos as listar_convenios
 from src.db import session_scope
-from src.faturamento.lote_faturamento.dtos import GuiaItemCreate, LoteFaturamentoCreate
 from src.faturamento.lote_faturamento.models import GuiaItem, GuiaTiss, LoteFaturamento
 from src.faturamento.lote_faturamento.repository import (
     listar_laudos_liberados_por_convenio,
@@ -17,7 +17,19 @@ from src.faturamento.lote_faturamento.repository import (
     salvar_guia_item,
     salvar_lote,
 )
-from src.faturamento.lote_faturamento.service import _gerar_codigo_lote, _gerar_codigo_tiss
+
+
+def _gerar_codigo_lote(session) -> str:
+    ano = datetime.now(timezone.utc).year
+    for _ in range(10):
+        codigo = f"LT-{ano}-{uuid.uuid4().hex[:6].upper()}"
+        if obter_lote_por_codigo(session, codigo) is None:
+            return codigo
+    raise RuntimeError("Não foi possível gerar código de lote único")
+
+
+def _gerar_codigo_tiss() -> str:
+    return f"TISS-{uuid.uuid4().hex[:12].upper()}"
 
 
 def executar_seeder_faturamento() -> dict[str, int]:
@@ -47,7 +59,7 @@ def executar_seeder_faturamento() -> dict[str, int]:
 
             guia = GuiaTiss(
                 lote_faturamento_id=lote.id,
-                codigo_tiss=_gerar_codigo_tiss(session),
+                codigo_tiss=_gerar_codigo_tiss(),
             )
             salvar_guia(session, guia)
             session.flush()

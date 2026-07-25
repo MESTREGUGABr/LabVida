@@ -70,8 +70,7 @@ def _render_registrar_glosa() -> None:
 
             if st.session_state.get(f"show_form_{guia_item_id}", False):
 
-                motivo_opcoes = _MOTIVOS_PADRAO
-                motivo = st.selectbox("Motivo", options=motivo_opcoes, key=f"motivo_{guia_item_id}")
+                motivo = st.selectbox("Motivo", options=_MOTIVOS_PADRAO, key=f"motivo_{guia_item_id}")
 
                 if motivo == "Outro":
                     motivo = st.text_input("Descreva o motivo", key=f"motivo_outro_{guia_item_id}")

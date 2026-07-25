@@ -7,7 +7,6 @@ from src.financeiro.titulo_receber.errors import FinanceiroError
 from src.financeiro.titulo_receber.service import (
     baixar_titulo as baixar_receber,
     listar_todos as receber_todos,
-    obter_titulo as obter_receber,
 )
 from src.financeiro.titulo_pagar.errors import TituloPagarJaBaixado, TituloPagarNaoEncontrado
 from src.financeiro.titulo_pagar.service import (
@@ -103,7 +102,7 @@ def _render_pagar() -> None:
 
     if not titulos:
         st.info("Nenhum título a pagar registrado.")
-        st.caption("Execute o seeder financeiro ou aguarde a Fase 3 (Compras).")
+        st.caption("Execute o seeder financeiro ou crie pedidos de compra (Compras).")
         return
 
     pendentes = [t for t in titulos if t.status == "PENDENTE"]

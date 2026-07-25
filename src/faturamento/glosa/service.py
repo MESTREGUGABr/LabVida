@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 from src.atendimento.ordem_servico.models import OrdemServico, OsItem
 from src.faturamento.glosa import repository
 from src.faturamento.glosa.dtos import GlosaCreate, GlosaListagemRead, GlosaRead
-from src.faturamento.glosa.errors import GuiaItemNaoEncontrado, ValorGlosaExcedeFaturado
+from src.faturamento.glosa.errors import (
+    GuiaItemNaoEncontrado,
+    ValorGlosaExcedeFaturado,
+    ValorGlosaInvalido,
+)
 from src.faturamento.glosa.models import Glosa
 from src.faturamento.lote_faturamento import repository as faturamento_repository
 from src.faturamento.lote_faturamento.dtos import StatusGuiaItem
@@ -19,7 +23,7 @@ def registrar_glosa(session: Session, dto: GlosaCreate) -> GlosaRead:
         raise GuiaItemNaoEncontrado("Guia Item não encontrado")
 
     if dto.valor_glosado <= 0:
-        raise ValueError("Valor da glosa deve ser maior que zero")
+        raise ValorGlosaInvalido("Valor da glosa deve ser maior que zero")
     if dto.valor_glosado > guia_item.valor_faturado:
         raise ValorGlosaExcedeFaturado("Valor da glosa excede o valor faturado do item")
 
