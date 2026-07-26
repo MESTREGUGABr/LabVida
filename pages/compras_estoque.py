@@ -8,12 +8,12 @@ from src.compras.insumo.service import (
     listar_todos_movimentos,
 )
 from src.db import session_scope
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Estoque", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Estoque", layout="wide", permissao="compras:visualizar_estoque")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Estoque")
     st.caption("Cadastro de insumos e controle de movimentações")

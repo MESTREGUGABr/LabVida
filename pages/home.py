@@ -1,81 +1,24 @@
 import streamlit as st
 
-from src.auth import build_logout_url
-from src.config import get_auth_config
+from src.ui import renderizar_menu, shell
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Home")
+    ctx = shell("LabVida - Home", layout="wide")
+    renderizar_menu(ctx["usuario_id"])
 
-    if "user" not in st.session_state:
-        st.markdown(
-            '<meta http-equiv="refresh" content="0; url=/">',
-            unsafe_allow_html=True,
-        )
-        st.stop()
-
-    user = st.session_state["user"]
+    user = ctx["user"]
 
     st.title("LabVida")
-    st.caption(f"Ola, {user['name']}")
+    st.caption(f"Olá, {user['name']}")
 
     st.divider()
 
     st.write("Bem-vindo ao LabVida!")
-    st.page_link("pages/cadastro_pacientes.py", label="Cadastro de Pacientes")
-    st.page_link("pages/cadastro_convenios.py", label="Cadastro de Convênios")
-
-    st.subheader("Cadastro")
-    st.page_link("pages/cadastro_pacientes.py", label="Pacientes", icon=":material/person:")
-    st.page_link("pages/cadastro_medicos.py", label="Médicos", icon=":material/stethoscope:")
-    st.page_link("pages/cadastro_convenios.py", label="Convênios", icon=":material/contract:")
-    st.page_link("pages/cadastro_procedimentos.py", label="Procedimentos", icon=":material/labs:")
-    st.page_link("pages/cadastro_unidades.py", label="Unidades e Setores", icon=":material/apartment:")
-
-    st.subheader("Atendimento e Coleta")
-    st.page_link("pages/atendimento_os.py", label="Ordens de Serviço", icon=":material/receipt_long:")
-    st.page_link("pages/atendimento_coleta.py", label="Registro de Coleta", icon=":material/science:")
-
-    st.subheader("Logística de Amostras")
-    st.page_link("pages/logistica_malotes.py", label="Gestão de Malotes", icon=":material/local_shipping:")
-    st.page_link("pages/logistica_recebimento.py", label="Recepção Central", icon=":material/inventory:")
-
-    st.subheader("Laboratorial")
-    st.page_link("pages/laboratorio_cadastros.py", label="Cadastros Laboratoriais", icon=":material/settings:")
-    st.page_link("pages/laboratorio_resultados.py", label="Resultados de Exames", icon=":material/biotech:")
-    st.page_link("pages/laboratorio_laudos.py", label="Emissão de Laudos", icon=":material/description:")
-
-    st.subheader("Operação da bancada")
-    st.page_link(
-        "pages/laboratorio_bancada.py",
-        label="Esteira da Bancada",
-        icon=":material/science:",
+    st.info(
+        "Utilize o menu lateral para navegar entre os módulos do ERP. "
+        "As opções exibidas correspondem ao seu perfil de acesso."
     )
-
-    st.subheader("Faturamento")
-    st.page_link("pages/faturamento_guias.py", label="Faturamento de Guias TISS", icon=":material/receipt:")
-    st.page_link("pages/faturamento_glosas.py", label="Controle de Glosas", icon=":material/cancel:")
-
-    st.subheader("Financeiro")
-    st.page_link("pages/financeiro_contas.py", label="Contas a Receber e Pagar", icon=":material/payments:")
-    st.page_link("pages/financeiro_caixa.py", label="Fluxo de Caixa", icon=":material/account_balance:")
-
-    st.subheader("Compras")
-    st.page_link("pages/compras_fornecedores.py", label="Fornecedores", icon=":material/warehouse:")
-    st.page_link("pages/compras_pedidos.py", label="Pedidos de Compra", icon=":material/shopping_cart:")
-    st.page_link("pages/compras_estoque.py", label="Estoque", icon=":material/inventory_2:")
-
-    st.divider()
-
-    if st.button("Sair"):
-        st.session_state.clear()
-        config = get_auth_config()
-        logout_url = build_logout_url(config)
-        st.markdown(
-            f'<meta http-equiv="refresh" content="0; url={logout_url}">',
-            unsafe_allow_html=True,
-        )
-        st.stop()
 
 
 if __name__ == "__main__":

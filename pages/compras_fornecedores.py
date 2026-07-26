@@ -9,12 +9,12 @@ from src.compras.fornecedor.service import (
     listar_todos,
 )
 from src.db import session_scope
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Fornecedores", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Fornecedores", layout="wide", permissao="compras:gerenciar_fornecedores")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Fornecedores")
     st.caption("Cadastro de fornecedores de insumos")

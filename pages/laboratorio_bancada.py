@@ -13,12 +13,12 @@ from src.db import session_scope
 from src.laboratorial.dtos import ResultadoCreate, ResultadoUpdate
 from src.laboratorial.models import StatusResultado
 from src.laboratorial.service import LaboratorialService
-from src.ui import exigir_login, usuario_id_logado
+from src.ui import renderizar_menu, shell, usuario_id_logado
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Esteira da Bancada", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Esteira da Bancada", layout="wide", permissao="laboratorial:registrar_resultado")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Esteira da bancada")
     st.caption("Amostras recebidas na central, prontas para processamento e revisão técnica")

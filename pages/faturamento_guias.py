@@ -13,7 +13,7 @@ from src.faturamento.lote_faturamento.service import (
     listar_laudos_pendentes_por_convenio,
     listar_lotes,
 )
-from src.ui import exigir_login, usuario_id_logado
+from src.ui import renderizar_menu, shell, usuario_id_logado
 
 _PARTICULAR = "Particular (sem convênio)"
 
@@ -24,8 +24,8 @@ def _convenio_label(c) -> str:
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Faturamento de Guias", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Faturamento de Guias", layout="wide", permissao="faturamento:gerenciar_lotes")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Faturamento de Guias TISS")
     st.caption("Criação de lotes por convênio, inclusão de laudos liberados e fechamento para cobrança")

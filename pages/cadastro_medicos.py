@@ -5,12 +5,12 @@ from src.cadastro.medico.dtos import UFS_VALIDAS, MedicoCreate
 from src.cadastro.medico.errors import CrmDuplicado
 from src.cadastro.medico.service import criar_medico, listar_medicos_ativos
 from src.db import session_scope
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Médicos")
-    exigir_login()
+    ctx = shell("LabVida - Médicos", permissao="cadastro:medicos:escrever")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Médicos")
     st.caption("Médicos solicitantes; o responsável técnico habilita a liberação de laudo")

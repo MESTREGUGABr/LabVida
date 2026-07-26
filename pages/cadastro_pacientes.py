@@ -14,19 +14,14 @@ from src.cadastro.service import (
     obter_paciente_por_id,
 )
 from src.db import session_scope
+from src.ui import renderizar_menu, shell
 
 DATA_MINIMA_DATE_INPUT = date(1000, 1, 1)
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Cadastro de Pacientes")
-
-    if "user" not in st.session_state:
-        st.markdown(
-            '<meta http-equiv="refresh" content="0; url=/">',
-            unsafe_allow_html=True,
-        )
-        st.stop()
+    ctx = shell("LabVida - Cadastro de Pacientes", permissao="cadastro:pacientes:escrever")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Cadastro de Pacientes")
     st.caption("Gerenciamento básico de Pacientes ativos do LabVida")
@@ -108,7 +103,7 @@ def _render_lista() -> None:
         [
             {
                 "Nome": paciente.nome,
-                "CPF do Paciente": paciente.cpf,
+                "CPF do Paciente": paciente.cpf_mascarado,
                 "Data de nascimento": paciente.data_nascimento.isoformat(),
                 "Telefone do Paciente": paciente.telefone,
                 "Sexo": _formatar_sexo(paciente.sexo),
@@ -133,7 +128,7 @@ def _render_edicao() -> None:
         st.info("Nenhum Paciente ativo cadastrado")
         return
 
-    opcoes = {f"{paciente.nome} - CPF {paciente.cpf}": paciente.id for paciente in pacientes}
+    opcoes = {f"{paciente.nome} - CPF {paciente.cpf_mascarado}": paciente.id for paciente in pacientes}
     selecionado = st.selectbox("Paciente", options=list(opcoes.keys()))
     paciente_id = opcoes[selecionado]
 

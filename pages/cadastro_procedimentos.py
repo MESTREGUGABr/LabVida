@@ -14,12 +14,12 @@ from src.cadastro.procedimento.service import (
 )
 from src.cadastro.convenio.errors import ConvenioNaoEncontrado
 from src.db import session_scope
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Procedimentos")
-    exigir_login()
+    ctx = shell("LabVida - Procedimentos", permissao="cadastro:procedimentos:escrever")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Procedimentos")
     st.caption("Catálogo de procedimentos (TUSS) e valores contratados por convênio")

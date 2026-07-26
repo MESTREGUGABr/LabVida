@@ -11,14 +11,14 @@ from src.atendimento.ordem_servico.dtos import StatusOrdemServico
 from src.atendimento.ordem_servico.service import listar_os
 from src.cadastro.service import listar_pacientes_ativos
 from src.db import session_scope
-from src.ui import exigir_login, usuario_id_logado
+from src.ui import renderizar_menu, shell, usuario_id_logado
 
 _STATUS_BLOQUEADO = {StatusOrdemServico.CONCLUIDA, StatusOrdemServico.CANCELADA}
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Coleta")
-    exigir_login()
+    ctx = shell("LabVida - Coleta", permissao="atendimento:coletar")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Registro de Coleta")
     st.caption("Gera a amostra (cadeia de custódia) e vincula o coletor à OS")

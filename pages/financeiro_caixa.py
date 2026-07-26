@@ -4,12 +4,12 @@ from datetime import date
 
 from src.db import session_scope
 from src.financeiro.movimento_caixa.service import fluxo_caixa_por_periodo
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Fluxo de Caixa", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Fluxo de Caixa", layout="wide", permissao="financeiro:baixar_titulo")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Fluxo de Caixa")
     st.caption("Consolidado de entradas e saídas por período")

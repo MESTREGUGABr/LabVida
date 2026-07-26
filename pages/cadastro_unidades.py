@@ -10,12 +10,12 @@ from src.cadastro.unidade.service import (
     listar_unidades_ativas,
 )
 from src.db import session_scope
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Unidades e Setores")
-    exigir_login()
+    ctx = shell("LabVida - Unidades e Setores", permissao="cadastro:unidades:escrever")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Unidades e Setores")
     st.caption("Cadastro das unidades da rede (central e coletas) e seus setores")

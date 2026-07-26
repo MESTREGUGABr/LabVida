@@ -12,12 +12,12 @@ from src.compras.pedido_compra.service import (
     receber_pedido,
 )
 from src.db import session_scope
-from src.ui import exigir_login, usuario_id_logado
+from src.ui import renderizar_menu, shell, usuario_id_logado
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Pedidos de Compra", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Pedidos de Compra", layout="wide", permissao="compras:solicitar")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Pedidos de Compra")
     st.caption("Solicitação, aprovação e recebimento de pedidos de insumos")

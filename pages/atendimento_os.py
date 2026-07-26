@@ -26,15 +26,15 @@ from src.cadastro.procedimento.service import listar_procedimentos_ativos
 from src.cadastro.service import listar_pacientes_ativos
 from src.cadastro.unidade.service import listar_unidades_ativas
 from src.db import session_scope
-from src.ui import exigir_login, usuario_id_logado
+from src.ui import renderizar_menu, shell, usuario_id_logado
 
 _PARTICULAR = "Particular (sem convênio)"
 _SEM_MEDICO = "Não informado"
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Ordens de Serviço", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Ordens de Serviço", layout="wide", permissao="atendimento:abrir_os")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Ordens de Serviço")
     st.caption("A OS é a entidade-espinha: abre o atendimento e percorre todo o fluxo")
@@ -60,7 +60,7 @@ def _render_abrir() -> None:
         st.info("Cadastre ao menos um paciente, uma unidade e um procedimento para abrir uma OS.")
         return
 
-    pacientes_opcoes = {f"{p.nome} - CPF {p.cpf}": p.id for p in pacientes}
+    pacientes_opcoes = {f"{p.nome} - CPF {p.cpf_mascarado}": p.id for p in pacientes}
     unidades_opcoes = {u.nome: u.id for u in unidades}
     medicos_opcoes = {_SEM_MEDICO: None} | {f"{m.nome} ({m.crm}/{m.uf_crm})": m.id for m in medicos}
     convenios_opcoes = {_PARTICULAR: None} | {c.nome: c.id for c in convenios}

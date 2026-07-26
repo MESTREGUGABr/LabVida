@@ -8,7 +8,7 @@ from src.faturamento.glosa.service import (
     listar_guias_itens_faturados,
     registrar_glosa,
 )
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
 
 _MOTIVOS_PADRAO = [
     "Erro de digitação no código TUSS",
@@ -21,8 +21,8 @@ _MOTIVOS_PADRAO = [
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Controle de Glosas", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Controle de Glosas", layout="wide", permissao="faturamento:registrar_glosa")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Controle de Glosas")
     st.caption("Registro e acompanhamento de glosas (recusas de pagamento por convênio)")

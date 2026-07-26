@@ -13,12 +13,12 @@ from src.financeiro.titulo_pagar.service import (
     baixar_titulo as baixar_pagar,
     listar_todos as pagar_todos,
 )
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Contas", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Contas", layout="wide", permissao="financeiro:baixar_titulo")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Contas")
     st.caption("Contas a receber e contas a pagar")

@@ -6,12 +6,12 @@ from src.logistica.malote.service import listar_malotes_em_transito_para_unidade
 from src.logistica.recebimento.dtos import ProtocoloRecebimentoCreate
 from src.logistica.recebimento.errors import LogisticaError
 from src.logistica.recebimento.service import obter_protocolo, receber_malote
-from src.ui import exigir_login, usuario_id_logado
+from src.ui import renderizar_menu, shell, usuario_id_logado
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Recepção Central", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Recepção Central", layout="wide", permissao="logistica:receber_malote")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Recepção de Malotes — Laboratório Central")
     st.caption("Conferência física, checagem de integridade e entrada das amostras no setor técnico")

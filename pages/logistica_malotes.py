@@ -12,12 +12,12 @@ from src.logistica.malote.service import (
     listar_malotes_por_unidade_origem,
     obter_malote,
 )
-from src.ui import exigir_login, usuario_id_logado
+from src.ui import renderizar_menu, shell, usuario_id_logado
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Gestão de Malotes", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Gestão de Malotes", layout="wide", permissao="logistica:despachar_malote")
+    renderizar_menu(ctx["usuario_id"])
 
     st.title("Gestão de Malotes")
     st.caption("Criação, vinculação de amostras e despacho de malotes entre unidades")
