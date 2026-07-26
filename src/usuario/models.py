@@ -5,6 +5,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db import Base
+import src.rbac.models as _rbac_models  # noqa: F401
 
 
 class Usuario(Base):
