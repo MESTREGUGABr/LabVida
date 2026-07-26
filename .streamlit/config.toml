@@ -1,6 +1,6 @@
 [theme]
-primaryColor = "#E84A27"
-backgroundColor = "#FAFBFC"
+primaryColor = "#1565C0"
+backgroundColor = "#F8FAFB"
 secondaryBackgroundColor = "#FFFFFF"
 textColor = "#212121"
 font = "Inter, system-ui, -apple-system, sans-serif"
