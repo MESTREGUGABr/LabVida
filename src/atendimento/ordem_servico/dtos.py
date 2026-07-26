@@ -43,6 +43,7 @@ class OsItemRead(BaseModel):
     procedimento_id: UUID
     valor_negociado: Decimal
     status: StatusOsItem
+    cancelado_por_usuario_id: UUID | None
 
 
 class OrdemServicoRead(BaseModel):
