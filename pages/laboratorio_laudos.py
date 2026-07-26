@@ -11,6 +11,12 @@ from src.laboratorial.dtos import LaudoCreate, LaudoUpdate
 from src.laboratorial.models import StatusLaudo, StatusResultado
 from src.laboratorial.service import LaboratorialService
 from src.ui import renderizar_menu, shell
+from src.ui_components import (
+    renderizar_cabecalho,
+    renderizar_empty_state,
+    renderizar_secao,
+)
+from src.ui_icons import ICONE_ADICIONAR, ICONE_LAUDO, ICONE_MEDICO, ICONE_RESULTADO
 
 
 def _listar_os_itens(session: Session):
@@ -18,16 +24,23 @@ def _listar_os_itens(session: Session):
 
 
 def main() -> None:
-    ctx = shell("Emissão de Laudos", layout="wide", permissao="laboratorial:liberar_laudo")
+    ctx = shell("Emissao de Laudos", layout="wide", permissao="laboratorial:liberar_laudo")
     renderizar_menu(ctx["usuario_id"])
 
-    st.title("Laudos e Liberação")
-    st.markdown("Emita e assine digitalmente os laudos dos exames.")
+    renderizar_cabecalho(
+        titulo="Laudos e Liberacao",
+        subtitulo="Emita e assine digitalmente os laudos dos exames",
+        icone=ICONE_LAUDO,
+    )
 
     with session_scope() as session:
         itens = _listar_os_itens(session)
         if not itens:
-            st.info("Nenhuma OS cadastrada no momento.")
+            renderizar_empty_state(
+                icone=ICONE_LAUDO,
+                titulo="Nenhuma OS cadastrada",
+                mensagem="Cadastre uma Ordem de Servico para emitir laudos.",
+            )
             return
 
         service = LaboratorialService(session)
@@ -42,7 +55,11 @@ def main() -> None:
         }
 
         if not opcoes_itens:
-            st.info("Nenhuma OS possui resultados para emitir laudo.")
+            renderizar_empty_state(
+                icone=ICONE_LAUDO,
+                titulo="Nenhum resultado disponivel",
+                mensagem="Nenhuma OS possui resultados para emitir laudo.",
+            )
             return
 
         escolha = st.selectbox(
@@ -53,7 +70,11 @@ def main() -> None:
         laudo = service.obter_laudo_por_os_item(item_selecionado.id)
         resultados = service.listar_resultados_por_os_item(item_selecionado.id)
 
-        st.subheader("Resultados do Exame")
+        renderizar_secao(
+            titulo=f"{ICONE_RESULTADO} Resultados do Exame",
+            descricao="Analitos registrados para este exame",
+        )
+
         todos_revisados = True
         if resultados:
             for res in resultados:
@@ -66,27 +87,36 @@ def main() -> None:
 
         if not todos_revisados:
             st.warning(
-                "Atenção: Nem todos os resultados foram digitados e REVISADOS. "
-                "Você não deve liberar o laudo ainda."
+                "Atencao: Nem todos os resultados foram digitados e REVISADOS. "
+                "Voce nao deve liberar o laudo ainda."
             )
 
         st.divider()
 
         if not laudo:
-            st.info(
-                "Este exame ainda não tem Laudo. Clique abaixo para iniciar o Rascunho."
+            renderizar_empty_state(
+                icone=ICONE_ADICIONAR,
+                titulo="Laudo nao iniciado",
+                mensagem="Este exame ainda nao tem Laudo. Clique abaixo para iniciar o Rascunho.",
+                rotulo_acao="Criar Rascunho de Laudo",
             )
-            if st.button("Criar Rascunho de Laudo", type="primary"):
-                try:
-                    service.criar_laudo(LaudoCreate(os_item_id=item_selecionado.id))
-                    st.toast("Laudo criado como Rascunho.", icon="✅")
-                    time.sleep(2.5)
-                    st.rerun()
-                except ValueError as e:
-                    st.error(str(e))
+
+            col1, col2, col3 = st.columns([1, 1, 1])
+            with col2:
+                if st.button("Criar Rascunho de Laudo", type="primary", width="stretch"):
+                    try:
+                        service.criar_laudo(LaudoCreate(os_item_id=item_selecionado.id))
+                        st.toast("Laudo criado como Rascunho.", icon="\u2705")
+                        time.sleep(2.5)
+                        st.rerun()
+                    except ValueError as e:
+                        st.error(str(e))
             return
 
-        st.subheader(f"Status do Laudo: {laudo.status.value}")
+        renderizar_secao(
+            titulo=f"Status do Laudo: {laudo.status.value}",
+            descricao="Assine e libere o laudo quando todos os resultados estiverem revisados",
+        )
 
         if laudo.status == StatusLaudo.LIBERADO:
             st.success(
@@ -107,17 +137,22 @@ def main() -> None:
             }
 
             if not medico_opts:
-                st.warning(
-                    "Nenhum médico responsável técnico ativo está cadastrado."
+                renderizar_empty_state(
+                    icone=ICONE_MEDICO,
+                    titulo="Nenhum responsavel tecnico",
+                    mensagem="Nenhum medico responsavel tecnico ativo esta cadastrado. Cadastre um medico com a flag de responsavel tecnico.",
                 )
                 st.stop()
 
-            responsavel = st.selectbox(
-                "Responsável Técnico", options=list(medico_opts.keys())
-            )
-            assinatura = st.text_input("Assinatura Digital (Hash/Chave)")
+            col1, col2 = st.columns(2)
+            with col1:
+                responsavel = st.selectbox(
+                    "Responsavel Tecnico", options=list(medico_opts.keys())
+                )
+            with col2:
+                assinatura = st.text_input("Assinatura Digital (Hash/Chave)")
 
-            if st.button("Salvar e LIBERAR Laudo", type="primary"):
+            if st.button("Salvar e LIBERAR Laudo", type="primary", width="stretch"):
                 try:
                     service.atualizar_laudo(
                         laudo.id,
@@ -127,7 +162,7 @@ def main() -> None:
                             status=StatusLaudo.LIBERADO,
                         ),
                     )
-                    st.toast("Laudo LIBERADO com sucesso!", icon="✅")
+                    st.toast("Laudo LIBERADO com sucesso!", icon="\u2705")
                     time.sleep(0.5)
                     st.rerun()
                 except ValueError as e:

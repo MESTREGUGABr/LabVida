@@ -27,17 +27,36 @@ from src.cadastro.service import listar_pacientes_ativos
 from src.cadastro.unidade.service import listar_unidades_ativas
 from src.db import session_scope
 from src.ui import renderizar_menu, shell, usuario_id_logado
+from src.ui_components import (
+    renderizar_cabecalho,
+    renderizar_empty_state,
+    renderizar_secao,
+    renderizar_status_badge,
+)
+from src.ui_theme import ACCENT_ORANGE
+from src.ui_icons import (
+    ICONE_AUTORIZACAO,
+    ICONE_BUSCA,
+    ICONE_CONVENIO,
+    ICONE_HISTORICO,
+    ICONE_OS,
+    ICONE_PRODUTIVIDADE,
+    ICONE_USUARIO,
+)
 
-_PARTICULAR = "Particular (sem convênio)"
-_SEM_MEDICO = "Não informado"
+_PARTICULAR = "Particular (sem convenio)"
+_SEM_MEDICO = "Nao informado"
 
 
 def main() -> None:
-    ctx = shell("LabVida - Ordens de Serviço", layout="wide", permissao="atendimento:abrir_os")
+    ctx = shell("LabVida - Ordens de Servico", layout="wide", permissao="atendimento:abrir_os")
     renderizar_menu(ctx["usuario_id"])
 
-    st.title("Ordens de Serviço")
-    st.caption("A OS é a entidade-espinha: abre o atendimento e percorre todo o fluxo")
+    renderizar_cabecalho(
+        titulo="Ordens de Servico",
+        subtitulo="A OS e a entidade central do fluxo: abre o atendimento e percorre todo o ciclo operacional",
+        icone=ICONE_OS,
+    )
 
     tab_abrir, tab_listar = st.tabs(["Abrir OS", "Acompanhar OS"])
 
@@ -57,7 +76,11 @@ def _render_abrir() -> None:
         procedimentos = listar_procedimentos_ativos(session)
 
     if not pacientes or not unidades or not procedimentos:
-        st.info("Cadastre ao menos um paciente, uma unidade e um procedimento para abrir uma OS.")
+        renderizar_empty_state(
+            icone=ICONE_OS,
+            titulo="Pre-requisitos pendentes",
+            mensagem="Cadastre ao menos um paciente, uma unidade e um procedimento para abrir uma OS.",
+        )
         return
 
     pacientes_opcoes = {f"{p.nome} - CPF {p.cpf_mascarado}": p.id for p in pacientes}
@@ -66,27 +89,52 @@ def _render_abrir() -> None:
     convenios_opcoes = {_PARTICULAR: None} | {c.nome: c.id for c in convenios}
     procedimentos_opcoes = {f"{p.codigo_tuss} - {p.nome}": p.id for p in procedimentos}
 
-    paciente_label = st.selectbox("Paciente", options=list(pacientes_opcoes.keys()))
-    unidade_label = st.selectbox("Unidade", options=list(unidades_opcoes.keys()))
-    medico_label = st.selectbox("Médico solicitante", options=list(medicos_opcoes.keys()))
-    convenio_label = st.selectbox("Convênio", options=list(convenios_opcoes.keys()))
+    renderizar_secao(
+        titulo=f"{ICONE_USUARIO} Dados do Atendimento",
+        descricao="Selecione o paciente, a unidade de coleta e o medico solicitante",
+    )
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        paciente_label = st.selectbox("Paciente", options=list(pacientes_opcoes.keys()))
+    with col2:
+        unidade_label = st.selectbox("Unidade", options=list(unidades_opcoes.keys()))
+    with col3:
+        medico_label = st.selectbox("Medico solicitante", options=list(medicos_opcoes.keys()))
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    renderizar_secao(
+        titulo=f"{ICONE_CONVENIO} Convenio e Procedimentos",
+        descricao="Selecione o convenio e os procedimentos solicitados",
+    )
+
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        convenio_label = st.selectbox("Convenio", options=list(convenios_opcoes.keys()))
     convenio_id = convenios_opcoes[convenio_label]
 
     selecionados = st.multiselect("Procedimentos", options=list(procedimentos_opcoes.keys()))
-    if convenio_id is not None:
-        st.caption("Deixe o valor em 0,00 para usar o valor de tabela vigente do convênio.")
 
     valores: dict[str, float] = {}
-    for label in selecionados:
-        valores[label] = st.number_input(
-            f"Valor negociado — {label} (R$)",
-            min_value=0.0,
-            value=0.0,
-            step=10.0,
-            key=f"valor_{label}",
-        )
+    if selecionados:
+        if convenio_id is not None:
+            st.caption("Deixe o valor em 0,00 para usar o valor de tabela vigente do convenio.")
 
-    if not st.button("Abrir OS", type="primary"):
+        cols = st.columns(min(len(selecionados), 3))
+        for i, label in enumerate(selecionados):
+            with cols[i % 3]:
+                valores[label] = st.number_input(
+                    f"Valor — {label} (R$)",
+                    min_value=0.0,
+                    value=0.0,
+                    step=10.0,
+                    key=f"valor_{label}",
+                )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    if not st.button("Abrir Ordem de Servico", type="primary", width="stretch"):
         return
 
     if not selecionados:
@@ -124,6 +172,7 @@ def _render_abrir() -> None:
         st.error(str(error))
     else:
         st.success(f"OS aberta: **{ordem.codigo_os}**")
+        st.toast(f"OS {ordem.codigo_os} aberta com sucesso", icon="\u2705")
 
 
 def _render_listar() -> None:
@@ -135,27 +184,43 @@ def _render_listar() -> None:
         procedimentos = {p.id: p.nome for p in listar_procedimentos_ativos(session)}
 
     if not ordens:
-        st.info("Nenhuma Ordem de Serviço aberta")
+        renderizar_empty_state(
+            icone=ICONE_OS,
+            titulo="Nenhuma Ordem de Servico",
+            mensagem="As OS abertas aparecerao aqui para acompanhamento do fluxo.",
+        )
         return
+
+    renderizar_secao(
+        titulo=f"{ICONE_PRODUTIVIDADE} Ordens de Servico",
+        descricao=f"{len(ordens)} OS(s) encontrada(s)",
+    )
 
     st.dataframe(
         [
             {
-                "Código": o.codigo_os,
-                "Paciente": pacientes.get(o.paciente_id, "—"),
-                "Convênio": convenios.get(o.convenio_id, _PARTICULAR),
-                "Unidade": unidades.get(o.unidade_id, "—"),
+                "Codigo": o.codigo_os,
+                "Paciente": pacientes.get(o.paciente_id, "\u2014"),
+                "Convenio": convenios.get(o.convenio_id, _PARTICULAR),
+                "Unidade": unidades.get(o.unidade_id, "\u2014"),
                 "Status": o.status,
-                "Aberta em": o.aberta_em.strftime("%d/%m/%Y %H:%M"),
+                "Abertura": o.aberta_em.strftime("%d/%m/%Y %H:%M"),
             }
             for o in ordens
         ],
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
+    )
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    renderizar_secao(
+        titulo=f"{ICONE_BUSCA} Detalhar Ordem de Servico",
+        descricao="Selecione uma OS para ver itens, historico e autorizacoes",
     )
 
     opcoes = {o.codigo_os: o.id for o in ordens}
-    codigo = st.selectbox("Detalhar OS", options=list(opcoes.keys()))
+    codigo = st.selectbox("OS", options=list(opcoes.keys()), label_visibility="collapsed")
     ordem_id = opcoes[codigo]
 
     with session_scope() as session:
@@ -163,51 +228,74 @@ def _render_listar() -> None:
         historico = listar_historico(session, ordem_id)
         autorizacoes = listar_autorizacoes(session, ordem_id)
 
-    st.subheader("Itens")
-    st.dataframe(
-        [
-            {
-                "Procedimento": procedimentos.get(i.procedimento_id, "—"),
-                "Valor": f"R$ {i.valor_negociado:.2f}",
-                "Status": i.status,
-            }
-            for i in itens
-        ],
-        hide_index=True,
-        use_container_width=True,
-    )
+    col_itens, col_hist = st.columns(2)
 
-    st.subheader("Histórico de status")
-    st.dataframe(
-        [{"Status": h.status, "Em": h.ocorrido_em.strftime("%d/%m/%Y %H:%M")} for h in historico],
-        hide_index=True,
-        use_container_width=True,
-    )
+    with col_itens:
+        st.markdown(f"**{ICONE_OS} Itens da OS**", unsafe_allow_html=True)
+        if itens:
+            st.dataframe(
+                [
+                    {
+                        "Procedimento": procedimentos.get(i.procedimento_id, "\u2014"),
+                        "Valor": f"R$ {i.valor_negociado:.2f}",
+                        "Status": i.status,
+                    }
+                    for i in itens
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+        else:
+            st.caption("Nenhum item registrado.")
+
+    with col_hist:
+        st.markdown(f"**{ICONE_HISTORICO} Historico de Status**", unsafe_allow_html=True)
+        if historico:
+            st.dataframe(
+                [
+                    {"Status": h.status, "Em": h.ocorrido_em.strftime("%d/%m/%Y %H:%M")}
+                    for h in historico
+                ],
+                hide_index=True,
+                width="stretch",
+            )
+        else:
+            st.caption("Nenhum historico registrado.")
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
     _render_autorizacoes(ordem_id, autorizacoes)
 
 
 def _render_autorizacoes(ordem_id, autorizacoes) -> None:
-    st.subheader("Autorizações de convênio")
+    renderizar_secao(
+        titulo=f"{ICONE_AUTORIZACAO} Autorizacoes de Convenio",
+        descricao="Consultar e registrar autorizacoes da operadora para esta OS",
+    )
+
     if autorizacoes:
         st.dataframe(
             [
                 {
                     "Guia": a.numero_guia,
                     "Status": a.status,
-                    "Validade": a.validade.strftime("%d/%m/%Y") if a.validade else "—",
+                    "Validade": a.validade.strftime("%d/%m/%Y") if a.validade else "\u2014",
                 }
                 for a in autorizacoes
             ],
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
 
     with st.form(f"form_autorizacao_{ordem_id}", clear_on_submit=True):
-        numero_guia = st.text_input("Número da guia")
-        status = st.selectbox("Status", options=list(StatusAutorizacao))
-        validade = st.date_input("Validade (opcional)", value=None, format="DD/MM/YYYY")
-        submitted = st.form_submit_button("Registrar autorização")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            numero_guia = st.text_input("Numero da guia")
+        with col2:
+            status = st.selectbox("Status", options=list(StatusAutorizacao))
+        with col3:
+            validade = st.date_input("Validade (opcional)", value=None, format="DD/MM/YYYY")
+        submitted = st.form_submit_button("Registrar autorizacao", type="primary")
 
     if not submitted:
         return
@@ -224,7 +312,7 @@ def _render_autorizacoes(ordem_id, autorizacoes) -> None:
     except (ValidationError, ValueError) as error:
         st.error(_mensagem(error))
     else:
-        st.success("Autorização registrada")
+        st.success("Autorizacao registrada")
         st.rerun()
 
 
