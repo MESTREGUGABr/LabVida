@@ -13,9 +13,21 @@ from src.faturamento.lote_faturamento.service import (
     listar_laudos_pendentes_por_convenio,
     listar_lotes,
 )
-from src.ui import exigir_login, usuario_id_logado
+from src.ui import renderizar_menu, shell, usuario_id_logado
+from src.ui_components import (
+    renderizar_cabecalho,
+    renderizar_empty_state,
+    renderizar_secao,
+)
+from src.ui_icons import (
+    ICONE_AMOSTRA,
+    ICONE_CONVENIO,
+    ICONE_FATURAMENTO,
+    ICONE_OS,
+    ICONE_PRODUTIVIDADE,
+)
 
-_PARTICULAR = "Particular (sem convênio)"
+_PARTICULAR = "Particular (sem convenio)"
 
 
 def _convenio_label(c) -> str:
@@ -24,11 +36,14 @@ def _convenio_label(c) -> str:
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Faturamento de Guias", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Faturamento de Guias", layout="wide", permissao="faturamento:gerenciar_lotes")
+    renderizar_menu(ctx["usuario_id"])
 
-    st.title("Faturamento de Guias TISS")
-    st.caption("Criação de lotes por convênio, inclusão de laudos liberados e fechamento para cobrança")
+    renderizar_cabecalho(
+        titulo="Faturamento de Guias TISS",
+        subtitulo="Criacao de lotes por convenio, inclusao de laudos liberados e fechamento para cobranca",
+        icone=ICONE_FATURAMENTO,
+    )
 
     with session_scope() as session:
         todos_convenios = {c.id: c.nome for c in listar_convenios(session)}
@@ -44,25 +59,39 @@ def main() -> None:
 
 
 def _render_novo_lote(convenios_ativos) -> None:
-    st.subheader("Novo Lote de Faturamento")
+    renderizar_secao(
+        titulo=f"{ICONE_AMOSTRA} Novo Lote de Faturamento",
+        descricao="Crie um lote para agrupar laudos a faturar por convenio",
+    )
 
     if not convenios_ativos:
-        st.warning("Nenhum convênio ativo cadastrado.")
+        renderizar_empty_state(
+            icone=ICONE_CONVENIO,
+            titulo="Nenhum convenio ativo",
+            mensagem="Cadastre um convenio ativo para criar lotes de faturamento.",
+        )
         return
 
     convenio_opcoes = {_convenio_label(c): c.id for c in convenios_ativos}
     convenio_opcoes[_PARTICULAR] = None
-    convenio_label = st.selectbox("Convênio", options=list(convenio_opcoes.keys()), key="novo_lote_convenio")
+
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        convenio_label = st.selectbox(
+            "Convenio", options=list(convenio_opcoes.keys()), key="novo_lote_convenio"
+        )
     convenio_id = convenio_opcoes[convenio_label]
 
     with session_scope() as session:
         pendentes = contar_laudos_pendentes(session, convenio_id)
-    st.caption(f"{pendentes} laudos liberados pendentes de faturamento para este convênio")
-
-    col1, col2 = st.columns([3, 1])
     with col2:
-        st.write("")
-        if st.button("Criar Lote", type="primary", key="criar_lote_btn"):
+        st.markdown(
+            f"<p style='color:#757575;font-size:13px;margin-top:28px;'>{pendentes} laudos pendentes</p>",
+            unsafe_allow_html=True,
+        )
+
+    with col3:
+        if st.button("Criar Lote", type="primary", key="criar_lote_btn", width="stretch"):
             try:
                 dto = LoteFaturamentoCreate(convenio_id=convenio_id)
                 with session_scope() as session:
@@ -74,12 +103,19 @@ def _render_novo_lote(convenios_ativos) -> None:
 
 
 def _render_lotes_abertos(lotes, todos_convenios) -> None:
-    st.subheader("Lotes Abertos")
+    renderizar_secao(
+        titulo=f"{ICONE_OS} Lotes Abertos",
+        descricao="Adicione laudos e feche os lotes para gerar titulos a receber",
+    )
 
     lotes_abertos = [l for l in lotes if l.status == "ABERTO"]
 
     if not lotes_abertos:
-        st.info("Nenhum lote ABERTO. Crie um lote na seção acima.")
+        renderizar_empty_state(
+            icone=ICONE_AMOSTRA,
+            titulo="Nenhum lote aberto",
+            mensagem="Crie um lote na secao acima para comecar o faturamento.",
+        )
         return
 
     for lote in lotes_abertos:
@@ -94,13 +130,13 @@ def _render_lotes_abertos(lotes, todos_convenios) -> None:
                 laudos_pendentes = listar_laudos_pendentes_por_convenio(session, lote.convenio_id)
 
             if not laudos_pendentes:
-                st.caption("Nenhum laudo liberado pendente para este convênio.")
+                st.caption("Nenhum laudo liberado pendente para este convenio.")
                 if total_itens > 0:
                     _render_fechar_lote(lote)
                 else:
                     st.caption(f"Itens faturados: {total_itens}")
             else:
-                st.write(f"**{len(laudos_pendentes)} laudos disponíveis para faturamento:**")
+                st.write(f"**{len(laudos_pendentes)} laudos disponiveis para faturamento:**")
 
                 selecionados = {}
                 for laudo_info in laudos_pendentes:
@@ -148,7 +184,7 @@ def _render_lotes_abertos(lotes, todos_convenios) -> None:
 
                 with c_info:
                     if total_itens > 0:
-                        st.caption(f"Já faturados neste lote: {total_itens} itens")
+                        st.caption(f"Ja faturados neste lote: {total_itens} itens")
 
                 if total_itens > 0:
                     st.divider()
@@ -157,37 +193,47 @@ def _render_lotes_abertos(lotes, todos_convenios) -> None:
 
 def _render_fechar_lote(lote) -> None:
     venc = date.today() + timedelta(days=30)
-    st.caption(f"Ao fechar, será gerado um título a receber de **R$ {lote.valor_total:.2f}** com vencimento em **{venc.strftime('%d/%m/%Y')}**.")
+    st.caption(
+        f"Ao fechar, sera gerado um titulo a receber de "
+        f"**R$ {lote.valor_total:.2f}** com vencimento em **{venc.strftime('%d/%m/%Y')}**."
+    )
     if st.button("Finalizar Faturamento", type="primary", key=f"fechar_{lote.id}"):
         try:
             with session_scope() as session:
                 fechar_lote(session, lote.id, usuario_id_logado())
-            st.toast(f"Lote {lote.codigo_lote} fechado! Título a receber gerado.")
+            st.toast(f"Lote {lote.codigo_lote} fechado! Titulo a receber gerado.")
             st.rerun()
         except FaturamentoError as e:
             st.error(str(e))
 
 
 def _render_historico(lotes, todos_convenios) -> None:
-    st.subheader("Histórico de Lotes")
+    renderizar_secao(
+        titulo=f"{ICONE_PRODUTIVIDADE} Historico de Lotes",
+        descricao="Todos os lotes de faturamento registrados no sistema",
+    )
 
     if not lotes:
-        st.info("Nenhum lote registrado.")
+        renderizar_empty_state(
+            icone=ICONE_PRODUTIVIDADE,
+            titulo="Nenhum lote registrado",
+            mensagem="O historico de lotes de faturamento aparecera aqui.",
+        )
         return
 
     rows = []
     for l in lotes:
         total_itens = sum(len(g.itens) for g in l.guias)
         rows.append({
-            "Código": l.codigo_lote,
-            "Convênio": todos_convenios.get(l.convenio_id, _PARTICULAR),
+            "Codigo": l.codigo_lote,
+            "Convenio": todos_convenios.get(l.convenio_id, _PARTICULAR),
             "Status": l.status,
             "Valor Total": f"R$ {l.valor_total:.2f}",
             "Itens": total_itens,
-            "Criado em": l.criado_em.strftime("%d/%m/%Y %H:%M") if l.criado_em else "—",
-            "Fechado em": l.fechado_em.strftime("%d/%m/%Y %H:%M") if l.fechado_em else "—",
+            "Criado em": l.criado_em.strftime("%d/%m/%Y %H:%M") if l.criado_em else "\u2014",
+            "Fechado em": l.fechado_em.strftime("%d/%m/%Y %H:%M") if l.fechado_em else "\u2014",
         })
-    st.dataframe(rows, hide_index=True, use_container_width=True)
+    st.dataframe(rows, hide_index=True, width="stretch")
 
 
 if __name__ == "__main__":

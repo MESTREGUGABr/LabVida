@@ -5,15 +5,20 @@ from src.cadastro.medico.dtos import UFS_VALIDAS, MedicoCreate
 from src.cadastro.medico.errors import CrmDuplicado
 from src.cadastro.medico.service import criar_medico, listar_medicos_ativos
 from src.db import session_scope
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state
+from src.ui_icons import ICONE_MEDICO
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Médicos")
-    exigir_login()
+    ctx = shell("LabVida - Médicos", permissao="cadastro:medicos:escrever")
+    renderizar_menu(ctx["usuario_id"])
 
-    st.title("Médicos")
-    st.caption("Médicos solicitantes; o responsável técnico habilita a liberação de laudo")
+    renderizar_cabecalho(
+        titulo="Medicos",
+        subtitulo="Medicos solicitantes; o responsavel tecnico habilita a liberacao de laudo",
+        icone=ICONE_MEDICO,
+    )
 
     with st.form("form_medico", clear_on_submit=True):
         nome = st.text_input("Nome")
@@ -45,15 +50,19 @@ def main() -> None:
                 {
                     "Nome": m.nome,
                     "CRM": f"{m.crm}/{m.uf_crm}",
-                    "Responsável técnico": "Sim" if m.responsavel_tecnico else "Não",
+                    "Responsavel tecnico": "Sim" if m.responsavel_tecnico else "Nao",
                 }
                 for m in medicos
             ],
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
     else:
-        st.info("Nenhum médico cadastrado")
+        renderizar_empty_state(
+            icone=ICONE_MEDICO,
+            titulo="Nenhum medico cadastrado",
+            mensagem="Os medicos cadastrados aparecerao aqui.",
+        )
 
 
 def _mensagem(error: Exception) -> str:

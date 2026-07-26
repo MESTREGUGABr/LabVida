@@ -4,15 +4,20 @@ from datetime import date
 
 from src.db import session_scope
 from src.financeiro.movimento_caixa.service import fluxo_caixa_por_periodo
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
+from src.ui_icons import ICONE_FINANCEIRO
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Fluxo de Caixa", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Fluxo de Caixa", layout="wide", permissao="financeiro:baixar_titulo")
+    renderizar_menu(ctx["usuario_id"])
 
-    st.title("Fluxo de Caixa")
-    st.caption("Consolidado de entradas e saídas por período")
+    renderizar_cabecalho(
+        titulo="Fluxo de Caixa",
+        subtitulo="Consolidado de entradas e saidas por periodo",
+        icone=ICONE_FINANCEIRO,
+    )
 
     hoje = date.today()
     col1, col2 = st.columns(2)
@@ -39,10 +44,14 @@ def main() -> None:
         st.metric("Saldo", f"R$ {resultado['saldo']:.2f}", delta_color=delta_color)
 
     st.divider()
-    st.subheader("Movimentos do Período")
+    renderizar_secao(titulo="Movimentos do Periodo")
 
     if not resultado["movimentos"]:
-        st.info(f"Nenhum movimento em {mes:02d}/{ano}.")
+        renderizar_empty_state(
+            icone=ICONE_FINANCEIRO,
+            titulo="Nenhum movimento",
+            mensagem=f"Nenhum movimento em {mes:02d}/{ano}.",
+        )
         return
 
     rows = []
@@ -54,7 +63,7 @@ def main() -> None:
             "Valor": f"R$ {m.valor:.2f}",
             "Descrição": m.descricao or "—",
         })
-    st.dataframe(rows, hide_index=True, use_container_width=True)
+    st.dataframe(rows, hide_index=True, width="stretch")
 
 
 if __name__ == "__main__":

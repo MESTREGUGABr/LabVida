@@ -6,15 +6,20 @@ from src.logistica.malote.service import listar_malotes_em_transito_para_unidade
 from src.logistica.recebimento.dtos import ProtocoloRecebimentoCreate
 from src.logistica.recebimento.errors import LogisticaError
 from src.logistica.recebimento.service import obter_protocolo, receber_malote
-from src.ui import exigir_login, usuario_id_logado
+from src.ui import renderizar_menu, shell, usuario_id_logado
+from src.ui_components import renderizar_cabecalho
+from src.ui_icons import ICONE_RECEPCAO, ICONE_OK
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Recepção Central", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Recepção Central", layout="wide", permissao="logistica:receber_malote")
+    renderizar_menu(ctx["usuario_id"])
 
-    st.title("Recepção de Malotes — Laboratório Central")
-    st.caption("Conferência física, checagem de integridade e entrada das amostras no setor técnico")
+    renderizar_cabecalho(
+        titulo="Recepcao de Malotes",
+        subtitulo="Conferencia fisica, checagem de integridade e entrada das amostras no setor tecnico — Laboratorio Central",
+        icone=ICONE_RECEPCAO,
+    )
 
     usuario_id = usuario_id_logado()
 
@@ -47,13 +52,13 @@ def main() -> None:
         st.dataframe(
             [{"Item ID": str(item.id), "Amostra ID": str(item.amostra_id)} for item in malote.itens],
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
 
     integridade_ok = st.radio(
         "Integridade das Amostras",
         options=[True, False],
-        format_func=lambda ok: "✅ Íntegras (sem vazamento/ranhura) — aceitar todas" if ok else "❌ Danificadas/Rejeitadas — recusar todas",
+        format_func=lambda ok: f"{ICONE_OK} Integras (sem vazamento/ranhura) — aceitar todas" if ok else "Rejeitadas — recusar todas",
     )
 
     observacao = st.text_area("Observações da recepção (opcional)", placeholder="Ex: Malote chegou com gelo adequado e sem avarias.")

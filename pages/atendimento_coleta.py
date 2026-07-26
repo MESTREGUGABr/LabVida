@@ -11,35 +11,59 @@ from src.atendimento.ordem_servico.dtos import StatusOrdemServico
 from src.atendimento.ordem_servico.service import listar_os
 from src.cadastro.service import listar_pacientes_ativos
 from src.db import session_scope
-from src.ui import exigir_login, usuario_id_logado
+from src.ui import renderizar_menu, shell, usuario_id_logado
+from src.ui_components import (
+    renderizar_cabecalho,
+    renderizar_empty_state,
+    renderizar_secao,
+)
+from src.ui_icons import ICONE_AMOSTRA, ICONE_COLETA, ICONE_OS
 
 _STATUS_BLOQUEADO = {StatusOrdemServico.CONCLUIDA, StatusOrdemServico.CANCELADA}
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Coleta")
-    exigir_login()
+    ctx = shell("LabVida - Coleta", permissao="atendimento:coletar")
+    renderizar_menu(ctx["usuario_id"])
 
-    st.title("Registro de Coleta")
-    st.caption("Gera a amostra (cadeia de custódia) e vincula o coletor à OS")
+    renderizar_cabecalho(
+        titulo="Registro de Coleta",
+        subtitulo="Gera a amostra (cadeia de custodia) e vincula o coletor a OS",
+        icone=ICONE_COLETA,
+    )
 
     with session_scope() as session:
         ordens = [o for o in listar_os(session) if o.status not in _STATUS_BLOQUEADO]
         pacientes = {p.id: p.nome for p in listar_pacientes_ativos(session)}
 
     if not ordens:
-        st.info("Nenhuma Ordem de Serviço disponível para coleta")
+        renderizar_empty_state(
+            icone=ICONE_COLETA,
+            titulo="Nenhuma OS disponivel",
+            mensagem="Nao ha Ordens de Servico disponiveis para coleta no momento.",
+        )
         return
+
+    renderizar_secao(
+        titulo=f"{ICONE_OS} Selecionar Ordem de Servico",
+        descricao="Escolha a OS e o tipo de material para registrar a coleta",
+    )
 
     opcoes = {
         f"{o.codigo_os} — {pacientes.get(o.paciente_id, '—')} ({o.status})": o.id for o in ordens
     }
-    label = st.selectbox("Ordem de Serviço", options=list(opcoes.keys()))
+
+    col1, col2 = st.columns(2)
+    with col1:
+        label = st.selectbox("Ordem de Servico", options=list(opcoes.keys()))
+    with col2:
+        tipo_material = st.selectbox(
+            "Tipo de material", options=list(TipoMaterial), format_func=_formatar_material
+        )
+
     ordem_id = opcoes[label]
 
-    tipo_material = st.selectbox("Tipo de material", options=list(TipoMaterial), format_func=_formatar_material)
-
-    if st.button("Registrar coleta", type="primary"):
+    if st.button("Registrar Coleta", type="primary", width="stretch"):
         try:
             dto = ColetaCreate(
                 ordem_servico_id=ordem_id,
@@ -52,26 +76,37 @@ def main() -> None:
             st.error(str(error))
         else:
             st.success(f"Coleta registrada. Amostra: **{amostra.codigo_barras}**")
+            st.toast(f"Amostra {amostra.codigo_barras} gerada", icon="\u2705")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    renderizar_secao(
+        titulo=f"{ICONE_COLETA} Amostras desta OS",
+        descricao="Amostras coletadas para a Ordem de Servico selecionada",
+    )
 
     with session_scope() as session:
         amostras = listar_amostras(session, ordem_id)
 
-    st.subheader("Amostras desta OS")
     if amostras:
         st.dataframe(
             [
                 {
-                    "Código de barras": a.codigo_barras,
+                    "Codigo de barras": a.codigo_barras,
                     "Material": _formatar_material(a.tipo_material),
                     "Status": a.status,
                 }
                 for a in amostras
             ],
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
     else:
-        st.info("Nenhuma amostra coletada ainda")
+        renderizar_empty_state(
+            icone=ICONE_AMOSTRA,
+            titulo="Nenhuma amostra coletada",
+            mensagem="As amostras coletadas para esta OS aparecerao aqui.",
+        )
 
 
 def _formatar_material(material: TipoMaterial) -> str:

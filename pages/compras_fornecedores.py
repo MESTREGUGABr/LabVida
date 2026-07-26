@@ -9,15 +9,20 @@ from src.compras.fornecedor.service import (
     listar_todos,
 )
 from src.db import session_scope
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao, renderizar_status_badge
+from src.ui_icons import ICONE_FORNECEDOR
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Fornecedores", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Fornecedores", layout="wide", permissao="compras:gerenciar_fornecedores")
+    renderizar_menu(ctx["usuario_id"])
 
-    st.title("Fornecedores")
-    st.caption("Cadastro de fornecedores de insumos")
+    renderizar_cabecalho(
+        titulo="Fornecedores",
+        subtitulo="Cadastro de fornecedores de insumos",
+        icone=ICONE_FORNECEDOR,
+    )
 
     tab1, tab2 = st.tabs(["Cadastrar", "Listar"])
 
@@ -28,7 +33,7 @@ def main() -> None:
 
 
 def _render_cadastrar() -> None:
-    st.subheader("Novo Fornecedor")
+    renderizar_secao(titulo="Novo Fornecedor")
 
     nome = st.text_input("Nome do Fornecedor")
     cnpj = st.text_input("CNPJ (somente números)", max_chars=14)
@@ -47,7 +52,7 @@ def _render_cadastrar() -> None:
 
 
 def _render_listar() -> None:
-    st.subheader("Fornecedores")
+    renderizar_secao(titulo="Fornecedores")
 
     with session_scope() as session:
         fornecedores = listar_todos(session)
@@ -57,13 +62,14 @@ def _render_listar() -> None:
         return
 
     for f in fornecedores:
-        emoji = "🟢" if f.status == "ATIVO" else "🔴"
         with st.container(border=True):
             c1, c2 = st.columns([4, 1])
             with c1:
-                st.write(f"{emoji} **{f.nome}**")
-                st.caption(f"CNPJ: {f.cnpj} | Status: {f.status}")
+                st.write(f"**{f.nome}**")
+                st.caption(f"CNPJ: {f.cnpj}")
             with c2:
+                st.write("")
+                renderizar_status_badge("Ativo" if f.status == "ATIVO" else "Inativo", "success" if f.status == "ATIVO" else "neutral")
                 if f.status == "ATIVO":
                     col_a, col_b = st.columns(2)
                     with col_a:

@@ -8,7 +8,9 @@ from src.faturamento.glosa.service import (
     listar_guias_itens_faturados,
     registrar_glosa,
 )
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
+from src.ui_icons import ICONE_ALERTA
 
 _MOTIVOS_PADRAO = [
     "Erro de digitação no código TUSS",
@@ -21,11 +23,14 @@ _MOTIVOS_PADRAO = [
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Controle de Glosas", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Controle de Glosas", layout="wide", permissao="faturamento:registrar_glosa")
+    renderizar_menu(ctx["usuario_id"])
 
-    st.title("Controle de Glosas")
-    st.caption("Registro e acompanhamento de glosas (recusas de pagamento por convênio)")
+    renderizar_cabecalho(
+        titulo="Controle de Glosas",
+        subtitulo="Registro e acompanhamento de glosas (recusas de pagamento por convenio)",
+        icone=ICONE_ALERTA,
+    )
 
     tab1, tab2 = st.tabs(["Registrar Glosa", "Glosas Registradas"])
 
@@ -36,13 +41,17 @@ def main() -> None:
 
 
 def _render_registrar_glosa() -> None:
-    st.subheader("Itens Faturados")
+    renderizar_secao(titulo="Itens Faturados")
 
     with session_scope() as session:
         itens = listar_guias_itens_faturados(session)
 
     if not itens:
-        st.info("Nenhum item faturado disponível para registro de glosa.")
+        renderizar_empty_state(
+            icone=ICONE_ALERTA,
+            titulo="Nenhum item faturado",
+            mensagem="Nao ha itens disponiveis para registro de glosa.",
+        )
         st.caption("Fature laudos na tela de Faturamento de Guias TISS antes de registrar glosas.")
         return
 
@@ -106,13 +115,17 @@ def _render_registrar_glosa() -> None:
 
 
 def _render_listar_glosas() -> None:
-    st.subheader("Glosas Registradas")
+    renderizar_secao(titulo="Glosas Registradas")
 
     with session_scope() as session:
         glosas = listar_glosas_com_contexto(session)
 
     if not glosas:
-        st.info("Nenhuma glosa registrada.")
+        renderizar_empty_state(
+            icone=ICONE_ALERTA,
+            titulo="Nenhuma glosa registrada",
+            mensagem="As glosas registradas aparecerao aqui.",
+        )
         return
 
     rows = []
@@ -129,7 +142,7 @@ def _render_listar_glosas() -> None:
         })
         total_glosado += g.valor_glosado
 
-    st.dataframe(rows, hide_index=True, use_container_width=True)
+    st.dataframe(rows, hide_index=True, width="stretch")
 
     col1, col2 = st.columns(2)
     with col1:

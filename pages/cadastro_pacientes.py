@@ -14,22 +14,26 @@ from src.cadastro.service import (
     obter_paciente_por_id,
 )
 from src.db import session_scope
+from src.ui import renderizar_menu, shell
+from src.ui_components import (
+    renderizar_cabecalho,
+    renderizar_empty_state,
+    renderizar_secao,
+)
+from src.ui_icons import ICONE_USUARIO
 
 DATA_MINIMA_DATE_INPUT = date(1000, 1, 1)
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Cadastro de Pacientes")
+    ctx = shell("LabVida - Cadastro de Pacientes", permissao="cadastro:pacientes:escrever")
+    renderizar_menu(ctx["usuario_id"])
 
-    if "user" not in st.session_state:
-        st.markdown(
-            '<meta http-equiv="refresh" content="0; url=/">',
-            unsafe_allow_html=True,
-        )
-        st.stop()
-
-    st.title("Cadastro de Pacientes")
-    st.caption("Gerenciamento básico de Pacientes ativos do LabVida")
+    renderizar_cabecalho(
+        titulo="Cadastro de Pacientes",
+        subtitulo="Gerenciamento basico de Pacientes ativos do LabVida",
+        icone=ICONE_USUARIO,
+    )
 
     tab_cadastrar, tab_listar, tab_editar = st.tabs(
         ["Cadastrar", "Pacientes ativos", "Editar e inativar"]
@@ -46,33 +50,39 @@ def main() -> None:
 
 
 def _render_cadastro() -> None:
-    st.subheader("Cadastrar Paciente")
+    renderizar_secao(
+        titulo="Novo Paciente",
+        descricao="Preencha os dados para cadastrar um novo paciente no sistema",
+    )
 
     with st.form("form_cadastrar_paciente", clear_on_submit=True):
-        nome = st.text_input("Nome")
-        cpf = st.text_input("CPF do Paciente")
-        data_nascimento = st.date_input(
-            "Data de nascimento",
-            value=None,
-            min_value=DATA_MINIMA_DATE_INPUT,
-            max_value=date.today(),
-            format="DD/MM/YYYY",
-        )
-        telefone = st.text_input("Telefone do Paciente")
-        sexo = st.selectbox(
-            "Sexo",
-            options=list(SexoPaciente),
-            index=list(SexoPaciente).index(SexoPaciente.NAO_INFORMADO),
-            format_func=_formatar_sexo,
-        )
-        submitted = st.form_submit_button("Cadastrar")
+        col1, col2 = st.columns(2)
+        with col1:
+            nome = st.text_input("Nome")
+            cpf = st.text_input("CPF do Paciente")
+            data_nascimento = st.date_input(
+                "Data de nascimento",
+                value=None,
+                min_value=DATA_MINIMA_DATE_INPUT,
+                max_value=date.today(),
+                format="DD/MM/YYYY",
+            )
+        with col2:
+            telefone = st.text_input("Telefone do Paciente")
+            sexo = st.selectbox(
+                "Sexo",
+                options=list(SexoPaciente),
+                index=list(SexoPaciente).index(SexoPaciente.NAO_INFORMADO),
+                format_func=_formatar_sexo,
+            )
+        submitted = st.form_submit_button("Cadastrar", type="primary")
 
     if not submitted:
         return
 
     try:
         if data_nascimento is None:
-            raise ValueError("Data de nascimento é obrigatória")
+            raise ValueError("Data de nascimento e obrigatoria")
 
         dto = PacienteCreate(
             nome=nome,
@@ -92,7 +102,10 @@ def _render_cadastro() -> None:
 
 
 def _render_lista() -> None:
-    st.subheader("Pacientes ativos")
+    renderizar_secao(
+        titulo="Pacientes Ativos",
+        descricao="Lista de todos os pacientes ativos no sistema",
+    )
 
     try:
         pacientes = _listar_pacientes_ativos()
@@ -101,14 +114,18 @@ def _render_lista() -> None:
         return
 
     if not pacientes:
-        st.info("Nenhum Paciente ativo cadastrado")
+        renderizar_empty_state(
+            icone=ICONE_USUARIO,
+            titulo="Nenhum paciente cadastrado",
+            mensagem="Os pacientes cadastrados aparecerao aqui.",
+        )
         return
 
     st.dataframe(
         [
             {
                 "Nome": paciente.nome,
-                "CPF do Paciente": paciente.cpf,
+                "CPF do Paciente": paciente.cpf_mascarado,
                 "Data de nascimento": paciente.data_nascimento.isoformat(),
                 "Telefone do Paciente": paciente.telefone,
                 "Sexo": _formatar_sexo(paciente.sexo),
@@ -116,12 +133,15 @@ def _render_lista() -> None:
             for paciente in pacientes
         ],
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
     )
 
 
 def _render_edicao() -> None:
-    st.subheader("Editar ou inativar Paciente")
+    renderizar_secao(
+        titulo="Editar ou Inativar Paciente",
+        descricao="Selecione um paciente para editar dados ou inativar",
+    )
 
     try:
         pacientes = _listar_pacientes_ativos()
@@ -130,10 +150,14 @@ def _render_edicao() -> None:
         return
 
     if not pacientes:
-        st.info("Nenhum Paciente ativo cadastrado")
+        renderizar_empty_state(
+            icone=ICONE_USUARIO,
+            titulo="Nenhum paciente ativo",
+            mensagem="Nao ha pacientes ativos para editar ou inativar.",
+        )
         return
 
-    opcoes = {f"{paciente.nome} - CPF {paciente.cpf}": paciente.id for paciente in pacientes}
+    opcoes = {f"{paciente.nome} - CPF {paciente.cpf_mascarado}": paciente.id for paciente in pacientes}
     selecionado = st.selectbox("Paciente", options=list(opcoes.keys()))
     paciente_id = opcoes[selecionado]
 
@@ -150,23 +174,26 @@ def _render_edicao() -> None:
 
 def _render_form_edicao(paciente: PacienteRead) -> None:
     with st.form(f"form_editar_paciente_{paciente.id}"):
-        nome = st.text_input("Nome", value=paciente.nome)
-        cpf = st.text_input("CPF do Paciente", value=paciente.cpf)
-        data_nascimento = st.date_input(
-            "Data de nascimento",
-            value=paciente.data_nascimento,
-            min_value=DATA_MINIMA_DATE_INPUT,
-            max_value=date.today(),
-            format="DD/MM/YYYY",
-        )
-        telefone = st.text_input("Telefone do Paciente", value=paciente.telefone)
-        sexo = st.selectbox(
-            "Sexo",
-            options=list(SexoPaciente),
-            index=list(SexoPaciente).index(paciente.sexo),
-            format_func=_formatar_sexo,
-        )
-        submitted = st.form_submit_button("Salvar alterações")
+        col1, col2 = st.columns(2)
+        with col1:
+            nome = st.text_input("Nome", value=paciente.nome)
+            cpf = st.text_input("CPF do Paciente", value=paciente.cpf)
+            data_nascimento = st.date_input(
+                "Data de nascimento",
+                value=paciente.data_nascimento,
+                min_value=DATA_MINIMA_DATE_INPUT,
+                max_value=date.today(),
+                format="DD/MM/YYYY",
+            )
+        with col2:
+            telefone = st.text_input("Telefone do Paciente", value=paciente.telefone)
+            sexo = st.selectbox(
+                "Sexo",
+                options=list(SexoPaciente),
+                index=list(SexoPaciente).index(paciente.sexo),
+                format_func=_formatar_sexo,
+            )
+        submitted = st.form_submit_button("Salvar alteracoes", type="primary")
 
     if not submitted:
         return
@@ -192,7 +219,7 @@ def _render_form_edicao(paciente: PacienteRead) -> None:
 
 def _render_inativacao(paciente_id: UUID) -> None:
     st.divider()
-    st.warning("Inativar remove o Paciente da listagem de ativos, sem exclusão física.")
+    st.warning("Inativar remove o Paciente da listagem de ativos, sem exclusao fisica.")
 
     if not st.button("Inativar Paciente", type="secondary"):
         return
@@ -216,7 +243,7 @@ def _formatar_sexo(sexo: SexoPaciente) -> str:
     return {
         SexoPaciente.MASCULINO: "Masculino",
         SexoPaciente.FEMININO: "Feminino",
-        SexoPaciente.NAO_INFORMADO: "Não informado",
+        SexoPaciente.NAO_INFORMADO: "Nao informado",
     }[sexo]
 
 

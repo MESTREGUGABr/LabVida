@@ -1,3 +1,4 @@
+import base64
 import streamlit as st
 
 from src.auth import AuthConfig, build_login_url, exchange_code, fetch_user
@@ -9,7 +10,7 @@ from src.usuario.service import sincronizar_usuario
 def main() -> None:
     st.set_page_config(
         page_title="LabVida",
-        page_icon="\U0001f52c",
+        page_icon="\U0001f9ea",
         layout="centered",
         initial_sidebar_state="collapsed",
     )
@@ -30,8 +31,8 @@ def main() -> None:
                 usuario = sincronizar_usuario(session, user.email, user.name)
             st.session_state["user"] = {
                 "id": str(usuario.id),
-                "name": user.name,
-                "email": user.email,
+                "name": user.name.title(),
+                "email": user.email.lower(),
                 "picture": user.picture,
             }
             st.session_state["id_token"] = tokens.get("id_token", "")
@@ -45,11 +46,20 @@ def main() -> None:
     if st.session_state.get("user"):
         st.switch_page("pages/home.py")
 
-    _render_login_page(config)
+    _renderizar_login(config)
 
 
-def _render_login_page(config: AuthConfig) -> None:
+def _logo_base64() -> str:
+    try:
+        with open("assets/logo_labvida.png", "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except Exception:
+        return ""
+
+
+def _renderizar_login(config: AuthConfig) -> None:
     login_url, _ = build_login_url(config)
+    logo_b64 = _logo_base64()
 
     google_g_svg = (
         '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">'
@@ -65,74 +75,155 @@ def _render_login_page(config: AuthConfig) -> None:
         "</svg>"
     )
 
+    logo_img = (
+        f'<img src="data:image/png;base64,{logo_b64}" '
+        f'width="64" style="border-radius:12px;" alt="LabVida">'
+    ) if logo_b64 else ""
+
     st.markdown(
-        """
+        f"""
         <style>
-        [data-testid="stSidebar"] { display: none; }
-        [data-testid="stHeader"] { display: none; }
-        #MainMenu { visibility: hidden; }
-        footer { visibility: hidden; }
-        .stApp {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        .login-container {
+        [data-testid="stSidebar"] {{ display: none; }}
+        [data-testid="stHeader"] {{ display: none; }}
+        #MainMenu {{ visibility: hidden; }}
+        footer {{ visibility: hidden; }}
+
+        .stApp {{
+            background: linear-gradient(160deg, #0A2540 0%, #0D3B66 35%, #12508C 70%, #0D3B66 100%);
+        }}
+
+        .stApp::before {{
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(ellipse at 15% 40%, rgba(0, 137, 123, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 60%, rgba(21, 101, 192, 0.10) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 25%, rgba(255, 255, 255, 0.03) 0%, transparent 40%);
+            pointer-events: none;
+        }}
+
+        .login-container {{
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 80vh;
+            min-height: 100vh;
             text-align: center;
-        }
-        .login-title {
-            color: #ffffff;
-            font-size: 3rem;
+            position: relative;
+            z-index: 1;
+        }}
+
+        .login-card {{
+            background: rgba(255, 255, 255, 0.97);
+            backdrop-filter: blur(24px);
+            border-radius: 16px;
+            padding: 48px 44px 44px 44px;
+            width: 420px;
+            max-width: 90vw;
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.10),
+                0 2px 8px rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }}
+
+        .login-logo {{
+            display: inline-block;
+            margin-bottom: 20px;
+        }}
+
+        .login-logo img {{
+            width: 64px;
+            border-radius: 12px;
+        }}
+
+        .login-title {{
+            color: #0A2540;
+            font-size: 28px;
             font-weight: 700;
-            margin-bottom: 0.25rem;
-        }
-        .login-subtitle {
-            color: rgba(255,255,255,0.85);
-            font-size: 1.1rem;
-            font-weight: 400;
-            margin-bottom: 2.5rem;
-        }
-        .google-btn {
+            letter-spacing: -0.4px;
+            margin-bottom: 4px;
+        }}
+
+        .login-subtitle {{
+            color: #607D8B;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 28px;
+        }}
+
+        .login-divider {{
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #1565C0, #00897B, transparent);
+            margin-bottom: 32px;
+        }}
+
+        .google-btn {{
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 12px;
+            width: 100%;
             background-color: #ffffff;
-            color: #3c4043;
-            font-family: "Google Sans", Roboto, Arial, sans-serif;
+            color: #37474F;
             font-size: 14px;
             font-weight: 500;
             letter-spacing: 0.25px;
-            padding: 12px 24px;
+            padding: 14px 24px;
             border: 1px solid #dadce0;
-            border-radius: 4px;
+            border-radius: 8px;
             cursor: pointer;
             text-decoration: none;
-            transition: box-shadow 0.2s ease, background-color 0.2s ease;
-        }
-        .google-btn:hover {
-            box-shadow: 0 1px 6px rgba(32,33,36,0.28);
-            background-color: #f8f9fa;
-            color: #202124;
-        }
-        .google-btn:active {
-            background-color: #e8eaed;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
+            transition: box-shadow 0.2s ease, background-color 0.2s ease, transform 0.15s ease;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+        }}
 
-    st.markdown(
-        f"""
+        .google-btn:hover {{
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            background-color: #fafafa;
+            color: #212121;
+            transform: translateY(-1px);
+        }}
+
+        .google-btn:active {{
+            background-color: #f0f0f0;
+            transform: translateY(0);
+        }}
+
+        .login-footer {{
+            color: rgba(255, 255, 255, 0.30);
+            font-size: 11px;
+            margin-top: 28px;
+            position: relative;
+            z-index: 1;
+        }}
+
+        @media (max-width: 480px) {{
+            .login-card {{
+                padding: 36px 24px 32px 24px;
+            }}
+            .login-title {{ font-size: 22px; }}
+            .login-subtitle {{ font-size: 12px; }}
+        }}
+        </style>
+
         <div class="login-container">
-            <div class="login-title">\U0001f52c LabVida</div>
-            <div class="login-subtitle">ERP para laboratorio de analises clinicas</div>
-            <a href="{login_url}" target="_self" class="google-btn">
-                {google_g_svg} Entrar com Google
-            </a>
+            <div class="login-card">
+                <div class="login-logo">{logo_img}</div>
+                <div class="login-title">LabVida</div>
+                <div class="login-subtitle">ERP para Laboratorio de Analises Clinicas</div>
+                <div class="login-divider"></div>
+                <a href="{login_url}" target="_self" class="google-btn">
+                    {google_g_svg} Entrar com Google
+                </a>
+            </div>
+            <div class="login-footer">
+                LabVida v1.0 &middot; Ambiente Seguro &middot; LGPD Compliance
+            </div>
         </div>
         """,
         unsafe_allow_html=True,

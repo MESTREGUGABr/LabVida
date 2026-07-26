@@ -10,9 +10,11 @@ from src.seeder.faturamento import main as seed_faturamento
 from src.seeder.financeiro import main as seed_financeiro
 from src.seeder.laboratorial import main as seed_laboratorial
 from src.seeder.pacientes import main as seed_pacientes
+from src.seeder.rbac import main as seed_rbac
 
 
 def main() -> None:
+    seed_rbac()
     seed_cadastros()
     seed_pacientes()
     seed_atendimento()

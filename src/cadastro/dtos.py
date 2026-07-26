@@ -2,7 +2,7 @@ from datetime import date
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from src.cadastro.validators import (
     normalizar_cnpj_convenio,
@@ -12,6 +12,7 @@ from src.cadastro.validators import (
     normalizar_telefone_convenio,
     normalizar_telefone_paciente,
 )
+from src.lgpd import mascarar_cpf
 
 
 def _validar_data_nascimento(data_nascimento: date) -> date:
@@ -97,6 +98,11 @@ class PacienteRead(BaseModel):
     data_nascimento: date
     telefone: str
     sexo: SexoPaciente = Field(default=SexoPaciente.NAO_INFORMADO)
+
+    @computed_field
+    @property
+    def cpf_mascarado(self) -> str:
+        return mascarar_cpf(self.cpf)
 
 
 class ConvenioCreate(BaseModel):

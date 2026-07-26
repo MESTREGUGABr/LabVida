@@ -12,15 +12,20 @@ from src.logistica.malote.service import (
     listar_malotes_por_unidade_origem,
     obter_malote,
 )
-from src.ui import exigir_login, usuario_id_logado
+from src.ui import renderizar_menu, shell, usuario_id_logado
+from src.ui_components import renderizar_cabecalho, renderizar_secao
+from src.ui_icons import ICONE_MALOTE
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Gestão de Malotes", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Gestão de Malotes", layout="wide", permissao="logistica:despachar_malote")
+    renderizar_menu(ctx["usuario_id"])
 
-    st.title("Gestão de Malotes")
-    st.caption("Criação, vinculação de amostras e despacho de malotes entre unidades")
+    renderizar_cabecalho(
+        titulo="Gestao de Malotes",
+        subtitulo="Criacao, vinculacao de amostras e despacho de malotes entre unidades",
+        icone=ICONE_MALOTE,
+    )
 
     usuario_id = usuario_id_logado()
 
@@ -34,10 +39,10 @@ def main() -> None:
         st.warning("Nenhuma unidade cadastrada no sistema.")
         return
 
-    tab1, tab2 = st.tabs(["✨ Criar e Despachar Malote", "📋 Histórico de Malotes"])
+    tab1, tab2 = st.tabs(["Criar e Despachar Malote", "Historico de Malotes"])
 
     with tab1:
-        st.subheader("1. Criar Novo Malote")
+        renderizar_secao(titulo="Criar Novo Malote")
         col1, col2 = st.columns(2)
         with col1:
             origem_opcoes = {f"{u.nome} ({u.tipo})": u.id for u in (unidades_coleta or unidades)}
@@ -64,7 +69,7 @@ def main() -> None:
                 st.error(str(e))
 
         st.divider()
-        st.subheader("2. Adicionar Amostras e Despachar")
+        renderizar_secao(titulo="Adicionar Amostras e Despachar")
 
         with session_scope() as session:
             malotes_abertos = [m for m in listar_malotes_por_unidade_origem(session, origem_id) if m.status == StatusMalote.ABERTO]
@@ -102,7 +107,7 @@ def main() -> None:
 
                 if malote_atual and malote_atual.itens:
                     st.write(f"Total de itens no malote: **{len(malote_atual.itens)}**")
-                    if st.button("🚀 Despachar Malote (Em Trânsito)", type="primary"):
+                    if st.button("Despachar Malote (Em Transito)", type="primary"):
                         try:
                             with session_scope() as session:
                                 despachar_malote(session, malote_id, usuario_id)
@@ -130,7 +135,7 @@ def main() -> None:
                     for m in todos_malotes
                 ],
                 hide_index=True,
-                use_container_width=True,
+                width="stretch",
             )
         else:
             st.info("Nenhum malote registrado para esta unidade.")

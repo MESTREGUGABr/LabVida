@@ -13,15 +13,20 @@ from src.db import session_scope
 from src.laboratorial.dtos import ResultadoCreate, ResultadoUpdate
 from src.laboratorial.models import StatusResultado
 from src.laboratorial.service import LaboratorialService
-from src.ui import exigir_login, usuario_id_logado
+from src.ui import renderizar_menu, shell, usuario_id_logado
+from src.ui_components import renderizar_cabecalho
+from src.ui_icons import ICONE_BANCADA
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Esteira da Bancada", layout="wide")
-    exigir_login()
+    ctx = shell("LabVida - Esteira da Bancada", layout="wide", permissao="laboratorial:registrar_resultado")
+    renderizar_menu(ctx["usuario_id"])
 
-    st.title("Esteira da bancada")
-    st.caption("Amostras recebidas na central, prontas para processamento e revisão técnica")
+    renderizar_cabecalho(
+        titulo="Esteira da Bancada",
+        subtitulo="Amostras recebidas na central, prontas para processamento e revisao tecnica",
+        icone=ICONE_BANCADA,
+    )
 
     with session_scope() as session:
         fila = _listar_fila(session)
@@ -54,7 +59,7 @@ def main() -> None:
                 for amostra, ordem, item, paciente in fila
             ],
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
 
     selecionada = next(row for row in fila if row[0].id == amostra_id)
@@ -95,7 +100,7 @@ def _render_resultados(amostra, item, equipamentos) -> None:
         resultados = list(service.listar_resultados_por_os_item(item.id))
 
     st.divider()
-    st.subheader("Resultados do exame")
+    renderizar_secao(titulo="Resultados do exame")
     if resultados:
         for resultado in resultados:
             _render_resultado(resultado, item, equipamentos)

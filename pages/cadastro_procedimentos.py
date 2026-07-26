@@ -14,15 +14,20 @@ from src.cadastro.procedimento.service import (
 )
 from src.cadastro.convenio.errors import ConvenioNaoEncontrado
 from src.db import session_scope
-from src.ui import exigir_login
+from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho
+from src.ui_icons import ICONE_PROCEDIMENTO
 
 
 def main() -> None:
-    st.set_page_config(page_title="LabVida - Procedimentos")
-    exigir_login()
+    ctx = shell("LabVida - Procedimentos", permissao="cadastro:procedimentos:escrever")
+    renderizar_menu(ctx["usuario_id"])
 
-    st.title("Procedimentos")
-    st.caption("Catálogo de procedimentos (TUSS) e valores contratados por convênio")
+    renderizar_cabecalho(
+        titulo="Procedimentos",
+        subtitulo="Catalogo de procedimentos (TUSS) e valores contratados por convenio",
+        icone=ICONE_PROCEDIMENTO,
+    )
 
     tab_procedimento, tab_valor = st.tabs(["Procedimentos", "Valores por convênio"])
 
@@ -57,7 +62,7 @@ def _render_procedimentos() -> None:
         st.dataframe(
             [{"TUSS": p.codigo_tuss, "Nome": p.nome, "Setor": p.setor or "—"} for p in procedimentos],
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
     else:
         st.info("Nenhum procedimento cadastrado")
