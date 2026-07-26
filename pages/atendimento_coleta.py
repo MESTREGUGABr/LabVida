@@ -81,7 +81,7 @@ def main() -> None:
     st.markdown("<br>", unsafe_allow_html=True)
 
     renderizar_secao(
-        titulo=f"{ICONE_AMOSTRA} Amostras desta OS",
+        titulo=f"{ICONE_COLETA} Amostras desta OS",
         descricao="Amostras coletadas para a Ordem de Servico selecionada",
     )
 

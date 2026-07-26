@@ -14,8 +14,8 @@ import streamlit as st
 from src.db import session_scope
 from src.rbac.gate import verificar_permissao
 from src.rbac.service import listar_permissoes_do_usuario
-from src.ui_css import injetar_css_global
-from src.ui_icons import ICONES_MAPA, ICONE_HOME
+from src.ui_css import injetar_css_global, injetar_toggle_dark_mode
+from src.ui_icons import ICONES_MAPA, ICONE_HOME, ICONE_SAIR, ICONE_TEMA
 
 _MENU = [
     (
@@ -77,6 +77,7 @@ _MENU = [
         "Administracao",
         [
             ("Usuarios e Perfis", "pages/admin_usuarios.py", "admin:gerenciar_usuarios"),
+            ("Meu Perfil", "pages/meu_perfil.py", None),
         ],
     ),
     (
@@ -174,46 +175,61 @@ def renderizar_menu(usuario_id: UUID) -> None:
         _renderizar_logo_sidebar()
 
         if user.get("name"):
+            nome = user.get("name", "")
+            email = user.get("email", "")
+            iniciais = "".join(p[0].upper() for p in nome.split()[:2]) if nome else "??"
             st.sidebar.markdown(
                 f"""
-                <div style="padding:6px 12px 10px 12px;text-align:center;">
-                    <p style="margin:0;font-size:14px;font-weight:600;color:#37474F;">
-                        {user.get("name", "")}
+                <a href="/meu_perfil" target="_self" style="text-decoration:none;">
+                <div style="padding:8px 14px 12px 14px;text-align:center;cursor:pointer;
+                border-radius:8px;transition:background 0.2s ease;margin:0 8px;"
+                onmouseover="this.style.background='rgba(255,255,255,0.04)'"
+                onmouseout="this.style.background='transparent'">
+                    <div style="
+                        display:inline-flex;align-items:center;justify-content:center;
+                        width:36px;height:36px;border-radius:50%;
+                        background:linear-gradient(135deg, #1565C0, #00897B);
+                        color:#fff;font-size:14px;font-weight:700;
+                        margin-bottom:6px;
+                    ">{iniciais}</div>
+                    <p style="margin:0;font-size:13px;font-weight:600;color:#F1F5F9;">
+                        {nome}
                     </p>
-                    <p style="margin:2px 0 0 0;font-size:12px;color:#78909C;">
-                        {user.get("email", "")}
+                    <p style="margin:2px 0 0 0;font-size:11px;color:#94A3B8;">
+                        {email}
                     </p>
                 </div>
+                </a>
                 """,
                 unsafe_allow_html=True,
             )
 
         st.sidebar.markdown(
-            "<hr style='border-color:#E8EAED;border-width:0.5px;opacity:0.5;margin:6px 12px;'>",
+            "<hr style='border-color:#1E3A5F;border-width:0.5px;opacity:0.4;margin:6px 14px;'>",
             unsafe_allow_html=True,
         )
 
         st.sidebar.markdown(
             f"""<a href="/home" target="_self"
-            style="display:block;padding:9px 12px;color:#37474F;text-decoration:none;
-            border-radius:6px;font-size:14px;font-weight:500;
+            style="display:block;padding:9px 12px;color:#F1F5F9;text-decoration:none;
+            border-radius:8px;font-size:13px;font-weight:500;
             border-left:3px solid transparent;transition:all 0.2s ease;
-            margin:1px 4px;">
+            margin:1px 8px;">
             <span style="display:inline-flex;align-items:center;gap:8px;">
             {ICONE_HOME} Inicio</span></a>""",
             unsafe_allow_html=True,
         )
 
         st.sidebar.markdown(
-            "<hr style='border-color:#E8EAED;border-width:0.5px;opacity:0.5;margin:10px 12px;'>",
+            "<hr style='border-color:#1E3A5F;border-width:0.5px;opacity:0.4;margin:10px 14px;'>",
             unsafe_allow_html=True,
         )
 
         if op_secoes:
             st.sidebar.markdown(
-                "<p style='color:#90A4AE;font-size:11px;"
-                "letter-spacing:0.8px;text-transform:uppercase;font-weight:600;"
-                "margin:16px 0 2px 0;padding:0 12px;'>"
+                "<p style='color:#94A3B8;font-size:10px;"
+                "letter-spacing:1.0px;text-transform:uppercase;font-weight:600;"
+                "margin:16px 0 2px 0;padding:0 14px;'>"
                 "Operacional</p>",
                 unsafe_allow_html=True,
             )
@@ -221,44 +237,63 @@ def renderizar_menu(usuario_id: UUID) -> None:
 
         if fer_secoes:
             st.sidebar.markdown(
-                "<hr style='border-color:#E8EAED;border-width:0.5px;opacity:0.5;margin:14px 12px;'>",
+                "<hr style='border-color:#1E3A5F;border-width:0.5px;opacity:0.4;margin:14px 14px;'>",
                 unsafe_allow_html=True,
             )
             st.sidebar.markdown(
-                "<p style='color:#90A4AE;font-size:11px;"
-                "letter-spacing:0.8px;text-transform:uppercase;font-weight:600;"
-                "margin:16px 0 2px 0;padding:0 12px;'>"
+                "<p style='color:#94A3B8;font-size:10px;"
+                "letter-spacing:1.0px;text-transform:uppercase;font-weight:600;"
+                "margin:16px 0 2px 0;padding:0 14px;'>"
                 "Ferramentas</p>",
                 unsafe_allow_html=True,
             )
             _renderizar_grupo_secoes(fer_secoes)
 
         st.sidebar.markdown(
-            "<hr style='border-color:#E8EAED;border-width:0.5px;opacity:0.5;margin:20px 12px 14px 12px;'>",
+            "<hr style='border-color:#1E3A5F;border-width:0.5px;opacity:0.4;margin:20px 14px 14px 14px;'>",
             unsafe_allow_html=True,
         )
 
-        if st.sidebar.button("\U0001f6aa Sair", use_container_width=True):
-            from src.auth import build_logout_url
-            from src.config import get_auth_config
+        from src.auth import build_logout_url
+        from src.config import get_auth_config
 
-            st.session_state.clear()
-            config = get_auth_config()
-            logout_url = build_logout_url(config)
-            st.markdown(
-                f'<meta http-equiv="refresh" content="0; url={logout_url}">',
-                unsafe_allow_html=True,
-            )
-            st.stop()
+        config = get_auth_config()
+        logout_url = build_logout_url(config)
+
+        st.sidebar.markdown(
+            f"""
+            <div style="display:flex;gap:8px;padding:0 8px;">
+                <a href="#" onclick="var d=document.body.getAttribute('data-theme');if(d==='dark'){{document.body.removeAttribute('data-theme');sessionStorage.setItem('lv_dark_mode','false');}}else{{document.body.setAttribute('data-theme','dark');sessionStorage.setItem('lv_dark_mode','true');}}return false;"
+                   style="display:inline-flex;align-items:center;justify-content:center;
+                   width:40px;height:40px;border-radius:8px;border:1px solid #1E3A5F;
+                   color:#F1F5F9;text-decoration:none;transition:all 0.2s ease;flex-shrink:0;"
+                   onmouseover="this.style.background='rgba(21,101,192,0.15)';this.style.borderColor='#2196F3';this.style.color='#64B5F6';"
+                   onmouseout="this.style.background='transparent';this.style.borderColor='#1E3A5F';this.style.color='#F1F5F9';"
+                   title="Alternar modo escuro">
+                    {ICONE_TEMA}
+                </a>
+                <a href="{logout_url}" target="_self"
+                   style="display:inline-flex;align-items:center;justify-content:center;gap:8px;
+                   flex:1;height:40px;border-radius:8px;border:1px solid #1E3A5F;
+                   color:#F1F5F9;text-decoration:none;font-size:13px;font-weight:500;
+                   transition:all 0.2s ease;"
+                   onmouseover="this.style.background='rgba(21,101,192,0.15)';this.style.borderColor='#2196F3';this.style.color='#64B5F6';"
+                   onmouseout="this.style.background='transparent';this.style.borderColor='#1E3A5F';this.style.color='#F1F5F9';">
+                    {ICONE_SAIR} Sair
+                </a>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def _renderizar_grupo_secoes(secoes: list[tuple[str, list[tuple[str, str]]]]) -> None:
     for secao, itens in secoes:
         icone = ICONES_MAPA.get(secao, "")
         st.sidebar.markdown(
-            f"""<p style="color:#90A4AE;font-size:11px;
-            letter-spacing:0.8px;text-transform:uppercase;font-weight:600;
-            margin-top:14px;margin-bottom:2px;padding:0 12px;">
+            f"""<p style="color:#94A3B8;font-size:10px;
+            letter-spacing:1.0px;text-transform:uppercase;font-weight:600;
+            margin-top:16px;margin-bottom:8px;padding:0 14px;">
             <span style="display:inline-flex;align-items:center;gap:6px;">{icone} {secao}</span></p>""",
             unsafe_allow_html=True,
         )
@@ -267,10 +302,10 @@ def _renderizar_grupo_secoes(secoes: list[tuple[str, list[tuple[str, str]]]]) ->
 
 
 def _renderizar_logo_sidebar() -> None:
-    st.sidebar.markdown(_logo_sidebar_html("assets/logo_1.png"), unsafe_allow_html=True)
+    st.sidebar.markdown(_logo_sidebar_html("assets/logo_labvida.png"), unsafe_allow_html=True)
     st.sidebar.markdown(
-        '<p style="margin:6px 0 0 0;font-size:18px;font-weight:700;color:#37474F;text-align:center;">LabVida</p>'
-        '<p style="margin:2px 0 0 0;font-size:11px;color:#90A4AE;letter-spacing:1.2px;text-transform:uppercase;text-align:center;">'
+        '<p style="margin:6px 0 0 0;font-size:18px;font-weight:700;color:#F1F5F9;text-align:center;">LabVida</p>'
+        '<p style="margin:2px 0 0 0;font-size:10px;color:#94A3B8;letter-spacing:1.2px;text-transform:uppercase;text-align:center;">'
         'ERP Laboratorial</p>',
         unsafe_allow_html=True,
     )
@@ -280,8 +315,8 @@ def _logo_sidebar_html(image_path: str) -> str:
     logo_bytes = Path(image_path).read_bytes()
     logo_base64 = b64encode(logo_bytes).decode("ascii")
     return (
-        '<div style="display:flex;justify-content:center;margin:8px 0 10px 0;">'
+        '<div style="display:flex;justify-content:center;margin:10px 0 12px 0;">'
         f'<img src="data:image/png;base64,{logo_base64}" alt="LabVida" '
-        'style="width:120px;height:auto;display:block;object-fit:contain;" />'
+        'style="width:48px;height:auto;display:block;object-fit:contain;border-radius:10px;" />'
         '</div>'
     )

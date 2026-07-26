@@ -23,7 +23,6 @@ from src.ui_components import (
 from src.ui_theme import ACCENT_ORANGE, ACCENT_TEAL, ACCENT_AMBER, ACCENT_BLUE
 from src.ui_icons import (
     ICONE_ALERTA,
-    ICONE_AMOSTRA,
     ICONE_COLETA,
     ICONE_FINANCEIRO,
     ICONE_HOME,
@@ -31,6 +30,7 @@ from src.ui_icons import (
     ICONE_OK,
     ICONE_OS,
     ICONE_PRODUTIVIDADE,
+    ICONE_TRANSITO,
 )
 
 
@@ -48,15 +48,29 @@ def main() -> None:
 
     _renderizar_kpis()
 
+    st.markdown("<br>", unsafe_allow_html=True)
+
     col_a1, col_a2, col_a3, col_a4 = st.columns(4)
-    with col_a1:
-        st.page_link("pages/atendimento_os.py", label="\U0001f4cb Abrir OS", use_container_width=True)
-    with col_a2:
-        st.page_link("pages/atendimento_coleta.py", label="\U0001f489 Registrar Coleta", use_container_width=True)
-    with col_a3:
-        st.page_link("pages/laboratorio_laudos.py", label="\U0001f4c4 Novo Laudo", use_container_width=True)
-    with col_a4:
-        st.page_link("pages/faturamento_guias.py", label="\U0001f4b0 Faturar", use_container_width=True)
+    links_rapidos = [
+        (ICONE_OS, "Abrir OS", "atendimento_os"),
+        (ICONE_COLETA, "Registrar Coleta", "atendimento_coleta"),
+        (ICONE_LAUDO, "Novo Laudo", "laboratorio_laudos"),
+        (ICONE_FINANCEIRO, "Faturar", "faturamento_guias"),
+    ]
+    for col, (icone, texto, pagina) in zip([col_a1, col_a2, col_a3, col_a4], links_rapidos):
+        with col:
+            st.markdown(
+                f"""<a href="/{pagina}" target="_self" style="
+                    display:flex;align-items:center;justify-content:center;gap:8px;
+                    background:#1565C0;color:#fff;padding:10px 16px;
+                    border-radius:8px;text-decoration:none;font-size:13px;font-weight:500;
+                    transition:all 0.15s ease;
+                " onmouseover="this.style.background='#0D47A1'"
+                   onmouseout="this.style.background='#1565C0'">
+                    {icone} {texto}
+                </a>""",
+                unsafe_allow_html=True,
+            )
 
     st.markdown("<br>", unsafe_allow_html=True)
 
@@ -104,7 +118,7 @@ def _renderizar_kpis() -> None:
             rotulo="OS em aberto",
             valor=str(os_abertas),
             icone=ICONE_OS,
-            cor_destaque=ACCENT_ORANGE,
+            cor_destaque=ACCENT_BLUE,
         )
 
     with col2:
@@ -129,7 +143,7 @@ def _renderizar_kpis() -> None:
             rotulo="Faturamento do mes",
             valor=valor_fmt,
             icone=ICONE_FINANCEIRO,
-            cor_destaque=ACCENT_BLUE,
+            cor_destaque=ACCENT_ORANGE,
         )
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -206,7 +220,7 @@ def _renderizar_alertas() -> None:
         )
     if amostras_em_transito > 0:
         alertas.append(
-            (ICONE_AMOSTRA, f"{amostras_em_transito} amostra(s) em transito", "info")
+            (ICONE_TRANSITO, f"{amostras_em_transito} amostra(s) em transito", "info")
         )
     if laudos_pendentes > 0:
         alertas.append(
@@ -224,8 +238,8 @@ def _renderizar_alertas() -> None:
     for icone, texto, tipo in alertas:
         cores = {
             "warning": ("#FFF3E0", "#E67E22"),
-            "info": ("#E3F2FD", "#1E75C4"),
-            "error": ("#FFEBEE", "#D32F2F"),
+            "info": ("#E3F2FD", "#1565C0"),
+            "error": ("#FFEBEE", "#C62828"),
             "success": ("#E0F2F1", "#00897B"),
         }
         bg, cor = cores.get(tipo, ("#ECEFF1", "#607D8B"))
@@ -233,8 +247,9 @@ def _renderizar_alertas() -> None:
         st.markdown(
             f"""
             <div style="display:flex;align-items:center;gap:10px;
-            background:{bg};border-radius:6px;padding:10px 14px;margin-bottom:8px;">
-                <span style="font-size:20px;">{icone}</span>
+            background:{bg};border-radius:8px;padding:12px 16px;margin-bottom:8px;
+            border-left:3px solid {cor};">
+                <span style="font-size:18px;flex-shrink:0;">{icone}</span>
                 <span style="font-size:13px;color:{cor};font-weight:500;">{texto}</span>
             </div>
             """,

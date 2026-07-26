@@ -14,7 +14,7 @@ from src.logistica.malote.service import (
 )
 from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import renderizar_cabecalho, renderizar_secao
-from src.ui_icons import ICONE_AMOSTRA
+from src.ui_icons import ICONE_MALOTE
 
 
 def main() -> None:
@@ -24,7 +24,7 @@ def main() -> None:
     renderizar_cabecalho(
         titulo="Gestao de Malotes",
         subtitulo="Criacao, vinculacao de amostras e despacho de malotes entre unidades",
-        icone=ICONE_AMOSTRA,
+        icone=ICONE_MALOTE,
     )
 
     usuario_id = usuario_id_logado()
