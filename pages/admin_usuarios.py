@@ -1,5 +1,4 @@
 import streamlit as st
-
 from src.db import session_scope
 from src.rbac import service as rbac_service
 from src.rbac.errors import PerfilNaoEncontrado
