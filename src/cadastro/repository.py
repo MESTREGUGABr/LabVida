@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.cadastro.models import Convenio, Paciente
+from src.lgpd import gerar_hash_cpf
 
 
 def obter_por_id(session: Session, paciente_id: UUID) -> Paciente | None:
@@ -11,7 +12,8 @@ def obter_por_id(session: Session, paciente_id: UUID) -> Paciente | None:
 
 
 def obter_por_cpf(session: Session, cpf: str) -> Paciente | None:
-    return session.scalar(select(Paciente).where(Paciente.cpf == cpf))
+    cpf_hash = gerar_hash_cpf(cpf)
+    return session.scalar(select(Paciente).where(Paciente.cpf_hash == cpf_hash))
 
 
 def listar_ativos_ordenados_por_nome(session: Session) -> list[Paciente]:
