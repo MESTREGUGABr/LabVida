@@ -5,14 +5,19 @@ from src.rbac.errors import PerfilNaoEncontrado
 from src.usuario import repository as usuario_repository
 from src.usuario.errors import UsuarioNaoEncontrado
 from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
+from src.ui_icons import ICONE_LIBERAR
 
 
 def main() -> None:
     ctx = shell("LabVida - Administração de Usuários", layout="wide", permissao="admin:gerenciar_usuarios")
     renderizar_menu(ctx["usuario_id"])
 
-    st.title("Administração de Usuários")
-    st.caption("Gerencie os perfis de acesso dos usuários do LabVida")
+    renderizar_cabecalho(
+        titulo="Administracao de Usuarios",
+        subtitulo="Gerencie os perfis de acesso dos usuarios do LabVida",
+        icone=ICONE_LIBERAR,
+    )
 
     tab_usuarios, tab_perfis = st.tabs(["Usuários", "Perfis e Permissões"])
 
@@ -24,7 +29,7 @@ def main() -> None:
 
 
 def _render_usuarios() -> None:
-    st.subheader("Vincular Usuário a Perfil")
+    renderizar_secao(titulo="Vincular Usuario a Perfil")
 
     with session_scope() as session:
         usuarios = usuario_repository.listar(session)
@@ -76,7 +81,7 @@ def _render_usuarios() -> None:
 
 
 def _render_perfis() -> None:
-    st.subheader("Perfis e Permissões")
+    renderizar_secao(titulo="Perfis e Permissoes")
 
     with session_scope() as session:
         perfis = rbac_service.listar_perfis(session)

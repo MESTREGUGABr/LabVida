@@ -13,14 +13,19 @@ from src.laboratorial.dtos import (
 )
 from src.laboratorial.service import LaboratorialService
 from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho, renderizar_secao
+from src.ui_icons import ICONE_RESULTADO
 
 
 def main() -> None:
     ctx = shell("Cadastros Laboratoriais", layout="wide", permissao="laboratorial:registrar_resultado")
     renderizar_menu(ctx["usuario_id"])
 
-    st.title("Cadastros Laboratoriais")
-    st.markdown("Gerencie Equipamentos e Valores de Referência.")
+    renderizar_cabecalho(
+        titulo="Cadastros Laboratoriais",
+        subtitulo="Gerencie Equipamentos e Valores de Referencia",
+        icone=ICONE_RESULTADO,
+    )
 
     tab1, tab2 = st.tabs(["Equipamentos", "Valores de Referência"])
 
@@ -32,7 +37,7 @@ def main() -> None:
 
 
 def _render_equipamentos() -> None:
-    st.header("Novo Equipamento")
+    renderizar_secao(titulo="Novo Equipamento")
 
     with session_scope() as session:
         unidades = listar_unidades(session)
@@ -64,7 +69,7 @@ def _render_equipamentos() -> None:
             st.success(f"Equipamento {nome_eq} salvo com sucesso!")
 
     st.divider()
-    st.header("Equipamentos Cadastrados")
+    renderizar_secao(titulo="Equipamentos Cadastrados")
     with session_scope() as session:
         service = LaboratorialService(session)
         lista_eq = service.listar_equipamentos()
@@ -74,14 +79,14 @@ def _render_equipamentos() -> None:
                     {"ID": e.id, "Nome": e.nome, "Protocolo": e.protocolo.value}
                     for e in lista_eq
                 ],
-                use_container_width=True,
+                width="stretch",
             )
         else:
             st.info("Nenhum equipamento cadastrado.")
 
 
 def _render_valores_referencia() -> None:
-    st.header("Novo Valor de Referência")
+    renderizar_secao(titulo="Novo Valor de Referencia")
     with session_scope() as session:
         procedimentos = listar_procedimentos(session)
         if not procedimentos:
@@ -123,7 +128,7 @@ def _render_valores_referencia() -> None:
                 st.error(str(e))
 
     st.divider()
-    st.header("Valores de Referência Cadastrados")
+    renderizar_secao(titulo="Valores de Referencia Cadastrados")
     with session_scope() as session:
         service = LaboratorialService(session)
         lista_vr = service.listar_valores_referencia()
@@ -139,7 +144,7 @@ def _render_valores_referencia() -> None:
                     }
                     for vr in lista_vr
                 ],
-                use_container_width=True,
+                width="stretch",
             )
         else:
             st.info("Nenhum valor de referência cadastrado.")

@@ -3,14 +3,19 @@ import pandas as pd
 
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
+from src.ui_icons import ICONE_FINANCEIRO
 
 
 def main() -> None:
     ctx = shell("BI - Financeiro", layout="wide", permissao="bi:visualizar")
     renderizar_menu(ctx["usuario_id"])
 
-    st.title("Indicadores Financeiros")
-    st.caption("Receita, glosas e rentabilidade por convênio e procedimento")
+    renderizar_cabecalho(
+        titulo="Indicadores Financeiros",
+        subtitulo="Receita, glosas e rentabilidade por convenio e procedimento",
+        icone=ICONE_FINANCEIRO,
+    )
 
     with session_scope() as session:
         from sqlalchemy import text
@@ -56,7 +61,11 @@ def main() -> None:
         )
 
     if receita_por_convenio.empty:
-        st.info("Nenhum dado financeiro disponível. Execute o ETL primeiro.")
+        renderizar_empty_state(
+            icone=ICONE_FINANCEIRO,
+            titulo="Nenhum dado financeiro",
+            mensagem="Execute o ETL primeiro para popular os indicadores financeiros.",
+        )
         return
 
     raw_faturado = totais["total_faturado"].iloc[0] if not totais.empty else 0
@@ -72,20 +81,20 @@ def main() -> None:
 
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("Receita por Convênio")
+        renderizar_secao(titulo="Receita por Convenio")
         st.bar_chart(
             receita_por_convenio.set_index("convenio")[["faturado", "glosado"]],
             use_container_width=True,
         )
 
     with col2:
-        st.subheader("Top 10 Procedimentos")
+        renderizar_secao(titulo="Top 10 Procedimentos")
         st.bar_chart(
             receita_por_procedimento.set_index("procedimento"),
             use_container_width=True,
         )
 
-    st.subheader("Fluxo de Caixa (Recebido vs Pago)")
+    renderizar_secao(titulo="Fluxo de Caixa")
     if not fluxo_caixa.empty:
         st.bar_chart(
             fluxo_caixa.set_index("mes")[["recebido", "pago"]],

@@ -14,14 +14,19 @@ from src.financeiro.titulo_pagar.service import (
     listar_todos as pagar_todos,
 )
 from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao, renderizar_status_badge
+from src.ui_icons import ICONE_FINANCEIRO
 
 
 def main() -> None:
     ctx = shell("LabVida - Contas", layout="wide", permissao="financeiro:baixar_titulo")
     renderizar_menu(ctx["usuario_id"])
 
-    st.title("Contas")
-    st.caption("Contas a receber e contas a pagar")
+    renderizar_cabecalho(
+        titulo="Contas",
+        subtitulo="Contas a receber e contas a pagar",
+        icone=ICONE_FINANCEIRO,
+    )
 
     tab1, tab2 = st.tabs(["Contas a Receber", "Contas a Pagar"])
 
@@ -32,7 +37,7 @@ def main() -> None:
 
 
 def _render_receber() -> None:
-    st.subheader("Contas a Receber")
+    renderizar_secao(titulo="Contas a Receber")
 
     with session_scope() as session:
         titulos = receber_todos(session)
@@ -40,7 +45,11 @@ def _render_receber() -> None:
         lotes = {l.id: l.convenio_id for l in listar_lotes(session)}
 
     if not titulos:
-        st.info("Nenhum título a receber registrado.")
+        renderizar_empty_state(
+            icone=ICONE_FINANCEIRO,
+            titulo="Nenhum titulo a receber",
+            mensagem="Feche um lote de faturamento para gerar titulos a receber.",
+        )
         st.caption("Feche um lote de faturamento para gerar títulos a receber.")
         return
 
@@ -48,15 +57,17 @@ def _render_receber() -> None:
     st.caption(f"{len(pendentes)} pendentes de {len(titulos)} total")
 
     for t in titulos:
-        emoji = "🟢" if t.status == "PAGO" else "🟡" if t.status == "PENDENTE" else "🔴"
+        status_tipo = "success" if t.status == "PAGO" else "warning" if t.status == "PENDENTE" else "error"
         ref = _conv_label(convs, lotes, t.lote_faturamento_id)
 
         with st.container(border=True):
             c1, c2 = st.columns([4, 1])
             with c1:
-                st.write(f"{emoji} **R$ {t.valor:.2f}** — Vencimento: {t.vencimento.strftime('%d/%m/%Y')}")
+                st.metric(f"R$ {t.valor:.2f}", f"Vencimento: {t.vencimento.strftime('%d/%m/%Y')}")
                 st.caption(f"Status: {t.status} | {ref}")
             with c2:
+                st.write("")
+                renderizar_status_badge(t.status, status_tipo)
                 if t.status == "PENDENTE":
                     if st.button("Baixar", key=f"receber_{t.id}"):
                         st.session_state[f"form_receber_{t.id}"] = True
@@ -95,13 +106,17 @@ def _render_receber() -> None:
 
 
 def _render_pagar() -> None:
-    st.subheader("Contas a Pagar")
+    renderizar_secao(titulo="Contas a Pagar")
 
     with session_scope() as session:
         titulos = pagar_todos(session)
 
     if not titulos:
-        st.info("Nenhum título a pagar registrado.")
+        renderizar_empty_state(
+            icone=ICONE_FINANCEIRO,
+            titulo="Nenhum titulo a pagar",
+            mensagem="Os titulos a pagar gerados a partir de pedidos de compra aparecerao aqui.",
+        )
         st.caption("Execute o seeder financeiro ou crie pedidos de compra (Compras).")
         return
 

@@ -13,14 +13,19 @@ from src.compras.pedido_compra.service import (
 )
 from src.db import session_scope
 from src.ui import renderizar_menu, shell, usuario_id_logado
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao, renderizar_status_badge
+from src.ui_icons import ICONE_PEDIDO
 
 
 def main() -> None:
     ctx = shell("LabVida - Pedidos de Compra", layout="wide", permissao="compras:solicitar")
     renderizar_menu(ctx["usuario_id"])
 
-    st.title("Pedidos de Compra")
-    st.caption("Solicitação, aprovação e recebimento de pedidos de insumos")
+    renderizar_cabecalho(
+        titulo="Pedidos de Compra",
+        subtitulo="Solicitacao, aprovacao e recebimento de pedidos de insumos",
+        icone=ICONE_PEDIDO,
+    )
 
     tab1, tab2 = st.tabs(["Novo Pedido", "Acompanhar"])
 
@@ -31,7 +36,7 @@ def main() -> None:
 
 
 def _render_novo_pedido() -> None:
-    st.subheader("Novo Pedido de Compra")
+    renderizar_secao(titulo="Novo Pedido de Compra")
 
     with session_scope() as session:
         fornecedores = listar_fornecedores(session)
@@ -79,7 +84,7 @@ def _render_novo_pedido() -> None:
 
 
 def _render_acompanhar() -> None:
-    st.subheader("Pedidos")
+    renderizar_secao(titulo="Pedidos")
 
     with session_scope() as session:
         pedidos = listar_pedidos(session)
@@ -91,16 +96,18 @@ def _render_acompanhar() -> None:
         return
 
     for p in pedidos:
-        status_emoji = {"RASCUNHO": "📝", "APROVADO": "✅", "RECEBIDO": "📦", "CANCELADO": "❌"}
-        emoji = status_emoji.get(p.status, "❓")
+        status_tipo = {"RASCUNHO": "neutral", "APROVADO": "info", "RECEBIDO": "success", "CANCELADO": "error"}
+        tipo = status_tipo.get(p.status, "neutral")
         total_itens = len(p.itens)
 
         with st.container(border=True):
             c1, c2 = st.columns([4, 1])
             with c1:
-                st.write(f"{emoji} **Pedido** — R$ {p.valor_total:.2f} — {total_itens} itens")
-                st.caption(f"Status: {p.status} | Fornecedor: {forn_nomes.get(p.fornecedor_id, 'Desconhecido')} | Criado: {p.criado_em.strftime('%d/%m/%Y %H:%M')}")
+                st.write(f"**Pedido** — R$ {p.valor_total:.2f} — {total_itens} itens")
+                st.caption(f"Fornecedor: {forn_nomes.get(p.fornecedor_id, 'Desconhecido')} | Criado: {p.criado_em.strftime('%d/%m/%Y %H:%M')}")
             with c2:
+                st.write("")
+                renderizar_status_badge(p.status, tipo)
                 if p.status == "RASCUNHO":
                     col_a, col_b = st.columns(2)
                     with col_a:

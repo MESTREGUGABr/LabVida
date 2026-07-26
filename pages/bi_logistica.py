@@ -3,14 +3,19 @@ import pandas as pd
 
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
+from src.ui_icons import ICONE_AMOSTRA
 
 
 def main() -> None:
     ctx = shell("BI - Logística", layout="wide", permissao="bi:visualizar")
     renderizar_menu(ctx["usuario_id"])
 
-    st.title("Indicadores Logísticos")
-    st.caption("Amostras, malotes e eficiência da cadeia de custódia")
+    renderizar_cabecalho(
+        titulo="Indicadores Logisticos",
+        subtitulo="Amostras, malotes e eficiencia da cadeia de custodia",
+        icone=ICONE_AMOSTRA,
+    )
 
     with session_scope() as session:
         from sqlalchemy import text
@@ -55,7 +60,11 @@ def main() -> None:
         )
 
     if amostras_por_unidade.empty and pendencias.empty:
-        st.info("Nenhum dado logístico disponível. Execute o ETL primeiro.")
+        renderizar_empty_state(
+            icone=ICONE_AMOSTRA,
+            titulo="Nenhum dado logistico",
+            mensagem="Execute o ETL primeiro para popular os indicadores logisticos.",
+        )
         return
 
     raw_amostras = totais_log["total_amostras"].iloc[0] if not totais_log.empty else 0
@@ -72,20 +81,20 @@ def main() -> None:
     col1, col2 = st.columns(2)
     with col1:
         if not amostras_por_unidade.empty:
-            st.subheader("Amostras por Unidade")
-            st.bar_chart(amostras_por_unidade.set_index("unidade"), use_container_width=True)
+            renderizar_secao(titulo="Amostras por Unidade")
+            st.bar_chart(amostras_por_unidade.set_index("unidade"), width="stretch")
 
     with col2:
         if not divergencias.empty:
-            st.subheader("Divergências por Unidade")
-            st.bar_chart(divergencias.set_index("unidade"), use_container_width=True)
+            renderizar_secao(titulo="Divergencias por Unidade")
+            st.bar_chart(divergencias.set_index("unidade"), width="stretch")
 
     if not pendencias.empty:
-        st.subheader("Status Atual das Amostras (Base Operacional)")
+        renderizar_secao(titulo="Status Atual das Amostras")
         st.dataframe(
             pendencias.rename(columns={"status": "Status", "quantidade": "Quantidade"}),
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
 
 

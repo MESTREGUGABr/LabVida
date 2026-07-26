@@ -3,14 +3,19 @@ import pandas as pd
 
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
+from src.ui_icons import ICONE_PRODUTIVIDADE
 
 
 def main() -> None:
     ctx = shell("BI - Produtividade", layout="wide", permissao="bi:visualizar")
     renderizar_menu(ctx["usuario_id"])
 
-    st.title("Produtividade Operacional")
-    st.caption("Indicadores de atendimento e exames por unidade")
+    renderizar_cabecalho(
+        titulo="Produtividade Operacional",
+        subtitulo="Indicadores de atendimento e exames por unidade",
+        icone=ICONE_PRODUTIVIDADE,
+    )
 
     with session_scope() as session:
         from sqlalchemy import text
@@ -56,7 +61,11 @@ def main() -> None:
         )
 
     if exames_por_unidade.empty:
-        st.info("Nenhum dado de atendimento disponível. Execute o ETL primeiro.")
+        renderizar_empty_state(
+            icone=ICONE_PRODUTIVIDADE,
+            titulo="Nenhum dado disponivel",
+            mensagem="Execute o ETL primeiro para popular os indicadores de produtividade.",
+        )
         return
 
     total_exames = int(exames_por_unidade["exames"].sum()) if not exames_por_unidade.empty else 0
@@ -69,17 +78,17 @@ def main() -> None:
 
     col1, col2 = st.columns(2)
     with col1:
-        st.subheader("Exames por Unidade")
+        renderizar_secao(titulo="Exames por Unidade")
         st.bar_chart(exames_por_unidade.set_index("unidade"), use_container_width=True)
 
     with col2:
-        st.subheader("Exames por Convênio")
+        renderizar_secao(titulo="Exames por Convenio")
         st.bar_chart(exames_por_convenio.set_index("convenio"), use_container_width=True)
 
-    st.subheader("Evolução Mensal")
+    renderizar_secao(titulo="Evolucao Mensal")
     st.line_chart(exames_por_mes.set_index("mes"), use_container_width=True)
 
-    st.subheader("Distribuição por Faixa Etária (Anônimo — LGPD)")
+    renderizar_secao(titulo="Distribuicao por Faixa Etaria")
     st.bar_chart(faixa_etaria.set_index("faixa_etaria"), use_container_width=True)
 
 

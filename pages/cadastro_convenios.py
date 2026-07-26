@@ -6,14 +6,19 @@ from src.cadastro.convenio.errors import ConvenioNaoEncontrado
 from src.cadastro.convenio.service import alternar_status, criar_convenio, listar_convenios
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_status_badge
+from src.ui_icons import ICONE_CONVENIO
 
 
 def main() -> None:
     ctx = shell("LabVida - Convênios", permissao="cadastro:convenios:escrever")
     renderizar_menu(ctx["usuario_id"])
 
-    st.title("Convênios")
-    st.caption("Operadoras conveniadas; o status controla o uso em Ordens de Serviço")
+    renderizar_cabecalho(
+        titulo="Convenios",
+        subtitulo="Operadoras conveniadas; o status controla o uso em Ordens de Servico",
+        icone=ICONE_CONVENIO,
+    )
 
     with st.form("form_convenio", clear_on_submit=True):
         nome = st.text_input("Nome")
@@ -34,15 +39,20 @@ def main() -> None:
         convenios = listar_convenios(session)
 
     if not convenios:
-        st.info("Nenhum convênio cadastrado")
+        renderizar_empty_state(
+            icone=ICONE_CONVENIO,
+            titulo="Nenhum convenio cadastrado",
+            mensagem="Os convenios cadastrados aparecerao aqui.",
+        )
         return
 
-    st.subheader("Convênios cadastrados")
+    st.subheader("Convenios cadastrados")
     for convenio in convenios:
         coluna_nome, coluna_status, coluna_acao = st.columns([3, 1, 1])
         coluna_nome.write(f"**{convenio.nome}**  \nANS: {convenio.registro_ans or '—'}")
         ativo = convenio.status == StatusConvenio.ATIVO
-        coluna_status.write("🟢 Ativo" if ativo else "🔴 Inativo")
+        with coluna_status:
+            renderizar_status_badge("Ativo" if ativo else "Inativo", "success" if ativo else "neutral")
         rotulo = "Inativar" if ativo else "Ativar"
         if coluna_acao.button(rotulo, key=f"status_{convenio.id}"):
             try:

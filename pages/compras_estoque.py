@@ -9,14 +9,19 @@ from src.compras.insumo.service import (
 )
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
+from src.ui_icons import ICONE_ESTOQUE
 
 
 def main() -> None:
     ctx = shell("LabVida - Estoque", layout="wide", permissao="compras:visualizar_estoque")
     renderizar_menu(ctx["usuario_id"])
 
-    st.title("Estoque")
-    st.caption("Cadastro de insumos e controle de movimentações")
+    renderizar_cabecalho(
+        titulo="Estoque",
+        subtitulo="Cadastro de insumos e controle de movimentacoes",
+        icone=ICONE_ESTOQUE,
+    )
 
     tab1, tab2 = st.tabs(["Insumos", "Movimentações"])
 
@@ -30,7 +35,7 @@ def _render_insumos() -> None:
     col_form, col_list = st.columns([1, 2])
 
     with col_form:
-        st.subheader("Novo Insumo")
+        renderizar_secao(titulo="Novo Insumo")
         nome = st.text_input("Nome")
         finalidade = st.text_input("Finalidade")
         if st.button("Cadastrar", type="primary"):
@@ -44,7 +49,7 @@ def _render_insumos() -> None:
                 st.error(str(e))
 
     with col_list:
-        st.subheader("Estoque Atual")
+        renderizar_secao(titulo="Estoque Atual")
         with session_scope() as session:
             insumos = listar_insumos(session)
 
@@ -59,11 +64,11 @@ def _render_insumos() -> None:
                 "Finalidade": i.finalidade,
                 "Qtd Estoque": f"{i.quantidade_estoque:.3f}",
             })
-        st.dataframe(rows, hide_index=True, use_container_width=True)
+        st.dataframe(rows, hide_index=True, width="stretch")
 
 
 def _render_movimentacoes() -> None:
-    st.subheader("Histórico de Movimentações")
+    renderizar_secao(titulo="Historico de Movimentacoes")
 
     with session_scope() as session:
         movs = listar_todos_movimentos(session)
@@ -84,7 +89,7 @@ def _render_movimentacoes() -> None:
             "Qtd": f"{m.quantidade:.3f}",
             "Observação": m.observacao or "—",
         })
-    st.dataframe(rows, hide_index=True, use_container_width=True)
+    st.dataframe(rows, hide_index=True, width="stretch")
 
 
 if __name__ == "__main__":

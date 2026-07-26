@@ -11,14 +11,19 @@ from src.cadastro.unidade.service import (
 )
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
+from src.ui_components import renderizar_cabecalho
+from src.ui_icons import ICONE_UNIDADE
 
 
 def main() -> None:
     ctx = shell("LabVida - Unidades e Setores", permissao="cadastro:unidades:escrever")
     renderizar_menu(ctx["usuario_id"])
 
-    st.title("Unidades e Setores")
-    st.caption("Cadastro das unidades da rede (central e coletas) e seus setores")
+    renderizar_cabecalho(
+        titulo="Unidades e Setores",
+        subtitulo="Cadastro das unidades da rede (central e coletas) e seus setores",
+        icone=ICONE_UNIDADE,
+    )
 
     tab_unidade, tab_setor = st.tabs(["Unidades", "Setores"])
 
@@ -51,7 +56,7 @@ def _render_unidades() -> None:
         st.dataframe(
             [{"Nome": u.nome, "Tipo": _formatar_tipo(u.tipo), "Endereço": u.endereco or "—"} for u in unidades],
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
     else:
         st.info("Nenhuma unidade cadastrada")
@@ -88,7 +93,7 @@ def _render_setores() -> None:
 
     if setores:
         st.dataframe(
-            [{"Setor": s.nome} for s in setores], hide_index=True, use_container_width=True
+            [{"Setor": s.nome} for s in setores], hide_index=True, width="stretch"
         )
     else:
         st.info("Nenhum setor nesta unidade")
