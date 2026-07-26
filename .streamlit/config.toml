@@ -1,0 +1,11 @@
+[theme]
+primaryColor = "#E84A27"
+backgroundColor = "#FAFBFC"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#212121"
+font = "Inter, system-ui, -apple-system, sans-serif"
+
+[server]
+enableXsrfProtection = true
+enableCORS = false
+headless = true
