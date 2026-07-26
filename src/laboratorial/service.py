@@ -2,10 +2,12 @@ from collections.abc import Sequence
 from datetime import datetime, timezone
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.atendimento.ordem_servico.dtos import StatusOsItem
-from src.atendimento.ordem_servico.models import OsItem
+from src.atendimento.ordem_servico import service as ordem_servico_service
+from src.atendimento.ordem_servico.dtos import StatusOrdemServico, StatusOsItem
+from src.atendimento.ordem_servico.models import OrdemServico, OsItem
 from src.laboratorial.dtos import (
     EquipamentoCreate,
     EquipamentoUpdate,
@@ -191,7 +193,9 @@ class LaboratorialService:
         self.repository.session.refresh(laudo)
         return laudo
 
-    def atualizar_laudo(self, laudo_id: UUID, dto: LaudoUpdate) -> Laudo:
+    def atualizar_laudo(
+        self, laudo_id: UUID, dto: LaudoUpdate, usuario_id: UUID
+    ) -> Laudo:
         laudo = self.repository.get_laudo(laudo_id)
         if not laudo:
             raise ValueError("Laudo não encontrado")
@@ -213,11 +217,45 @@ class LaboratorialService:
             os_item = self.repository.session.get(OsItem, laudo.os_item_id)
             if os_item:
                 os_item.status = StatusOsItem.RESULTADO_LIBERADO
+                self._concluir_os_se_todos_laudos_liberados(os_item, usuario_id)
 
         laudo = self.repository.save_laudo(laudo)
         self.repository.session.commit()
         self.repository.session.refresh(laudo)
         return laudo
+
+    def _concluir_os_se_todos_laudos_liberados(
+        self, os_item: OsItem, usuario_id: UUID | None
+    ) -> None:
+        ordem = self.repository.session.get(OrdemServico, os_item.ordem_servico_id)
+        if ordem is None or ordem.status != StatusOrdemServico.EM_ANALISE:
+            return
+
+        itens = self.repository.session.scalars(
+            select(OsItem).where(OsItem.ordem_servico_id == ordem.id)
+        ).all()
+        itens_ativos = [item for item in itens if item.status != StatusOsItem.CANCELADO]
+        if not itens_ativos:
+            return
+
+        item_ids = [item.id for item in itens_ativos]
+        laudos = self.repository.session.scalars(
+            select(Laudo).where(Laudo.os_item_id.in_(item_ids))
+        ).all()
+        laudos_por_item = {laudo.os_item_id: laudo for laudo in laudos}
+
+        todos_liberados = all(
+            laudos_por_item.get(item.id) is not None
+            and laudos_por_item[item.id].status == StatusLaudo.LIBERADO
+            for item in itens_ativos
+        )
+        if todos_liberados:
+            ordem_servico_service.registrar_transicao(
+                self.repository.session,
+                ordem,
+                StatusOrdemServico.CONCLUIDA,
+                usuario_id,
+            )
 
     def obter_laudo_por_os_item(self, os_item_id: UUID) -> Laudo | None:
         return self.repository.get_laudo_by_os_item(os_item_id)

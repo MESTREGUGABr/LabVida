@@ -16,6 +16,18 @@ _Evitar_: modulo inicial, base de dados, tela de cadastro.
 Entidade central do fluxo operacional; representa o atendimento de um paciente e agrupa os exames solicitados.
 _Evitar_: pedido, atendimento, ordem.
 
+**Item ativo da OS**:
+Item de uma Ordem de Servico que ainda participa do atendimento e pode exigir a liberacao de um Laudo; um item cancelado nao e ativo.
+_Evitar_: item pendente, exame ativo.
+
+**Conclusao da OS**:
+Estado da Ordem de Servico alcancado quando todos os seus itens ativos possuem Laudos liberados. Itens cancelados nao impedem a conclusao.
+_Evitar_: fechamento, finalizacao do pedido.
+
+**Cancelamento da OS**:
+Estado da Ordem de Servico alcancado quando todos os seus itens estao cancelados. O cancelamento de um ou mais itens nao cancela a OS enquanto houver trabalho ativo.
+_Evitar_: cancelamento parcial da ordem, exclusao da OS.
+
 **Paciente**:
 Pessoa de qualquer idade atendida pelo laboratorio e vinculada a uma ou mais Ordens de Servico.
 _Evitar_: cliente, usuario.

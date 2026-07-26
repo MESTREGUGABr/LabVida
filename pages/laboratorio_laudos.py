@@ -6,12 +6,14 @@ from sqlalchemy import select
 
 from src.db import session_scope
 from src.atendimento.ordem_servico.models import OsItem
+from src.cadastro.medico.service import listar_medicos_ativos
 from src.laboratorial.dtos import LaudoCreate, LaudoUpdate
 from src.laboratorial.models import StatusLaudo, StatusResultado
 from src.laboratorial.service import LaboratorialService
-from src.cadastro.medico.service import listar_medicos_ativos
+from src.ui import exigir_login, usuario_id_logado
 
 st.set_page_config(page_title="Emissão de Laudos", page_icon="📝", layout="wide")
+exigir_login()
 
 st.title("📝 Laudos e Liberação")
 st.markdown("Emita e assine digitalmente os laudos dos exames.")
@@ -95,7 +97,8 @@ with session_scope() as session:
                                     responsavel_tecnico_id=medico_opts[responsavel],
                                     assinatura_digital=assinatura if assinatura else None,
                                     status=StatusLaudo.LIBERADO,
-                                )
+                                ),
+                                usuario_id=usuario_id_logado(),
                             )
                             st.toast("Laudo LIBERADO com sucesso!", icon="✅")
                             time.sleep(0.5)
