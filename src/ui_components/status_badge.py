@@ -71,14 +71,15 @@ def renderizar_status_badge(status: str, tipo: str = "neutral") -> None:
         f"""
         <span style="
             display:inline-block;
-            padding:2px 10px;
+            padding:3px 12px;
             border-radius:12px;
-            font-size:12px;
+            font-size:11px;
             font-weight:600;
             background:{bg};
             color:{cor};
             white-space:nowrap;
             line-height:1.6;
+            letter-spacing:0.2px;
         ">{status}</span>
         """,
         unsafe_allow_html=True,

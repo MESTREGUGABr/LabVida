@@ -7,7 +7,7 @@ from typing import Any
 
 import streamlit as st
 
-from src.ui_theme import NEUTRAL_200, NEUTRAL_50, PRIMARY_500, WHITE
+from src.ui_theme import BORDER_RADIUS, NEUTRAL_200, SHADOW_CARD, WHITE
 
 
 @dataclass
@@ -32,9 +32,10 @@ def renderizar_barra_filtros(
         <div style="
             background:{WHITE};
             border:1px solid {NEUTRAL_200};
-            border-radius:8px;
-            padding:16px 16px 8px 16px;
-            margin-bottom:16px;
+            border-radius:{BORDER_RADIUS};
+            padding:18px 18px 10px 18px;
+            margin-bottom:20px;
+            box-shadow:{SHADOW_CARD};
         ">
         """,
         unsafe_allow_html=True,

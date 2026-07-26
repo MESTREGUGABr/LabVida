@@ -6,8 +6,6 @@ from dataclasses import dataclass
 
 import streamlit as st
 
-from src.ui_theme import NEUTRAL_700, PRIMARY_500, STATUS_ERROR
-
 
 @dataclass
 class Acao:
@@ -20,13 +18,8 @@ class Acao:
 
 
 def renderizar_barra_acoes(acoes: list[Acao]) -> None:
-    """Renderiza uma barra de botoes de acao em linha.
-
-    acoes: lista de Acao com rotulo, tipo ('primary', 'secondary', 'danger'),
-           ao_clicar, desabilitado, icone e chave.
-    """
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("<hr style='margin:0 0 12px 0;'>", unsafe_allow_html=True)
+    st.markdown("<hr style='margin:0 0 14px 0;border-color:#E0E4E8;border-width:0.5px;'>", unsafe_allow_html=True)
 
     num_acoes = len(acoes)
     colunas = st.columns(num_acoes) if num_acoes > 0 else []

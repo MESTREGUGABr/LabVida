@@ -51,7 +51,7 @@ def main() -> None:
 
 def _logo_base64() -> str:
     try:
-        with open("assets/logo_1.png", "rb") as f:
+        with open("assets/logo_labvida.png", "rb") as f:
             return base64.b64encode(f.read()).decode()
     except Exception:
         return ""
@@ -77,7 +77,7 @@ def _renderizar_login(config: AuthConfig) -> None:
 
     logo_img = (
         f'<img src="data:image/png;base64,{logo_b64}" '
-        f'width="72" style="border-radius:12px;" alt="LabVida">'
+        f'width="64" style="border-radius:12px;" alt="LabVida">'
     ) if logo_b64 else ""
 
     st.markdown(
@@ -89,7 +89,7 @@ def _renderizar_login(config: AuthConfig) -> None:
         footer {{ visibility: hidden; }}
 
         .stApp {{
-            background: linear-gradient(155deg, #0D2B4A 0%, #143B5E 40%, #1E4D73 100%);
+            background: linear-gradient(160deg, #0A2540 0%, #0D3B66 35%, #12508C 70%, #0D3B66 100%);
         }}
 
         .stApp::before {{
@@ -100,9 +100,9 @@ def _renderizar_login(config: AuthConfig) -> None:
             width: 100%;
             height: 100%;
             background:
-                radial-gradient(ellipse at 20% 50%, rgba(0, 137, 123, 0.06) 0%, transparent 50%),
-                radial-gradient(ellipse at 80% 50%, rgba(232, 74, 39, 0.06) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 30%, rgba(255, 255, 255, 0.03) 0%, transparent 40%);
+                radial-gradient(ellipse at 15% 40%, rgba(0, 137, 123, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 60%, rgba(21, 101, 192, 0.10) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 25%, rgba(255, 255, 255, 0.03) 0%, transparent 40%);
             pointer-events: none;
         }}
 
@@ -118,33 +118,33 @@ def _renderizar_login(config: AuthConfig) -> None:
         }}
 
         .login-card {{
-            background: rgba(255, 255, 255, 0.98);
-            backdrop-filter: blur(20px);
+            background: rgba(255, 255, 255, 0.97);
+            backdrop-filter: blur(24px);
             border-radius: 16px;
-            padding: 48px 40px 40px 40px;
+            padding: 48px 44px 44px 44px;
             width: 420px;
             max-width: 90vw;
             box-shadow:
-                0 4px 24px rgba(0, 0, 0, 0.12),
-                0 1px 4px rgba(0, 0, 0, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.3);
+                0 8px 32px rgba(0, 0, 0, 0.10),
+                0 2px 8px rgba(0, 0, 0, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }}
 
         .login-logo {{
             display: inline-block;
-            margin-bottom: 16px;
+            margin-bottom: 20px;
         }}
 
         .login-logo img {{
-            width: 72px;
+            width: 64px;
             border-radius: 12px;
         }}
 
         .login-title {{
-            color: #0D2B4A;
-            font-size: 26px;
+            color: #0A2540;
+            font-size: 28px;
             font-weight: 700;
-            letter-spacing: -0.3px;
+            letter-spacing: -0.4px;
             margin-bottom: 4px;
         }}
 
@@ -152,14 +152,14 @@ def _renderizar_login(config: AuthConfig) -> None:
             color: #607D8B;
             font-size: 14px;
             font-weight: 500;
-            margin-bottom: 32px;
+            margin-bottom: 28px;
         }}
 
         .login-divider {{
             width: 100%;
             height: 2px;
-            background: linear-gradient(to right, transparent, #E84A27, #00897B, transparent);
-            margin-bottom: 28px;
+            background: linear-gradient(to right, transparent, #1565C0, #00897B, transparent);
+            margin-bottom: 32px;
         }}
 
         .google-btn {{
@@ -195,11 +195,19 @@ def _renderizar_login(config: AuthConfig) -> None:
         }}
 
         .login-footer {{
-            color: rgba(255, 255, 255, 0.35);
+            color: rgba(255, 255, 255, 0.30);
             font-size: 11px;
-            margin-top: 24px;
+            margin-top: 28px;
             position: relative;
             z-index: 1;
+        }}
+
+        @media (max-width: 480px) {{
+            .login-card {{
+                padding: 36px 24px 32px 24px;
+            }}
+            .login-title {{ font-size: 22px; }}
+            .login-subtitle {{ font-size: 12px; }}
         }}
         </style>
 
