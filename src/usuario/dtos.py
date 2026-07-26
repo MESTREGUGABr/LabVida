@@ -10,3 +10,4 @@ class UsuarioRead(BaseModel):
     email: str
     nome: str
     ativo: bool
+    perfil_id: UUID | None = None
