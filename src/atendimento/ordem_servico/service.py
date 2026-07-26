@@ -16,10 +16,14 @@ from src.atendimento.ordem_servico.dtos import (
 from src.atendimento.ordem_servico.errors import (
     ConvenioInvalidoParaOS,
     MedicoInvalidoParaOS,
+    ItemNaoPodeSerCancelado,
+    OrdemServicoNaoPodeSerCancelada,
     OrdemServicoNaoEncontrada,
+    OsItemNaoEncontrado,
     PacienteInvalidoParaOS,
     ProcedimentoInvalidoParaOS,
     UnidadeInvalidaParaOS,
+    UsuarioNaoAutorizadoParaCancelamento,
     ValorItemNaoDefinido,
 )
 from src.atendimento.ordem_servico.models import OrdemServico, OsItem, OsStatusHistorico
@@ -30,6 +34,7 @@ from src.cadastro.medico import repository as medico_repository
 from src.cadastro.procedimento import repository as procedimento_repository
 from src.cadastro.procedimento.service import obter_valor_vigente
 from src.cadastro.unidade import repository as unidade_repository
+from src.usuario import repository as usuario_repository
 
 
 def abrir_os(session: Session, dto: OrdemServicoCreate, usuario_id: UUID | None = None) -> OrdemServicoRead:
@@ -121,6 +126,98 @@ def listar_historico(session: Session, ordem_servico_id: UUID) -> list[OsStatusH
     ]
 
 
+def cancelar_item_os(session: Session, os_item_id: UUID, usuario_id: UUID) -> OsItemRead:
+    """Cancela um item ativo e recalcula o status agregado da sua OS.
+
+    Todas as validações acontecem antes da primeira alteração persistente. O
+    commit único mantém item, OS e histórico na mesma transação.
+    """
+    usuario = usuario_repository.obter_por_id(session, usuario_id)
+    if usuario is None or not usuario.ativo:
+        raise UsuarioNaoAutorizadoParaCancelamento("Usuário inválido ou inativo")
+
+    item = repository.obter_item_por_id(session, os_item_id)
+    if item is None:
+        raise OsItemNaoEncontrado("Item da Ordem de Serviço não encontrado")
+
+    ordem = repository.obter_por_id(session, item.ordem_servico_id)
+    if ordem is None:
+        raise OrdemServicoNaoEncontrada("Ordem de Serviço não encontrada")
+    _validar_item_cancelavel(session, item)
+    if ordem.status in {StatusOrdemServico.CONCLUIDA, StatusOrdemServico.CANCELADA}:
+        raise ItemNaoPodeSerCancelado("Não é possível cancelar item de uma OS terminal")
+
+    item.status = StatusOsItem.CANCELADO
+    item.cancelado_por_usuario_id = usuario_id
+    _atualizar_status_agregado(session, ordem, usuario_id)
+    session.commit()
+    session.refresh(item)
+    return OsItemRead.model_validate(item)
+
+
+def cancelar_os(session: Session, ordem_servico_id: UUID, usuario_id: UUID) -> OrdemServicoRead:
+    """Cancela integralmente uma OS quando nenhum item concluído a impede."""
+    usuario = usuario_repository.obter_por_id(session, usuario_id)
+    if usuario is None or not usuario.ativo:
+        raise UsuarioNaoAutorizadoParaCancelamento("Usuário inválido ou inativo")
+
+    ordem = repository.obter_por_id(session, ordem_servico_id)
+    if ordem is None:
+        raise OrdemServicoNaoEncontrada("Ordem de Serviço não encontrada")
+    itens = repository.listar_itens(session, ordem.id)
+    if not itens:
+        raise OrdemServicoNaoPodeSerCancelada("Ordem de Serviço sem itens")
+    if ordem.status in {StatusOrdemServico.CONCLUIDA, StatusOrdemServico.CANCELADA}:
+        raise OrdemServicoNaoPodeSerCancelada("Ordem de Serviço já está em estado terminal")
+
+    if any(
+        item.status == StatusOsItem.RESULTADO_LIBERADO
+        or repository.item_tem_laudo_liberado(session, item.id)
+        or repository.item_faturado(session, item)
+        for item in itens
+    ):
+        raise OrdemServicoNaoPodeSerCancelada(
+            "A OS contém item com Laudo liberado ou faturado"
+        )
+
+    for item in itens:
+        item.status = StatusOsItem.CANCELADO
+        item.cancelado_por_usuario_id = usuario_id
+    _atualizar_status_agregado(session, ordem, usuario_id)
+    session.commit()
+    session.refresh(ordem)
+    return OrdemServicoRead.model_validate(ordem)
+
+
+def _validar_item_cancelavel(session: Session, item: OsItem) -> None:
+    if item.status == StatusOsItem.CANCELADO:
+        raise ItemNaoPodeSerCancelado("Item já está cancelado")
+    if item.status == StatusOsItem.RESULTADO_LIBERADO:
+        raise ItemNaoPodeSerCancelado("Item com Laudo liberado não pode ser cancelado")
+    if repository.item_tem_laudo_liberado(session, item.id):
+        raise ItemNaoPodeSerCancelado("Item com Laudo liberado não pode ser cancelado")
+    if repository.item_faturado(session, item):
+        raise ItemNaoPodeSerCancelado("Item faturado não pode ser cancelado")
+
+
+def _atualizar_status_agregado(
+    session: Session, ordem: OrdemServico, usuario_id: UUID
+) -> None:
+    itens = repository.listar_itens(session, ordem.id)
+    if not itens:
+        return
+    if all(item.status == StatusOsItem.CANCELADO for item in itens):
+        novo_status = StatusOrdemServico.CANCELADA
+    else:
+        ativos = [item for item in itens if item.status != StatusOsItem.CANCELADO]
+        todos_liberados = all(
+            repository.item_tem_laudo_liberado(session, item.id) for item in ativos
+        )
+        novo_status = StatusOrdemServico.CONCLUIDA if todos_liberados else ordem.status
+    if novo_status != ordem.status:
+        registrar_transicao(session, ordem, novo_status, usuario_id)
+
+
 def registrar_transicao(
     session: Session, ordem: OrdemServico, novo_status: StatusOrdemServico, usuario_id: UUID | None
 ) -> None:
@@ -129,6 +226,8 @@ def registrar_transicao(
     Pensado para ser chamado dentro da transação de outro service (ex.: coleta),
     garantindo atomicidade da operação ponta a ponta.
     """
+    if ordem.status == novo_status:
+        return
     ordem.status = novo_status
     _registrar_historico(session, ordem.id, novo_status, usuario_id)
 

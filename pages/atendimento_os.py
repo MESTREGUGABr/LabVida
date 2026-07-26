@@ -5,17 +5,25 @@ from pydantic import ValidationError
 
 from src.atendimento.autorizacao.dtos import AutorizacaoCreate, StatusAutorizacao
 from src.atendimento.autorizacao.service import listar_autorizacoes, registrar_autorizacao
-from src.atendimento.ordem_servico.dtos import OrdemServicoCreate, OsItemInput
+from src.atendimento.ordem_servico.dtos import (
+    OrdemServicoCreate,
+    OsItemInput,
+)
 from src.atendimento.ordem_servico.errors import (
     ConvenioInvalidoParaOS,
+    ItemNaoPodeSerCancelado,
     MedicoInvalidoParaOS,
+    OrdemServicoNaoPodeSerCancelada,
     PacienteInvalidoParaOS,
     ProcedimentoInvalidoParaOS,
     UnidadeInvalidaParaOS,
+    UsuarioNaoAutorizadoParaCancelamento,
     ValorItemNaoDefinido,
 )
 from src.atendimento.ordem_servico.service import (
     abrir_os,
+    cancelar_item_os,
+    cancelar_os,
     listar_historico,
     listar_itens,
     listar_os,
@@ -157,6 +165,7 @@ def _render_listar() -> None:
     opcoes = {o.codigo_os: o.id for o in ordens}
     codigo = st.selectbox("Detalhar OS", options=list(opcoes.keys()))
     ordem_id = opcoes[codigo]
+    ordem = next(o for o in ordens if o.id == ordem_id)
 
     with session_scope() as session:
         itens = listar_itens(session, ordem_id)
@@ -177,6 +186,8 @@ def _render_listar() -> None:
         use_container_width=True,
     )
 
+    _render_cancelamento(ordem_id, ordem, itens, procedimentos)
+
     st.subheader("Histórico de status")
     st.dataframe(
         [{"Status": h.status, "Em": h.ocorrido_em.strftime("%d/%m/%Y %H:%M")} for h in historico],
@@ -185,6 +196,57 @@ def _render_listar() -> None:
     )
 
     _render_autorizacoes(ordem_id, autorizacoes)
+
+
+def _render_cancelamento(ordem_id, ordem, itens, procedimentos) -> None:
+    st.subheader("Cancelamento")
+
+    with st.form(f"form_cancelar_os_{ordem_id}"):
+        confirmar = st.checkbox(
+            "Confirmo o cancelamento de todos os itens desta OS",
+            key=f"confirmar_cancelar_os_{ordem_id}",
+        )
+        cancelar_integral = st.form_submit_button("Cancelar OS inteira", type="secondary")
+
+    if cancelar_integral:
+        if not confirmar:
+            st.warning("Marque a confirmação para cancelar a OS inteira.")
+        else:
+            _executar_cancelamento(
+                lambda session: cancelar_os(session, ordem_id, usuario_id_logado()),
+                f"OS {ordem.codigo_os} cancelada com sucesso.",
+                (OrdemServicoNaoPodeSerCancelada, UsuarioNaoAutorizadoParaCancelamento),
+            )
+
+    st.caption("Ou cancele somente um item da OS que ainda possa ser cancelado.")
+    for item in itens:
+        procedimento = procedimentos.get(item.procedimento_id, "Procedimento não identificado")
+
+        with st.container(border=True):
+            col_detalhe, col_acao = st.columns([4, 1])
+            col_detalhe.write(f"**{procedimento}** — {item.status}")
+            cancelar_item = col_acao.button(
+                "Cancelar item",
+                key=f"cancelar_item_{item.id}",
+                type="secondary",
+            )
+            if cancelar_item:
+                _executar_cancelamento(
+                    lambda session: cancelar_item_os(session, item.id, usuario_id_logado()),
+                    f"Item de {procedimento} cancelado.",
+                    (ItemNaoPodeSerCancelado, UsuarioNaoAutorizadoParaCancelamento),
+                )
+
+
+def _executar_cancelamento(acao, mensagem_sucesso: str, erros: tuple[type[Exception], ...]) -> None:
+    try:
+        with session_scope() as session:
+            acao(session)
+    except erros as error:
+        st.error(str(error))
+    else:
+        st.success(mensagem_sucesso)
+        st.rerun()
 
 
 def _render_autorizacoes(ordem_id, autorizacoes) -> None:

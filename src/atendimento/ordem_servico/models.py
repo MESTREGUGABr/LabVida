@@ -48,6 +48,9 @@ class OsItem(Base):
     )
     valor_negociado: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+    cancelado_por_usuario_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
+    )
 
     ordem_servico: Mapped["OrdemServico"] = relationship("OrdemServico")
     procedimento: Mapped[Procedimento] = relationship("Procedimento")

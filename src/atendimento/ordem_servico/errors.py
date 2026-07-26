@@ -2,6 +2,22 @@ class OrdemServicoNaoEncontrada(Exception):
     pass
 
 
+class OsItemNaoEncontrado(Exception):
+    pass
+
+
+class UsuarioNaoAutorizadoParaCancelamento(Exception):
+    pass
+
+
+class ItemNaoPodeSerCancelado(Exception):
+    pass
+
+
+class OrdemServicoNaoPodeSerCancelada(Exception):
+    pass
+
+
 class OrdemSemItens(Exception):
     pass
 
