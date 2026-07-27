@@ -121,6 +121,24 @@ def _render_lista() -> None:
         )
         return
 
+    busca = st.text_input(
+        "Buscar por nome", placeholder="Digite parte do nome do paciente", key="busca_pac"
+    ).strip().lower()
+    if busca:
+        pacientes = [p for p in pacientes if busca in p.nome.lower()]
+
+    _LIMITE = 100
+    total = len(pacientes)
+    exibidos = pacientes[:_LIMITE]
+    st.caption(
+        f"Exibindo {len(exibidos)} de {total} paciente(s)"
+        + (f" — refine a busca para ver além dos {_LIMITE} primeiros." if total > _LIMITE else "")
+    )
+
+    if not exibidos:
+        st.info("Nenhum paciente corresponde à busca.")
+        return
+
     st.dataframe(
         [
             {
@@ -130,7 +148,7 @@ def _render_lista() -> None:
                 "Telefone do Paciente": paciente.telefone,
                 "Sexo": _formatar_sexo(paciente.sexo),
             }
-            for paciente in pacientes
+            for paciente in exibidos
         ],
         hide_index=True,
         width="stretch",

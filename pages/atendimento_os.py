@@ -201,21 +201,51 @@ def _render_listar() -> None:
         descricao=f"{len(ordens)} OS(s) encontrada(s)",
     )
 
-    st.dataframe(
-        [
-            {
-                "Codigo": o.codigo_os,
-                "Paciente": pacientes.get(o.paciente_id, "\u2014"),
-                "Convenio": convenios.get(o.convenio_id, _PARTICULAR),
-                "Unidade": unidades.get(o.unidade_id, "\u2014"),
-                "Status": o.status,
-                "Abertura": o.aberta_em.strftime("%d/%m/%Y %H:%M"),
-            }
-            for o in ordens
-        ],
-        hide_index=True,
-        width="stretch",
+    col_busca, col_status = st.columns([2, 1])
+    with col_busca:
+        busca = st.text_input(
+            "Buscar", placeholder="C\u00f3digo da OS ou nome do paciente", key="busca_os"
+        ).strip().lower()
+    with col_status:
+        status_opcoes = ["Todos"] + sorted({o.status for o in ordens})
+        status_filtro = st.selectbox("Status", options=status_opcoes, key="filtro_status_os")
+
+    filtradas = [
+        o
+        for o in ordens
+        if (status_filtro == "Todos" or o.status == status_filtro)
+        and (
+            not busca
+            or busca in o.codigo_os.lower()
+            or busca in pacientes.get(o.paciente_id, "").lower()
+        )
+    ]
+
+    _LIMITE = 100
+    exibidas = filtradas[:_LIMITE]
+    st.caption(
+        f"Exibindo {len(exibidas)} de {len(filtradas)} OS(s) filtrada(s)"
+        + (f" \u2014 refine a busca para ver al\u00e9m das {_LIMITE} primeiras." if len(filtradas) > _LIMITE else "")
     )
+
+    if exibidas:
+        st.dataframe(
+            [
+                {
+                    "Codigo": o.codigo_os,
+                    "Paciente": pacientes.get(o.paciente_id, "\u2014"),
+                    "Convenio": convenios.get(o.convenio_id, _PARTICULAR),
+                    "Unidade": unidades.get(o.unidade_id, "\u2014"),
+                    "Status": o.status,
+                    "Abertura": o.aberta_em.strftime("%d/%m/%Y %H:%M"),
+                }
+                for o in exibidas
+            ],
+            hide_index=True,
+            width="stretch",
+        )
+    else:
+        st.info("Nenhuma OS corresponde aos filtros.")
 
     st.markdown("<br>", unsafe_allow_html=True)
 
