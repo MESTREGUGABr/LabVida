@@ -13,6 +13,7 @@ from src.financeiro.titulo_pagar.service import (
     baixar_titulo as baixar_pagar,
     listar_todos as pagar_todos,
 )
+from src.financeiro.conciliacao_pagamento.service import listar_todas as conciliacoes_todas
 from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao, renderizar_status_badge
 from src.ui_icons import ICONE_FINANCEIRO
@@ -28,12 +29,61 @@ def main() -> None:
         icone=ICONE_FINANCEIRO,
     )
 
-    tab1, tab2 = st.tabs(["Contas a Receber", "Contas a Pagar"])
+    tab1, tab2, tab3 = st.tabs(["Contas a Receber", "Contas a Pagar", "Conciliações"])
 
     with tab1:
         _render_receber()
     with tab2:
         _render_pagar()
+    with tab3:
+        _render_conciliacoes()
+
+
+def _render_conciliacoes() -> None:
+    renderizar_secao(
+        titulo="Conciliações de Pagamento",
+        descricao="Divergências entre o valor faturado e o efetivamente recebido",
+    )
+
+    with session_scope() as session:
+        conciliacoes = conciliacoes_todas(session)
+
+    if not conciliacoes:
+        renderizar_empty_state(
+            icone=ICONE_FINANCEIRO,
+            titulo="Nenhuma conciliação",
+            mensagem="Divergências surgem ao baixar um título recebendo menos que o faturado.",
+        )
+        return
+
+    total_divergencia = sum(c.divergencia for c in conciliacoes)
+    com_divergencia = [c for c in conciliacoes if c.divergencia > 0]
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Conciliações com divergência", len(com_divergencia))
+    with col2:
+        st.metric("Total divergente", f"R$ {total_divergencia:.2f}")
+
+    if total_divergencia > 0:
+        st.warning(
+            f"Há R$ {total_divergencia:.2f} de divergência acumulada — revise os recebimentos abaixo."
+        )
+
+    st.dataframe(
+        [
+            {
+                "Título": str(c.titulo_receber_id)[:8],
+                "Recebido": f"R$ {c.valor_recebido:.2f}",
+                "Divergência": f"R$ {c.divergencia:.2f}",
+                "Data": c.conciliado_em.strftime("%d/%m/%Y %H:%M"),
+                "Observação": c.observacao or "—",
+            }
+            for c in conciliacoes
+        ],
+        hide_index=True,
+        width="stretch",
+    )
 
 
 def _render_receber() -> None:
