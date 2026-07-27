@@ -127,17 +127,22 @@ def _render_lista() -> None:
     if busca:
         pacientes = [p for p in pacientes if busca in p.nome.lower()]
 
-    _LIMITE = 100
     total = len(pacientes)
-    exibidos = pacientes[:_LIMITE]
-    st.caption(
-        f"Exibindo {len(exibidos)} de {total} paciente(s)"
-        + (f" — refine a busca para ver além dos {_LIMITE} primeiros." if total > _LIMITE else "")
-    )
-
-    if not exibidos:
+    if total == 0:
         st.info("Nenhum paciente corresponde à busca.")
         return
+
+    _PAGINA = 25
+    total_paginas = max(1, (total + _PAGINA - 1) // _PAGINA)
+    pagina = st.selectbox(
+        "Pagina", options=list(range(1, total_paginas + 1)), key="pagina_pac"
+    )
+    inicio = (pagina - 1) * _PAGINA
+    exibidos = pacientes[inicio : inicio + _PAGINA]
+    st.caption(
+        f"Exibindo {inicio + 1}–{inicio + len(exibidos)} de {total} paciente(s) "
+        f"· pagina {pagina}/{total_paginas}"
+    )
 
     st.dataframe(
         [

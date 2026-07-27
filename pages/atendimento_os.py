@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from src.atendimento.ordem_servico.dtos import (
     OrdemServicoCreate,
     OsItemInput,
+    StatusOrdemServico,
 )
 from src.atendimento.ordem_servico.errors import (
     ConvenioInvalidoParaOS,
@@ -22,6 +23,7 @@ from src.atendimento.ordem_servico.service import (
     abrir_os,
     cancelar_item_os,
     cancelar_os,
+    contar_os,
     listar_historico,
     listar_itens,
     listar_os,
@@ -182,13 +184,13 @@ def _render_abrir() -> None:
 
 def _render_listar() -> None:
     with session_scope() as session:
-        ordens = listar_os(session)
         pacientes = {p.id: p.nome for p in listar_pacientes_ativos(session)}
         convenios = {c.id: c.nome for c in listar_convenios(session)}
         unidades = {u.id: u.nome for u in listar_unidades_ativas(session)}
         procedimentos = {p.id: p.nome for p in listar_procedimentos_ativos(session)}
+        total_geral = contar_os(session)
 
-    if not ordens:
+    if total_geral == 0:
         renderizar_empty_state(
             icone=ICONE_OS,
             titulo="Nenhuma Ordem de Servico",
@@ -198,60 +200,69 @@ def _render_listar() -> None:
 
     renderizar_secao(
         titulo=f"{ICONE_PRODUTIVIDADE} Ordens de Servico",
-        descricao=f"{len(ordens)} OS(s) encontrada(s)",
+        descricao=f"{total_geral} OS(s) no total",
     )
+
+    _PAGINA = 20
 
     col_busca, col_status = st.columns([2, 1])
     with col_busca:
         busca = st.text_input(
-            "Buscar", placeholder="C\u00f3digo da OS ou nome do paciente", key="busca_os"
-        ).strip().lower()
+            "Buscar", placeholder="Codigo da OS ou nome do paciente", key="busca_os"
+        ).strip()
     with col_status:
-        status_opcoes = ["Todos"] + sorted({o.status for o in ordens})
+        status_opcoes = ["Todos"] + [s.value for s in StatusOrdemServico]
         status_filtro = st.selectbox("Status", options=status_opcoes, key="filtro_status_os")
 
-    filtradas = [
-        o
-        for o in ordens
-        if (status_filtro == "Todos" or o.status == status_filtro)
-        and (
-            not busca
-            or busca in o.codigo_os.lower()
-            or busca in pacientes.get(o.paciente_id, "").lower()
-        )
-    ]
+    busca_param = busca or None
+    status_param = None if status_filtro == "Todos" else status_filtro
 
-    _LIMITE = 100
-    exibidas = filtradas[:_LIMITE]
+    # Contagem e p\u00e1gina v\u00eam do banco (server-side) \u2014 permite navegar todas as OS, n\u00e3o s\u00f3 100.
+    with session_scope() as session:
+        total = contar_os(session, busca=busca_param, status=status_param)
+
+    total_paginas = max(1, (total + _PAGINA - 1) // _PAGINA)
+    pagina = st.selectbox(
+        "Pagina", options=list(range(1, total_paginas + 1)), key="pagina_os"
+    )
+    offset = (pagina - 1) * _PAGINA
+
+    with session_scope() as session:
+        ordens = listar_os(
+            session, busca=busca_param, status=status_param, limite=_PAGINA, offset=offset
+        )
+
+    inicio = offset + 1 if total else 0
     st.caption(
-        f"Exibindo {len(exibidas)} de {len(filtradas)} OS(s) filtrada(s)"
-        + (f" \u2014 refine a busca para ver al\u00e9m das {_LIMITE} primeiras." if len(filtradas) > _LIMITE else "")
+        f"Exibindo {inicio}\u2013{offset + len(ordens)} de {total} OS(s) "
+        f"\u00b7 pagina {pagina}/{total_paginas}"
     )
 
-    if exibidas:
-        st.dataframe(
-            [
-                {
-                    "Codigo": o.codigo_os,
-                    "Paciente": pacientes.get(o.paciente_id, "\u2014"),
-                    "Convenio": convenios.get(o.convenio_id, _PARTICULAR),
-                    "Unidade": unidades.get(o.unidade_id, "\u2014"),
-                    "Status": o.status,
-                    "Abertura": o.aberta_em.strftime("%d/%m/%Y %H:%M"),
-                }
-                for o in exibidas
-            ],
-            hide_index=True,
-            width="stretch",
-        )
-    else:
+    if not ordens:
         st.info("Nenhuma OS corresponde aos filtros.")
+        return
+
+    st.dataframe(
+        [
+            {
+                "Codigo": o.codigo_os,
+                "Paciente": pacientes.get(o.paciente_id, "\u2014"),
+                "Convenio": convenios.get(o.convenio_id, _PARTICULAR),
+                "Unidade": unidades.get(o.unidade_id, "\u2014"),
+                "Status": o.status,
+                "Abertura": o.aberta_em.strftime("%d/%m/%Y %H:%M"),
+            }
+            for o in ordens
+        ],
+        hide_index=True,
+        width="stretch",
+    )
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     renderizar_secao(
         titulo=f"{ICONE_BUSCA} Detalhar Ordem de Servico",
-        descricao="Selecione uma OS para ver itens, historico e cancelamento",
+        descricao="Selecione uma OS (da pagina atual) para ver itens, historico e cancelamento",
     )
 
     opcoes = {o.codigo_os: o.id for o in ordens}

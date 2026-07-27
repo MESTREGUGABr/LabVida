@@ -36,6 +36,44 @@ from src.usuario.models import Usuario
 from tests.atendimento._helpers import montar_base
 
 
+def test_listar_os_paginado_e_busca(session: Session) -> None:
+    from src.atendimento.ordem_servico.service import contar_os, listar_os
+
+    base = montar_base(session)
+    codigos = []
+    for _ in range(3):
+        ordem = abrir_os(
+            session,
+            OrdemServicoCreate(
+                paciente_id=base.paciente_id,
+                unidade_id=base.unidade_id,
+                convenio_id=None,
+                itens=[OsItemInput(procedimento_id=base.procedimento_id, valor_negociado=Decimal("50"))],
+            ),
+            base.usuario_id,
+        )
+        codigos.append(ordem.codigo_os)
+
+    assert contar_os(session) == 3
+
+    pagina1 = listar_os(session, limite=2, offset=0)
+    pagina2 = listar_os(session, limite=2, offset=2)
+    assert len(pagina1) == 2
+    assert len(pagina2) == 1
+    # Sem sobreposição entre páginas.
+    ids_p1 = {o.id for o in pagina1}
+    assert all(o.id not in ids_p1 for o in pagina2)
+
+    # Busca pelo código de uma OS específica.
+    alvo = codigos[0]
+    encontrados = listar_os(session, busca=alvo)
+    assert contar_os(session, busca=alvo) == 1
+    assert [o.codigo_os for o in encontrados] == [alvo]
+
+    # Busca pelo nome do paciente (montar_base usa "Ana Maria") traz as 3.
+    assert contar_os(session, busca="Ana") == 3
+
+
 def _abrir_os_com_dois_itens(session: Session):
     base = montar_base(session)
     segundo = criar_procedimento(

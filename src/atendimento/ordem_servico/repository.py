@@ -1,9 +1,10 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from src.atendimento.ordem_servico.models import OrdemServico, OsItem, OsStatusHistorico
+from src.cadastro.models import Paciente
 from src.faturamento.lote_faturamento.models import GuiaItem
 from src.laboratorial.models import Laudo, StatusLaudo
 
@@ -24,6 +25,35 @@ def listar(session: Session, limite: int = 100) -> list[OrdemServico]:
     return list(
         session.scalars(select(OrdemServico).order_by(OrdemServico.aberta_em.desc()).limit(limite))
     )
+
+
+def _filtro_os(stmt, busca: str | None, status: str | None):
+    """Aplica busca (código da OS ou nome do paciente) e filtro de status a um select."""
+    if busca:
+        termo = f"%{busca.strip()}%"
+        stmt = stmt.outerjoin(Paciente, Paciente.id == OrdemServico.paciente_id).where(
+            or_(OrdemServico.codigo_os.ilike(termo), Paciente.nome.ilike(termo))
+        )
+    if status:
+        stmt = stmt.where(OrdemServico.status == status)
+    return stmt
+
+
+def contar_filtrado(session: Session, busca: str | None = None, status: str | None = None) -> int:
+    stmt = _filtro_os(select(func.count(OrdemServico.id)).select_from(OrdemServico), busca, status)
+    return session.scalar(stmt) or 0
+
+
+def listar_filtrado(
+    session: Session,
+    busca: str | None = None,
+    status: str | None = None,
+    limite: int = 20,
+    offset: int = 0,
+) -> list[OrdemServico]:
+    stmt = _filtro_os(select(OrdemServico), busca, status)
+    stmt = stmt.order_by(OrdemServico.aberta_em.desc()).limit(limite).offset(offset)
+    return list(session.scalars(stmt))
 
 
 def listar_por_status(session: Session, status: str) -> list[OrdemServico]:

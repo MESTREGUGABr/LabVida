@@ -122,8 +122,21 @@ def obter_os(session: Session, ordem_servico_id: UUID) -> OrdemServicoRead:
     return OrdemServicoRead.model_validate(ordem)
 
 
-def listar_os(session: Session) -> list[OrdemServicoRead]:
-    return [OrdemServicoRead.model_validate(o) for o in repository.listar(session)]
+def listar_os(
+    session: Session,
+    busca: str | None = None,
+    status: str | None = None,
+    limite: int = 100,
+    offset: int = 0,
+) -> list[OrdemServicoRead]:
+    ordens = repository.listar_filtrado(
+        session, busca=busca, status=status, limite=limite, offset=offset
+    )
+    return [OrdemServicoRead.model_validate(o) for o in ordens]
+
+
+def contar_os(session: Session, busca: str | None = None, status: str | None = None) -> int:
+    return repository.contar_filtrado(session, busca=busca, status=status)
 
 
 def listar_itens(session: Session, ordem_servico_id: UUID) -> list[OsItemRead]:
