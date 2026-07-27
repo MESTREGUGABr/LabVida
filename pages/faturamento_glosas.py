@@ -8,7 +8,7 @@ from src.faturamento.glosa.service import (
     listar_guias_itens_faturados,
     registrar_glosa,
 )
-from src.ui import renderizar_menu, shell
+from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
 from src.ui_icons import ICONE_ALERTA
 
@@ -100,7 +100,7 @@ def _render_registrar_glosa() -> None:
                             valor_glosado=valor_glosado,
                         )
                         with session_scope() as session:
-                            registrar_glosa(session, dto)
+                            registrar_glosa(session, dto, usuario_id=usuario_id_logado())
                         st.toast("Glosa registrada com sucesso!")
                         st.session_state[f"show_form_{guia_item_id}"] = False
                         st.rerun()

@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
+from src.auditoria import registrar_auditoria
 from src.financeiro.conciliacao_pagamento.models import ConciliacaoPagamento
 from src.financeiro.movimento_caixa.dtos import TipoMovimento
 from src.financeiro.movimento_caixa.models import MovimentoCaixa
@@ -29,7 +30,13 @@ def listar_pendentes(session: Session) -> list[TituloReceberRead]:
     return [TituloReceberRead.model_validate(t) for t in repository.listar_pendentes(session)]
 
 
-def baixar_titulo(session: Session, titulo_id: UUID, valor_pago: float, observacao: str | None = None) -> TituloReceberRead:
+def baixar_titulo(
+    session: Session,
+    titulo_id: UUID,
+    valor_pago: float,
+    observacao: str | None = None,
+    usuario_id: UUID | None = None,
+) -> TituloReceberRead:
     titulo = repository.obter_por_id(session, titulo_id)
     if titulo is None:
         raise TituloReceberNaoEncontrado("Título a receber não encontrado")
@@ -56,6 +63,16 @@ def baixar_titulo(session: Session, titulo_id: UUID, valor_pago: float, observac
             observacao=f"Divergência de R$ {divergencia:.2f} — valor esperado: R$ {titulo.valor:.2f}",
         )
         session.add(conciliacao)
+
+    if usuario_id is not None:
+        registrar_auditoria(
+            session,
+            usuario_id,
+            entidade="titulo_receber",
+            entidade_id=titulo.id,
+            acao="BAIXAR_TITULO_RECEBER",
+            dados={"valor_pago": str(valor_pago), "divergencia": str(divergencia)},
+        )
 
     session.commit()
     session.refresh(titulo)

@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.auditoria import registrar_auditoria
 from src.atendimento.ordem_servico.models import OrdemServico, OsItem
 from src.faturamento.glosa import repository
 from src.faturamento.glosa.dtos import GlosaCreate, GlosaListagemRead, GlosaRead
@@ -13,7 +14,9 @@ from src.faturamento.lote_faturamento.dtos import StatusGuiaItem
 from src.laboratorial.models import Laudo
 
 
-def registrar_glosa(session: Session, dto: GlosaCreate) -> GlosaRead:
+def registrar_glosa(
+    session: Session, dto: GlosaCreate, usuario_id: UUID | None = None
+) -> GlosaRead:
     guia_item = faturamento_repository.obter_guia_item_por_id(session, dto.guia_item_id)
     if guia_item is None:
         raise GuiaItemNaoEncontrado("Guia Item não encontrado")
@@ -37,6 +40,20 @@ def registrar_glosa(session: Session, dto: GlosaCreate) -> GlosaRead:
 
     if dto.valor_glosado >= guia_item.valor_faturado:
         guia_item.status = StatusGuiaItem.GLOSADO
+
+    if usuario_id is not None:
+        registrar_auditoria(
+            session,
+            usuario_id,
+            entidade="glosa",
+            entidade_id=guia_item.id,
+            acao="REGISTRAR_GLOSA",
+            dados={
+                "guia_item_id": str(dto.guia_item_id),
+                "valor_glosado": str(dto.valor_glosado),
+                "motivo": dto.motivo,
+            },
+        )
 
     session.commit()
     session.refresh(glosa)

@@ -13,7 +13,7 @@ from src.financeiro.titulo_pagar.service import (
     baixar_titulo as baixar_pagar,
     listar_todos as pagar_todos,
 )
-from src.ui import renderizar_menu, shell
+from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao, renderizar_status_badge
 from src.ui_icons import ICONE_FINANCEIRO
 
@@ -89,7 +89,10 @@ def _render_receber() -> None:
                         if st.button("Confirmar", type="primary", key=f"conf_rec_{t.id}"):
                             try:
                                 with session_scope() as session:
-                                    resultado = baixar_receber(session, t.id, valor_pago, obs or None)
+                                    resultado = baixar_receber(
+                                        session, t.id, valor_pago, obs or None,
+                                        usuario_id=usuario_id_logado(),
+                                    )
                                 divergencia = resultado.valor - valor_pago
                                 if divergencia > 0:
                                     st.toast(f"Recebido R$ {valor_pago:.2f}. Divergência: R$ {divergencia:.2f}")
@@ -144,7 +147,7 @@ def _render_pagar() -> None:
                     if st.button("Confirmar Pagamento", type="primary", key=f"conf_pag_{t.id}"):
                         try:
                             with session_scope() as session:
-                                baixar_pagar(session, t.id, obs or None)
+                                baixar_pagar(session, t.id, obs or None, usuario_id=usuario_id_logado())
                             st.toast(f"Título de R$ {t.valor:.2f} pago com sucesso!")
                             st.session_state.pop(f"form_pagar_{t.id}", None)
                             st.rerun()

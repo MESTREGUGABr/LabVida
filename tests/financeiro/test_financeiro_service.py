@@ -74,3 +74,46 @@ def test_fluxo_caixa_vazio(session: Session) -> None:
     assert resultado["total_entradas"] == 0
     assert resultado["total_saidas"] == 0
     assert resultado["saldo"] == 0
+
+
+def test_baixar_titulo_receber_registra_auditoria(session: Session) -> None:
+    from src.auditoria.models import AuditoriaLog
+    from src.financeiro.titulo_receber.models import TituloReceber
+
+    base = montar_base(session)
+    titulo = TituloReceber(
+        lote_faturamento_id=base.lote_id,
+        valor=100.00,
+        vencimento=date.today() + timedelta(days=30),
+        status="PENDENTE",
+    )
+    session.add(titulo)
+    session.commit()
+
+    baixar_receber(session, titulo.id, 100.00, usuario_id=base.usuario_id)
+
+    logs = session.query(AuditoriaLog).filter_by(acao="BAIXAR_TITULO_RECEBER").all()
+    assert len(logs) == 1
+    assert logs[0].entidade_id == titulo.id
+    assert logs[0].usuario_id == base.usuario_id
+
+
+def test_baixar_titulo_pagar_registra_auditoria(session: Session) -> None:
+    from src.auditoria.models import AuditoriaLog
+
+    base = montar_base(session)
+    titulo = TituloPagar(
+        pedido_compra_id=None,
+        valor=250.00,
+        vencimento=date.today() + timedelta(days=20),
+        status="PENDENTE",
+    )
+    salvar_pagar(session, titulo)
+    session.commit()
+
+    baixar_pagar(session, titulo.id, usuario_id=base.usuario_id)
+
+    logs = session.query(AuditoriaLog).filter_by(acao="BAIXAR_TITULO_PAGAR").all()
+    assert len(logs) == 1
+    assert logs[0].entidade_id == titulo.id
+    assert logs[0].usuario_id == base.usuario_id
