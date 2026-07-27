@@ -15,8 +15,9 @@ from src.bi.models import (
     FatoFinanceiro,
     FatoLogistica,
 )
-from src.atendimento.amostra.models import Amostra
+from src.atendimento.amostra.models import Amostra, Coleta
 from src.atendimento.ordem_servico.models import OrdemServico, OsItem
+from src.laboratorial.models import Laudo, StatusLaudo
 from src.cadastro.convenio.models import Convenio
 from src.cadastro.models import Paciente
 from src.cadastro.procedimento.models import Procedimento
@@ -107,6 +108,24 @@ def _sk_paciente(session, pid, nasc=None, sexo=None) -> int:
     return dim.sk_paciente
 
 
+def _tempo_ciclo_os(session, os_id) -> Decimal | None:
+    """Horas entre a primeira coleta e o último laudo liberado da OS (indicador de ciclo)."""
+    coleta_min = session.scalar(
+        select(func.min(Coleta.coletada_em))
+        .join(Amostra, Amostra.id == Coleta.amostra_id)
+        .where(Amostra.ordem_servico_id == os_id)
+    )
+    laudo_max = session.scalar(
+        select(func.max(Laudo.liberado_em))
+        .join(OsItem, OsItem.id == Laudo.os_item_id)
+        .where(OsItem.ordem_servico_id == os_id, Laudo.status == StatusLaudo.LIBERADO)
+    )
+    if coleta_min is None or laudo_max is None:
+        return None
+    horas = (laudo_max - coleta_min).total_seconds() / 3600
+    return Decimal(str(round(horas, 2)))
+
+
 def _carga_dimensoes(session):
     _sk_unidade(session, "00000000-0000-0000-0000-000000000000", "Consolidado", "SISTEMA")
     _sk_tempo(session, date.today())
@@ -141,9 +160,10 @@ def _carga_fatos(session):
             continue
         sp = _sk_paciente(session, paciente.id, paciente.data_nascimento, paciente.sexo)
         sc = _sk_convenio(session, os.convenio_id)
+        tempo_ciclo = _tempo_ciclo_os(session, os.id)
         for item in session.scalars(select(OsItem).where(OsItem.ordem_servico_id == os.id)).all():
             spr = _sk_procedimento(session, item.procedimento_id)
-            session.add(FatoAtendimento(sk_tempo=st, sk_unidade=su, sk_convenio=sc, sk_procedimento=spr, sk_paciente=sp, qtd_exames=1))
+            session.add(FatoAtendimento(sk_tempo=st, sk_unidade=su, sk_convenio=sc, sk_procedimento=spr, sk_paciente=sp, qtd_exames=1, tempo_ciclo_os_horas=tempo_ciclo))
     session.commit()
 
     for gi in session.scalars(select(GuiaItem)).all():
