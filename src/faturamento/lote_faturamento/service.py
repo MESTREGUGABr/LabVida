@@ -2,6 +2,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src.auditoria import registrar_auditoria

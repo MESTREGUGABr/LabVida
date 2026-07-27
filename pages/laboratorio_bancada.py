@@ -14,7 +14,7 @@ from src.laboratorial.dtos import ResultadoCreate, ResultadoUpdate
 from src.laboratorial.models import StatusResultado
 from src.laboratorial.service import LaboratorialService
 from src.ui import renderizar_menu, shell, usuario_id_logado
-from src.ui_components import renderizar_cabecalho
+from src.ui_components import renderizar_cabecalho, renderizar_secao
 from src.ui_icons import ICONE_BANCADA
 
 
