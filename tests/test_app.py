@@ -15,18 +15,21 @@ def usuario_logado(monkeypatch) -> dict:
     O menu lateral usa st.page_link, que exige o registro de paginas MPA — indisponivel
     quando o AppTest roda uma pagina isolada. Neutralizamos o menu para focar na pagina.
     """
+    import uuid
     from src.db import session_scope
     from src.usuario.service import sincronizar_usuario
 
     monkeypatch.setattr("src.ui.renderizar_menu", lambda *args, **kwargs: None)
 
+    email = f"operador_{uuid.uuid4().hex[:8]}@labvida.test"
     with session_scope() as session:
-        usuario = sincronizar_usuario(session, "operador@labvida.test", "Operador Teste")
+        usuario = sincronizar_usuario(session, email, "Operador Teste")
         return {
             "id": str(usuario.id),
             "name": "Operador Teste",
-            "email": "operador@labvida.test",
+            "email": email,
         }
+
 
 
 @pytest.fixture()
@@ -108,3 +111,20 @@ def test_cadastro_convenios_redirects_when_not_logged_in(monkeypatch) -> None:
     app.run()
 
     assert not app.exception
+
+
+def test_home_quick_links_do_not_use_raw_html_href(usuario_logado, monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr("streamlit.page_link", lambda page, label=None, **kwargs: calls.append((page, label)))
+
+    app = AppTest.from_file(str(PROJECT_ROOT / "pages" / "home.py"))
+    app.session_state["user"] = usuario_logado
+    app.run()
+
+    assert not app.exception
+    assert ("pages/atendimento_os.py", "Abrir OS") in calls
+    assert ("pages/atendimento_coleta.py", "Registrar Coleta") in calls
+    assert ("pages/laboratorio_laudos.py", "Novo Laudo") in calls
+    assert ("pages/faturamento_guias.py", "Faturar") in calls
+
+

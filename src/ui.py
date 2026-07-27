@@ -180,11 +180,8 @@ def renderizar_menu(usuario_id: UUID) -> None:
             iniciais = "".join(p[0].upper() for p in nome.split()[:2]) if nome else "??"
             st.sidebar.markdown(
                 f"""
-                <a href="/meu_perfil" target="_self" style="text-decoration:none;">
-                <div style="padding:8px 14px 12px 14px;text-align:center;cursor:pointer;
-                border-radius:8px;transition:background 0.2s ease;margin:0 8px;"
-                onmouseover="this.style.background='rgba(255,255,255,0.04)'"
-                onmouseout="this.style.background='transparent'">
+                <div style="padding:8px 14px 12px 14px;text-align:center;
+                border-radius:8px;margin:0 8px;">
                     <div style="
                         display:inline-flex;align-items:center;justify-content:center;
                         width:36px;height:36px;border-radius:50%;
@@ -199,7 +196,6 @@ def renderizar_menu(usuario_id: UUID) -> None:
                         {email}
                     </p>
                 </div>
-                </a>
                 """,
                 unsafe_allow_html=True,
             )
@@ -209,16 +205,7 @@ def renderizar_menu(usuario_id: UUID) -> None:
             unsafe_allow_html=True,
         )
 
-        st.sidebar.markdown(
-            f"""<a href="/home" target="_self"
-            style="display:block;padding:9px 12px;color:#F1F5F9;text-decoration:none;
-            border-radius:8px;font-size:13px;font-weight:500;
-            border-left:3px solid transparent;transition:all 0.2s ease;
-            margin:1px 8px;">
-            <span style="display:inline-flex;align-items:center;gap:8px;">
-            {ICONE_HOME} Inicio</span></a>""",
-            unsafe_allow_html=True,
-        )
+        st.page_link("pages/home.py", label="Inicio", icon="🏠")
 
         st.sidebar.markdown(
             "<hr style='border-color:#1E3A5F;border-width:0.5px;opacity:0.4;margin:10px 14px;'>",

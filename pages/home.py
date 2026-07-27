@@ -52,25 +52,14 @@ def main() -> None:
 
     col_a1, col_a2, col_a3, col_a4 = st.columns(4)
     links_rapidos = [
-        (ICONE_OS, "Abrir OS", "atendimento_os"),
-        (ICONE_COLETA, "Registrar Coleta", "atendimento_coleta"),
-        (ICONE_LAUDO, "Novo Laudo", "laboratorio_laudos"),
-        (ICONE_FINANCEIRO, "Faturar", "faturamento_guias"),
+        ("📋", "Abrir OS", "pages/atendimento_os.py"),
+        ("💉", "Registrar Coleta", "pages/atendimento_coleta.py"),
+        ("📄", "Novo Laudo", "pages/laboratorio_laudos.py"),
+        ("💵", "Faturar", "pages/faturamento_guias.py"),
     ]
     for col, (icone, texto, pagina) in zip([col_a1, col_a2, col_a3, col_a4], links_rapidos):
         with col:
-            st.markdown(
-                f"""<a href="/{pagina}" target="_self" style="
-                    display:flex;align-items:center;justify-content:center;gap:8px;
-                    background:#1565C0;color:#fff;padding:10px 16px;
-                    border-radius:8px;text-decoration:none;font-size:13px;font-weight:500;
-                    transition:all 0.15s ease;
-                " onmouseover="this.style.background='#0D47A1'"
-                   onmouseout="this.style.background='#1565C0'">
-                    {icone} {texto}
-                </a>""",
-                unsafe_allow_html=True,
-            )
+            st.page_link(pagina, label=texto, icon=icone, use_container_width=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
