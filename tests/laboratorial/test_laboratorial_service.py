@@ -11,7 +11,7 @@ from src.cadastro.medico.models import Medico
 from src.cadastro.models import Paciente
 from src.cadastro.procedimento.models import Procedimento
 from src.cadastro.unidade.models import Unidade
-from src.laboratorial.dtos import LaudoCreate, LaudoUpdate, ResultadoCreate
+from src.laboratorial.dtos import LaudoCreate, LaudoUpdate, ResultadoCreate, ResultadoUpdate
 from src.laboratorial.models import StatusLaudo, StatusResultado
 from src.usuario.models import Usuario
 from src.laboratorial.service import LaboratorialService
@@ -319,3 +319,50 @@ def test_nao_libera_laudo_com_medico_inativo(session: Session) -> None:
     session.rollback()
     session.refresh(laudo)
     assert laudo.status == StatusLaudo.RASCUNHO
+
+
+def test_laudo_liberado_nao_pode_ser_alterado(session: Session) -> None:
+    service, item, laudo, medico, usuario = _montar_cenario_laudo(session)
+    _registrar_resultado_revisado(service, item.id, usuario.id)
+    service.atualizar_laudo(
+        laudo.id,
+        LaudoUpdate(responsavel_tecnico_id=medico.id, status=StatusLaudo.LIBERADO),
+        usuario_id=usuario.id,
+    )
+
+    with pytest.raises(ValueError, match="liberado"):
+        service.atualizar_laudo(
+            laudo.id,
+            LaudoUpdate(assinatura_digital="assinatura-nova"),
+            usuario_id=usuario.id,
+        )
+
+
+def test_criar_laudo_duplicado_falha(session: Session) -> None:
+    service, item, laudo, medico, usuario = _montar_cenario_laudo(session)
+
+    with pytest.raises(ValueError, match="já existe"):
+        service.criar_laudo(LaudoCreate(os_item_id=item.id))
+
+
+def test_atualizar_resultado_gera_auditoria(session: Session) -> None:
+    service, item, laudo, medico, usuario = _montar_cenario_laudo(session)
+    resultado = service.registrar_resultado(
+        ResultadoCreate(
+            os_item_id=item.id,
+            analito="Hemoglobina",
+            valor="10.0",
+            status=StatusResultado.AGUARDANDO_REVISAO,
+            usuario_id=usuario.id,
+        )
+    )
+
+    service.atualizar_resultado(
+        resultado.id,
+        ResultadoUpdate(valor="14.2", status=StatusResultado.REVISADO, usuario_id=usuario.id),
+    )
+
+    auditorias = service.listar_auditoria_resultado(resultado.id)
+    pares = {(a.valor_anterior, a.valor_novo) for a in auditorias}
+    assert ("", "10.0") in pares  # criação
+    assert ("10.0", "14.2") in pares  # atualização
