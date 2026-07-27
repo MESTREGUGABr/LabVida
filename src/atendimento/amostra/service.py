@@ -3,6 +3,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from src.auditoria import registrar_auditoria
 from src.atendimento.amostra import repository
 from src.atendimento.amostra.dtos import AmostraRead, ColetaCreate, StatusAmostra
 from src.atendimento.amostra.errors import ColetaNaoPermitida, ColetorInvalido, OrdemServicoInexistente
@@ -59,6 +60,18 @@ def registrar_coleta(session: Session, dto: ColetaCreate) -> AmostraRead:
 
     if ordem.status != StatusOrdemServico.COLETADA:
         os_service.registrar_transicao(session, ordem, StatusOrdemServico.COLETADA, coletor.id)
+
+    registrar_auditoria(
+        session,
+        coletor.id,
+        entidade="amostra",
+        entidade_id=amostra.id,
+        acao="REGISTRAR_COLETA",
+        dados={
+            "ordem_servico_id": str(ordem.id),
+            "codigo_barras": amostra.codigo_barras,
+        },
+    )
 
     session.commit()
     session.refresh(amostra)

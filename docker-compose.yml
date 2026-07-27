@@ -46,7 +46,8 @@ services:
       AUTH0_CLIENT_ID: test-client-id
       AUTH0_CLIENT_SECRET: test-client-secret
       APP_BASE_URL: http://localhost:8501
-      LGPD_ENCRYPTION_KEY: test-lgpd-key-must-be-32-bytes-long!
+      # Chave Fernet valida (32 bytes base64 url-safe) exclusiva para o ambiente de testes.
+      LGPD_ENCRYPTION_KEY: Q22r1OivohTtSBRaMi-hjLxXxrQ3SwEdOumlaNDfvw8=
     volumes:
       - .:/app
     depends_on:

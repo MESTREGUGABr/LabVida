@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from src.auditoria import registrar_auditoria
 from src.atendimento.ordem_servico import repository
 from src.atendimento.ordem_servico.dtos import (
     OrdemServicoCreate,
@@ -99,6 +100,16 @@ def abrir_os(session: Session, dto: OrdemServicoCreate, usuario_id: UUID | None 
 
     _registrar_historico(session, ordem.id, StatusOrdemServico.ABERTA, usuario_id)
 
+    if usuario_id is not None:
+        registrar_auditoria(
+            session,
+            usuario_id,
+            entidade="ordem_servico",
+            entidade_id=ordem.id,
+            acao="ABRIR_OS",
+            dados={"codigo_os": ordem.codigo_os, "itens": len(dto.itens)},
+        )
+
     session.commit()
     session.refresh(ordem)
     return OrdemServicoRead.model_validate(ordem)
@@ -150,6 +161,17 @@ def cancelar_item_os(session: Session, os_item_id: UUID, usuario_id: UUID) -> Os
     item.status = StatusOsItem.CANCELADO
     item.cancelado_por_usuario_id = usuario_id
     _atualizar_status_agregado(session, ordem, usuario_id)
+    registrar_auditoria(
+        session,
+        usuario_id,
+        entidade="os_item",
+        entidade_id=item.id,
+        acao="CANCELAR_ITEM",
+        dados={
+            "ordem_servico_id": str(item.ordem_servico_id),
+            "procedimento_id": str(item.procedimento_id),
+        },
+    )
     session.commit()
     session.refresh(item)
     return OsItemRead.model_validate(item)
@@ -184,6 +206,14 @@ def cancelar_os(session: Session, ordem_servico_id: UUID, usuario_id: UUID) -> O
         item.status = StatusOsItem.CANCELADO
         item.cancelado_por_usuario_id = usuario_id
     _atualizar_status_agregado(session, ordem, usuario_id)
+    registrar_auditoria(
+        session,
+        usuario_id,
+        entidade="ordem_servico",
+        entidade_id=ordem.id,
+        acao="CANCELAR_OS",
+        dados={"codigo_os": ordem.codigo_os},
+    )
     session.commit()
     session.refresh(ordem)
     return OrdemServicoRead.model_validate(ordem)

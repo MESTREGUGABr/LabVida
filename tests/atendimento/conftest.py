@@ -8,6 +8,7 @@ from src.db import session_scope
 
 
 _TABELAS = (
+    "auditoria_log",
     "protocolos_recebimento",
     "amostras_movimentacoes",
     "malotes_amostras",

@@ -4,6 +4,7 @@ from uuid import UUID
 
 from sqlalchemy.orm import Session
 
+from src.auditoria import registrar_auditoria
 from src.cadastro.convenio import repository as convenio_repository
 from src.cadastro.convenio.dtos import StatusConvenio
 from src.faturamento.lote_faturamento import repository
@@ -111,6 +112,16 @@ def fechar_lote(session: Session, lote_id: UUID, usuario_id: UUID | None = None)
         status="PENDENTE",
     )
     session.add(titulo)
+
+    if usuario_id is not None:
+        registrar_auditoria(
+            session,
+            usuario_id,
+            entidade="lote_faturamento",
+            entidade_id=lote.id,
+            acao="FECHAR_LOTE",
+            dados={"codigo_lote": lote.codigo_lote, "valor_total": str(lote.valor_total)},
+        )
 
     session.commit()
     session.refresh(lote)
