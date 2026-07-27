@@ -7,7 +7,7 @@
 > **Última atualização:** 2026-07-26 (2) — **Stacks A, B e C concluídas** e **Stack D em grande parte
 > implementada**: RBAC efetivo (gate no shell), **auditoria append-only plugada nos services**, **LGPD
 > aplicada** (CPF criptografado), BI com ETL + 3 dashboards, navegação unificada + design system.
-> **Suíte completa verde: 132 testes.** ✅ Heads paralelas do Alembic **resolvidas** (merge `0012`).
+> **Suíte completa verde: 138 testes.** ✅ Heads paralelas do Alembic **resolvidas** (merge `0012`).
 > Ver §4 (estado atual) e §10.
 >
 > Fontes vivas no repo: `README.md` (visão + como rodar), `CONTEXT.md` (glossário de domínio),
@@ -38,8 +38,8 @@
   auditoria *append-only* **plugada nos services**, **LGPD com CPF criptografado (Fernet) + hash**, BI com
   esquema estrela, ETL e 3 dashboards, navegação unificada + design system). Tudo em fatias verticais
   (migration → model → repository → service → DTO/validação → tela → testes), com **suíte completa verde:
-  132 testes**. Restam acabamentos da **D** (RBAC por perfil padrão, ampliar auditoria ao financeiro,
-  aprofundar ETL, deploy/hardening) — os bloqueios de operação já foram resolvidos (§4.3/§8).
+  138 testes**. Restam apenas evoluções (ETL incremental do BI, rotação automatizada da chave LGPD,
+  fluxo de caixa) e a **execução** do deploy — o roteiro está no `DEPLOY.md` (§4.3/§8).
 - **Contexto:** projeto da disciplina **Sistemas de Informação e Tecnologias (SIT)** — Ciência da
   Computação, **UFAPE** (Garanhuns-PE, 2026). Equipe de 4.
 - **O plano:** evoluir o produto dividindo o trabalho em **4 stacks verticais** (cada pessoa dona de um
@@ -244,7 +244,7 @@ do Alembic (§8) e melhorias pontuais.**
 | **Seeder de pacientes** ⭐ | popula Pacientes de exemplo com **Faker** (CPF válido, telefone, sexo) — `make seeder` | `src/seeder/*` |
 | **Infra Docker** | `docker-compose` (app + Postgres 16 + serviços de teste), `Dockerfile` (Python 3.12-slim, não-root) | `docker-compose.yml`, `Dockerfile` |
 | **Migrations** | Alembic configurado, **autogenerate ligado** (`env.py` lê `Base.metadata`); aplica no boot | `alembic/`, `alembic.ini` |
-| **Testes** | pytest: `AppTest` (login/home) + DTOs/validators (unit) + services (integração via Postgres de teste); cobre cadastros, atendimento, logística, laboratorial, faturamento, financeiro, compras, RBAC, LGPD, auditoria e BI — **132 testes (suíte verde)** | `tests/` (subpasta por módulo) |
+| **Testes** | pytest: `AppTest` (login/home) + DTOs/validators (unit) + services (integração via Postgres de teste); cobre cadastros, atendimento, logística, laboratorial, faturamento, financeiro, compras, RBAC, LGPD, auditoria e BI — **138 testes (suíte verde)** | `tests/` (subpasta por módulo) |
 | **Automação** | `Makefile` (`up/down/test/migrate/revision/seeder/clean`) | `Makefile` |
 
 > ⭐ = fundação/Cadastro de Pacientes. ⭐⭐ = Stack A. ⭐⭐⭐ = Stack B. 🟧 = Stack C. 🟪 = Stack D.
@@ -270,18 +270,22 @@ do Alembic (§8) e melhorias pontuais.**
 - ✅ **LGPD_ENCRYPTION_KEY — RESOLVIDO:** adicionada ao `.env.example`; corrigida a chave de teste inválida
   no `docker-compose`; `tests/conftest.py` garante uma chave Fernet válida. (Bug: a chave de teste anterior
   não era um Fernet válido e quebrava a suíte que cria paciente.)
-- ✅ **Anonimização no BI — VERIFICADO:** o BI não carrega PII (só `faixa_etaria` + `sexo` + `id_origem`
-  pseudonimizado). Requisito atendido; hashear `id_origem` fica como endurecimento opcional.
-- 🟡 **RBAC — acabamento:** atribuir perfis por padrão (hoje usuário sem perfil cai em acesso amplo de
-  compatibilidade), revisar granularidade das permissões por página e cobrir com mais testes de gate.
-- 🟡 **Auditoria — ampliar** para os demais movimentos financeiros (baixa de título, caixa, glosa).
+- ✅ **Anonimização no BI — REFORÇADA:** o BI já não carregava PII; agora o `id_origem` do paciente é um
+  **hash SHA-256** (não o UUID cru), impedindo join trivial de volta a `pacientes` (migração `0013` + ETL).
+- ✅ **RBAC — perfil por padrão:** novo usuário recebe perfil no login (bootstrap: 1º vira `admin`, demais
+  `visualizador`), encerrando o acesso amplo por ausência de perfil. Coberto por testes.
+- ✅ **Auditoria financeira:** `registrar_auditoria` também em baixa de título (receber/pagar) e registro
+  de glosa, com testes.
+- ✅ **Busca/paginação:** telas de Pacientes e de OS ganharam busca (nome/código) + filtro de status (OS)
+  e limite de exibição.
+- ✅ **Deploy — guia + template:** `DEPLOY.md` e `.env.production.example` com passo a passo e checklist de
+  hardening (Auth0 leaked password, segredos, chave LGPD). Execução do deploy depende de alvo/credenciais.
 - 🟡 **BI — profundidade do ETL**: agendamento/atualização incremental e mais indicadores.
-- 🟢 **Deploy** (definir alvo) + envs de produção; *leaked password* / hardening do Auth0; rotação da
-  `LGPD_ENCRYPTION_KEY`.
-- 🟢 Melhorias pontuais: busca/paginação de OS e pacientes; conciliação/fluxo de caixa mais completos.
+- 🟡 **Rotação da `LGPD_ENCRYPTION_KEY`** (re-criptografia dos CPFs) — documentada, ainda não automatizada.
+- 🟢 Conciliação/fluxo de caixa mais completos.
 - ℹ️ **Integrações externas** (TISS real, HL7/ASTM): **fora do escopo** do protótipo (modeladas).
 
-> Em uma frase: **as quatro alas estão de pé e a suíte está verde (132 testes)** — A, B e C completas e D
+> Em uma frase: **as quatro alas estão de pé e a suíte está verde (138 testes)** — A, B e C completas e D
 > em grande parte pronta. Restam acabamentos (RBAC por padrão, ampliar auditoria, ETL) e o hardening/deploy.
 
 ---
@@ -488,26 +492,27 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
 - **Stack D (grande parte)**: RBAC efetivo (perfil→permissão + gate no shell + gestão de usuários), LGPD
   (CPF criptografado), BI (estrela + ETL + 3 dashboards), navegação unificada + design system — **Stack D**.
 - **Heads paralelas do Alembic resolvidas** (merge `0012_merge_heads_c_d`) — **Stack D**.
-- **Auditoria append-only plugada** nas operações sensíveis (OS, coleta, laudo, lote) — **Stack D**.
+- **Auditoria append-only plugada** nas operações sensíveis (OS, coleta, laudo, lote, **baixa de título e
+  glosa**) — **Stack C/D**.
 - **LGPD_ENCRYPTION_KEY** no `.env.example`/`docker-compose`/`conftest` + correção da chave de teste inválida — **Stack D**.
-- **132 testes — suíte completa verde** (validada em banco limpo via docker).
+- **RBAC com perfil por padrão** (bootstrap admin + `visualizador`) encerrando o acesso plano — **Stack D**.
+- **BI com `id_origem` anonimizado por hash** (migração `0013`) — **Stack D**.
+- **Busca/paginação** em Pacientes e OS — **Stack A**.
+- **`DEPLOY.md` + `.env.production.example`** (guia + hardening) — **Stack D**.
+- **Issues #8/#9 (hardening laboratorial):** service bloqueia laudo com resultado não revisado e valida
+  responsável técnico ativo — **Stack B**.
+- **138 testes — suíte completa verde** (validada em banco limpo via docker).
 
 **🔴 Alta (destrava/consolida)**
-- _(vazio — os bloqueios de operação foram resolvidos nesta leva.)_
+- _(vazio — resolvidos nesta leva.)_
 
 **🟡 Média**
-- RBAC: atribuir perfis por padrão + revisar granularidade + testes de gate — **Stack D**.
-- Ampliar auditoria aos demais movimentos financeiros (baixa de título, caixa, glosa) — **Stack C/D**.
-- Anonimização mais forte no BI (hashear `id_origem`) + gestão/rotação da `LGPD_ENCRYPTION_KEY` — **Stack D**.
-- Profundidade/atualização do ETL do BI — **Stack D**.
+- Profundidade/atualização do ETL do BI (incremental, mais indicadores) — **Stack D**.
+- **Rotação automatizada** da `LGPD_ENCRYPTION_KEY` (re-criptografia) — **Stack D**.
 - Alertas de divergência na conciliação; fluxo de caixa consolidado — **Stack C**.
-- ✅ **Hardening laboratorial (issues #8/#9):** o service agora bloqueia a liberação de laudo com
-  resultado não revisado (#8) e valida que o responsável é médico ativo com `responsavel_tecnico=True`
-  (#9), com testes — **Stack B**.
 
 **🟢 Baixa / oportunístico**
-- Busca/paginação de OS e pacientes — **Stack A**.
-- Deploy + hardening de produção (Auth0, *leaked password*) — **Stack D**.
+- Executar o **deploy** de fato (definir alvo/credenciais) seguindo o `DEPLOY.md` — **Stack D**.
 
 ---
 
@@ -518,18 +523,19 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
   **`0012_merge_heads_c_d`**; `alembic upgrade head` aplica a cadeia inteira em banco limpo (validado).
 - ⚠️ **Ordem das migrations:** com várias pessoas gerando migration na `main`, **combinar a head antes** —
   a bifurcação acima foi exatamente esse risco; usar branch/PR curto ajuda a evitar repetição.
-- ✅ **Banco com schema:** as migrations `0003`…`0012` cobrem cadastros, Stack A/B/C e a transversal D
+- ✅ **Banco com schema:** as migrations `0003`…`0013` cobrem cadastros, Stack A/B/C e a transversal D
   (RBAC/auditoria, LGPD, BI), com **head única**.
-- ✅ **RBAC efetivo:** perfil→permissão com gate no `shell()`. **Atenção:** usuário **sem perfil** ainda
-  entra em **acesso amplo (fallback)** — atribuir perfis por padrão antes de tratar como controle real.
+- ✅ **RBAC efetivo + perfil por padrão:** perfil→permissão com gate no `shell()`. Novo usuário recebe
+  perfil no login (bootstrap: 1º = `admin`, demais = `visualizador`) — o acesso amplo por ausência de perfil
+  só ocorre se o RBAC **não** tiver sido semeado (`python -m src.seeder`).
 - ✅ **LGPD — CPF criptografado:** dívida do texto puro **quitada** (`cpf_encrypted`/Fernet + `cpf_hash`).
-  **`LGPD_ENCRYPTION_KEY`** agora documentada no `.env.example`, provida ao serviço de teste e blindada no
-  `conftest`. Correção: a chave de teste anterior no `docker-compose` **não era um Fernet válido** e
-  quebrava a suíte que cria paciente. Pendente: **guarda/rotação da chave** em produção.
-- ✅ **Auditoria plugada:** `registrar_auditoria` é chamado em abrir/cancelar OS e item, coleta, liberação
-  de laudo e fechamento de lote (com testes de wiring). Pendente: ampliar aos demais movimentos financeiros.
+  **`LGPD_ENCRYPTION_KEY`** documentada (`.env.example`/`.env.production.example`), provida ao serviço de
+  teste e blindada no `conftest`. No BI, `id_origem` do paciente vira **hash** (não o UUID). Pendente:
+  **rotação automatizada** da chave (re-criptografia) — procedimento descrito no `DEPLOY.md`.
+- ✅ **Auditoria plugada:** `registrar_auditoria` em abrir/cancelar OS e item, coleta, liberação de laudo,
+  fechamento de lote, **baixa de título (receber/pagar) e glosa** (com testes). Pendente: caixa/conciliação.
 - ⚠️ **Auth0/segredos:** `.env` com `AUTH0_CLIENT_SECRET` e `LGPD_ENCRYPTION_KEY` **nunca** vão pro git;
-  signup público e proteção de senha vazada a revisar antes de qualquer deploy.
+  signup público e proteção de senha vazada a revisar antes de qualquer deploy (checklist no `DEPLOY.md`).
 - ℹ️ **Integrações externas (TISS real, HL7/ASTM)** ficam **simuladas** no protótipo — deixar claro na
   apresentação o que é fluxo interno vs. integração real.
 
@@ -554,18 +560,24 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
 
 ---
 
-> **Próximo passo sugerido:** as quatro stacks estão implementadas (A/B/C completas, D em grande parte) e a
-> **suíte está verde (132 testes)**. Os bloqueios de operação (heads do Alembic, auditoria não plugada,
-> chave LGPD) foram resolvidos nesta leva. O que resta é **acabamento**: **(1)** fechar o RBAC (perfis por
-> padrão + granularidade + testes de gate); **(2)** ampliar a auditoria aos demais movimentos financeiros;
-> **(3)** endurecer a anonimização do BI (hashear `id_origem`) e a gestão/rotação da `LGPD_ENCRYPTION_KEY`;
-> **(4)** aprofundar o ETL do BI; **(5)** deploy + hardening do Auth0. A head atual do Alembic é
-> **`0012_merge_heads_c_d`** — nova migration deve partir dela.
+> **Próximo passo sugerido:** as quatro stacks estão implementadas e a **suíte está verde (138 testes)**.
+> Os itens de operação/acabamento e o backlog médio/baixo foram resolvidos (RBAC com perfil padrão,
+> auditoria financeira, anonimização por hash no BI, busca/paginação, guia de deploy). O que resta é
+> **evolução e execução**: **(1)** aprofundar o ETL do BI (incremental + indicadores); **(2)** automatizar a
+> rotação da `LGPD_ENCRYPTION_KEY`; **(3)** enriquecer conciliação/fluxo de caixa; **(4)** **executar** o
+> deploy conforme o `DEPLOY.md`. A head atual do Alembic é **`0013_bi_paciente_hash`** — nova migration
+> deve partir dela.
 
 ---
 
 ## 10. Changelog da resenha
 
+- **2026-07-26 (4)** — Backlog médio/baixo resolvido, **suíte verde (138 testes)**: **RBAC com perfil por
+  padrão** (bootstrap: 1º usuário = `admin`, demais = `visualizador`), encerrando o acesso plano; **auditoria
+  financeira** (baixa de título a receber/pagar e glosa); **BI com `id_origem` anonimizado por hash SHA-256**
+  (migração `0013` + ETL); **busca/paginação** nas telas de Pacientes e OS; **`DEPLOY.md` +
+  `.env.production.example`** (guia de deploy + checklist de hardening Auth0/segredos/LGPD). Head do Alembic:
+  `0013_bi_paciente_hash`.
 - **2026-07-26 (3)** — Resolvidas issues abertas do repositório (backend + UX), **suíte verde (132 testes)**:
   **#8** o service bloqueia liberação de laudo com resultado não revisado; **#9** valida responsável técnico
   (médico ativo + `responsavel_tecnico`) no service, com testes; **#16** recebimento de malote permite
