@@ -30,9 +30,15 @@ Gere a chave LGPD:
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-> ⚠️ **A chave LGPD é permanente.** Trocá-la torna ilegíveis todos os CPFs já gravados.
-> Guarde-a no gestor de segredos e faça backup. Rotação exige re-criptografar os dados
-> (descriptografar com a chave antiga e regravar com a nova) — não é um simples swap.
+> ⚠️ **A chave LGPD é permanente.** Trocá-la sem re-criptografar torna ilegíveis os CPFs já gravados.
+> Para rotacionar com segurança, defina a **nova** chave no ambiente e rode o utilitário informando a
+> **antiga** (ele descriptografa com a antiga e regrava com a nova; o `cpf_hash` não muda):
+>
+> ```bash
+> LGPD_ENCRYPTION_KEY=<chave_nova> python -m src.lgpd.rotacao <chave_antiga>
+> ```
+>
+> Faça isso em janela de manutenção, com backup do banco antes.
 
 ## 3. Subir a aplicação
 
