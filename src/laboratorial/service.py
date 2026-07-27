@@ -5,9 +5,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.auditoria import registrar_auditoria
 from src.atendimento.ordem_servico import service as ordem_servico_service
 from src.atendimento.ordem_servico.dtos import StatusOrdemServico, StatusOsItem
 from src.atendimento.ordem_servico.models import OrdemServico, OsItem
+from src.cadastro.medico import repository as medico_repository
 from src.laboratorial.dtos import (
     EquipamentoCreate,
     EquipamentoUpdate,
@@ -24,6 +26,7 @@ from src.laboratorial.models import (
     Resultado,
     ResultadoAuditoria,
     StatusLaudo,
+    StatusResultado,
     ValorReferencia,
 )
 from src.laboratorial.repository import LaboratorialRepository
@@ -211,6 +214,28 @@ class LaboratorialService:
         if dto.status == StatusLaudo.LIBERADO:
             if not laudo.responsavel_tecnico_id:
                 raise ValueError("Laudo precisa de um responsável técnico para ser liberado")
+
+            # Issue #9: a autorização é regra de domínio, não pode depender da lista da tela.
+            medico = medico_repository.obter_por_id(
+                self.repository.session, laudo.responsavel_tecnico_id
+            )
+            if medico is None or not medico.ativo or not medico.responsavel_tecnico:
+                raise ValueError(
+                    "Laudo só pode ser liberado por um médico ativo marcado como "
+                    "responsável técnico"
+                )
+
+            # Issue #8: não liberar enquanto houver resultado pendente de revisão.
+            resultados = self.repository.get_resultados_by_os_item(laudo.os_item_id)
+            if not resultados:
+                raise ValueError(
+                    "Não é possível liberar o laudo sem resultados registrados"
+                )
+            if any(r.status != StatusResultado.REVISADO for r in resultados):
+                raise ValueError(
+                    "Todos os resultados do exame precisam estar REVISADOS para liberar o laudo"
+                )
+
             laudo.status = StatusLaudo.LIBERADO
             laudo.liberado_em = datetime.now(timezone.utc)
 
@@ -218,6 +243,18 @@ class LaboratorialService:
             if os_item:
                 os_item.status = StatusOsItem.RESULTADO_LIBERADO
                 self._concluir_os_se_todos_laudos_liberados(os_item, usuario_id)
+
+            registrar_auditoria(
+                self.repository.session,
+                usuario_id,
+                entidade="laudo",
+                entidade_id=laudo.id,
+                acao="LIBERAR_LAUDO",
+                dados={
+                    "os_item_id": str(laudo.os_item_id),
+                    "responsavel_tecnico_id": str(laudo.responsavel_tecnico_id),
+                },
+            )
 
         laudo = self.repository.save_laudo(laudo)
         self.repository.session.commit()
