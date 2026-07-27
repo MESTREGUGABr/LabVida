@@ -52,7 +52,9 @@ class DimPacienteAnon(Base):
     __tablename__ = "bi_dim_paciente_anon"
 
     sk_paciente: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    id_origem: Mapped[str] = mapped_column(UUID(as_uuid=True), nullable=False, unique=True)
+    # Pseudônimo: hash SHA-256 do UUID do paciente (não o UUID cru), para o BI não
+    # permitir join trivial de volta a `pacientes`. Mantém estabilidade para o upsert.
+    id_origem: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     faixa_etaria: Mapped[str] = mapped_column(String(20), nullable=False)
     sexo: Mapped[str] = mapped_column(String(20), nullable=False)
 

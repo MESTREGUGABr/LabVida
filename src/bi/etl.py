@@ -1,3 +1,4 @@
+import hashlib
 from datetime import date
 from decimal import Decimal
 
@@ -79,8 +80,14 @@ def _sk_procedimento(session, pid, tuss="", nome="", setor=None) -> int:
     return dim.sk_procedimento
 
 
+def _hash_paciente(pid) -> str:
+    """Pseudônimo determinístico do paciente para o BI (não reversível para PII)."""
+    return hashlib.sha256(str(pid).encode()).hexdigest()
+
+
 def _sk_paciente(session, pid, nasc=None, sexo=None) -> int:
-    dim = session.scalar(select(DimPacienteAnon).where(DimPacienteAnon.id_origem == pid))
+    id_hash = _hash_paciente(pid)
+    dim = session.scalar(select(DimPacienteAnon).where(DimPacienteAnon.id_origem == id_hash))
     if dim:
         return dim.sk_paciente
     faixa = "Desconhecida"
@@ -94,7 +101,7 @@ def _sk_paciente(session, pid, nasc=None, sexo=None) -> int:
         elif idade <= 65: faixa = "51-65 anos"
         else: faixa = "66+ anos"
     sexo_str = sexo.value if hasattr(sexo, 'value') else str(sexo) if sexo else "NAO_INFORMADO"
-    dim = DimPacienteAnon(id_origem=pid, faixa_etaria=faixa, sexo=sexo_str)
+    dim = DimPacienteAnon(id_origem=id_hash, faixa_etaria=faixa, sexo=sexo_str)
     session.add(dim)
     session.flush()
     return dim.sk_paciente

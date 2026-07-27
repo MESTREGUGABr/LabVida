@@ -52,3 +52,6 @@ def test_etl_anonimiza_paciente(session: Session) -> None:
     assert dim is not None
     assert dim.faixa_etaria in ("19-30 anos", "31-50 anos")
     assert dim.sexo == "FEMININO"
+    # Anonimização reforçada: id_origem é hash SHA-256, não o UUID cru do paciente.
+    assert len(dim.id_origem) == 64
+    assert dim.id_origem != str(paciente.id)
