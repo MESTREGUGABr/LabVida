@@ -7,7 +7,7 @@
 > **Última atualização:** 2026-07-26 (2) — **Stacks A, B e C concluídas** e **Stack D em grande parte
 > implementada**: RBAC efetivo (gate no shell), **auditoria append-only plugada nos services**, **LGPD
 > aplicada** (CPF criptografado), BI com ETL + 3 dashboards, navegação unificada + design system.
-> **Suíte completa verde: 138 testes.** ✅ Heads paralelas do Alembic **resolvidas** (merge `0012`).
+> **Suíte completa verde: 147 testes.** ✅ Heads paralelas do Alembic **resolvidas** (merge `0012`).
 > Ver §4 (estado atual) e §10.
 >
 > Fontes vivas no repo: `README.md` (visão + como rodar), `CONTEXT.md` (glossário de domínio),
@@ -38,8 +38,8 @@
   auditoria *append-only* **plugada nos services**, **LGPD com CPF criptografado (Fernet) + hash**, BI com
   esquema estrela, ETL e 3 dashboards, navegação unificada + design system). Tudo em fatias verticais
   (migration → model → repository → service → DTO/validação → tela → testes), com **suíte completa verde:
-  138 testes**. Restam apenas evoluções (ETL incremental do BI, rotação automatizada da chave LGPD,
-  fluxo de caixa) e a **execução** do deploy — o roteiro está no `DEPLOY.md` (§4.3/§8).
+  147 testes**. Restam apenas evoluções opcionais (ETL incremental/agendado do BI, rotação de chave
+  automatizada, mais KPIs) e a **execução** do deploy — o roteiro está no `DEPLOY.md` (§4.3/§8).
 - **Contexto:** projeto da disciplina **Sistemas de Informação e Tecnologias (SIT)** — Ciência da
   Computação, **UFAPE** (Garanhuns-PE, 2026). Equipe de 4.
 - **O plano:** evoluir o produto dividindo o trabalho em **4 stacks verticais** (cada pessoa dona de um
@@ -244,7 +244,7 @@ do Alembic (§8) e melhorias pontuais.**
 | **Seeder de pacientes** ⭐ | popula Pacientes de exemplo com **Faker** (CPF válido, telefone, sexo) — `make seeder` | `src/seeder/*` |
 | **Infra Docker** | `docker-compose` (app + Postgres 16 + serviços de teste), `Dockerfile` (Python 3.12-slim, não-root) | `docker-compose.yml`, `Dockerfile` |
 | **Migrations** | Alembic configurado, **autogenerate ligado** (`env.py` lê `Base.metadata`); aplica no boot | `alembic/`, `alembic.ini` |
-| **Testes** | pytest: `AppTest` (login/home) + DTOs/validators (unit) + services (integração via Postgres de teste); cobre cadastros, atendimento, logística, laboratorial, faturamento, financeiro, compras, RBAC, LGPD, auditoria e BI — **138 testes (suíte verde)** | `tests/` (subpasta por módulo) |
+| **Testes** | pytest: `AppTest` (login/home) + DTOs/validators (unit) + services (integração via Postgres de teste); cobre cadastros, atendimento, logística, laboratorial, faturamento, financeiro, compras, RBAC, LGPD, auditoria e BI — **147 testes (suíte verde)** | `tests/` (subpasta por módulo) |
 | **Automação** | `Makefile` (`up/down/test/migrate/revision/seeder/clean`) | `Makefile` |
 
 > ⭐ = fundação/Cadastro de Pacientes. ⭐⭐ = Stack A. ⭐⭐⭐ = Stack B. 🟧 = Stack C. 🟪 = Stack D.
@@ -276,16 +276,20 @@ do Alembic (§8) e melhorias pontuais.**
   `visualizador`), encerrando o acesso amplo por ausência de perfil. Coberto por testes.
 - ✅ **Auditoria financeira:** `registrar_auditoria` também em baixa de título (receber/pagar) e registro
   de glosa, com testes.
-- ✅ **Busca/paginação:** telas de Pacientes e de OS ganharam busca (nome/código) + filtro de status (OS)
-  e limite de exibição.
+- ✅ **Busca/paginação:** OS **server-side** (busca por código/paciente + status + páginas, percorrendo
+  todas as OS) e Pacientes (busca + paginação). Fatia vertical repo→service→página, com testes.
+- ✅ **Conciliação e fluxo de caixa:** aba "Conciliações" expõe divergências; fluxo de caixa consolidado
+  por período (mês/ano).
+- ✅ **Rotação da `LGPD_ENCRYPTION_KEY`:** utilitário `python -m src.lgpd.rotacao` re-criptografa os CPFs
+  (com teste). Falta só **automatizar/agendar**.
+- ✅ **BI — indicador de ciclo:** ETL popula `tempo_ciclo_os_horas` (coleta→laudo). Falta ETL
+  **incremental/agendado** e mais KPIs.
 - ✅ **Deploy — guia + template:** `DEPLOY.md` e `.env.production.example` com passo a passo e checklist de
   hardening (Auth0 leaked password, segredos, chave LGPD). Execução do deploy depende de alvo/credenciais.
-- 🟡 **BI — profundidade do ETL**: agendamento/atualização incremental e mais indicadores.
-- 🟡 **Rotação da `LGPD_ENCRYPTION_KEY`** (re-criptografia dos CPFs) — documentada, ainda não automatizada.
-- 🟢 Conciliação/fluxo de caixa mais completos.
+- 🟢 Evolução opcional: ETL incremental/agendado, rotação de chave automatizada, mais KPIs de BI.
 - ℹ️ **Integrações externas** (TISS real, HL7/ASTM): **fora do escopo** do protótipo (modeladas).
 
-> Em uma frase: **as quatro alas estão de pé e a suíte está verde (138 testes)** — A, B e C completas e D
+> Em uma frase: **as quatro alas estão de pé e a suíte está verde (147 testes)** — A, B e C completas e D
 > em grande parte pronta. Restam acabamentos (RBAC por padrão, ampliar auditoria, ETL) e o hardening/deploy.
 
 ---
@@ -383,9 +387,13 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
   - ✅ **Autorização de convênio** (guia/status/validade) registrada e vinculada à OS (+ helper
     `possui_autorizacao_valida`).
   - ✅ **CPF criptografado na origem** (LGPD) — **feito na Stack D** (`cpf_encrypted`/Fernet + `cpf_hash`).
-  - 🟢 Busca/listagem paginada de pacientes e OS (hoje lista simples / últimas 100 OS).
-- **Dependências:** consumiu uma `usuario` **mínima** criada nesta leva (terreno da Stack D, alinhado);
-  produz amostras `COLETADA` consumidas pela Stack B.
+  - ✅ **Busca e paginação** de pacientes e OS. **OS é server-side** (`contar_filtrado`/`listar_filtrado`
+    no repository → `listar_os(busca, status, limite, offset)`/`contar_os` no service → página com busca +
+    filtro de status + navegação de página), permitindo percorrer **todas** as OS (não só as 100 recentes).
+    Pacientes com busca por nome + paginação (client-side sobre a lista ordenada). Com testes de repo/service.
+- **Dependências (fatia vertical da paginação):** `repository` (query com filtro/`limit`/`offset` + `count`)
+  → `service` (parâmetros de busca/paginação) → `página` (widgets de busca/status/página). Continua
+  consumindo a `usuario` da Stack D e produzindo amostras `COLETADA` para a Stack B.
 
 ### 🟩 Stack B — Logística & Laboratorial  *(operação técnica)*
 **Dono sugerido:** Clauderson
@@ -403,10 +411,14 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
   - ✅ **Cadastro de valores de referência** para os analitos.
   - ✅ **Esteira de bancada** e telas de logística, cadastros laboratoriais, resultados e laudos.
   - ✅ **Cancelamento coerente de OS/itens** com conclusão automática da OS ao liberar o último laudo.
-- **Melhorias pendentes:** validação de vínculo do responsável técnico com cadastro de médico/RBAC (o gate
-  por perfil já existe; falta amarrar ao cadastro), mais testes específicos do service laboratorial.
+  - ✅ **Regras de liberação no service** (issues #8/#9): bloqueia laudo com resultado não revisado e exige
+    responsável técnico **médico ativo com a flag** (não confia na lista da tela). Também recusa individual
+    de amostras no recebimento (issue #16).
+- **Melhorias pendentes:** ✅ resolvidas nesta fase — validação de RT feita no service (#9) e **mais testes
+  do service laboratorial** (laudo já liberado não altera, laudo duplicado, auditoria de resultado). Sobra
+  só evolução opcional (esteira de bancada mais rica).
 - **Dependências:** recebe amostras da Stack A; o laudo liberado é o ponto de integração com a Stack C;
-  a autorização por perfil ainda será consolidada pela Stack D.
+  a autorização por perfil é consolidada pela Stack D (gate no `shell()`).
 
 ### 🟧 Stack C — Faturamento, Financeiro & Compras
 **Dono sugerido:** Victor
@@ -425,8 +437,9 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
   - ✅ **Glosa** (motivo/operadora) registrada e vinculada ao faturamento.
   - ✅ **Financeiro:** `titulo_receber`/`titulo_pagar`, `movimento_caixa` e **conciliação** de pagamento.
   - ✅ **Compras:** fornecedor, pedido de compra (→ **`titulo_pagar`**), insumo e movimento de estoque.
-- **Melhorias pendentes:** 🟡 alertas de divergência mais ricos na conciliação, fluxo de caixa
-  consolidado por período, e instrumentar a **auditoria** nas operações financeiras (Stack D).
+- **Melhorias pendentes:** ✅ resolvidas — **fluxo de caixa consolidado por período** (tela mês/ano),
+  **conciliações/divergências expostas** na aba "Conciliações" (contas), e **auditoria** plugada nas baixas
+  de título e na glosa. Sobra evolução opcional (mais alertas/kpis de divergência).
 - **Dependências:** consome o **laudo liberado** (Stack B); abastece o BI (Stack D) com receita/glosa.
 
 ### 🟪 Stack D — Transversal: Segurança/RBAC, Auditoria, BI & Plataforma
@@ -450,16 +463,18 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
     substitui o antigo *meta-refresh* repetido em cada página.
   - ✅ **Design system:** tema institucional + componentes (`renderizar_cabecalho/secao/empty_state`,
     `kpi_card`, `status_badge`, `filter_bar`, `action_bar`) e ícones SVG (FontAwesome/currentColor).
-  - ✅ **LGPD:** CPF em repouso criptografado (Fernet) + hash SHA-256 + máscara na UI.
-  - ✅ **BI:** esquema estrela + ETL + dashboards de produtividade, logística e financeiro.
-- **Itens a desenvolver / acabamento:**
-  - 🔴 **Corrigir heads paralelas do Alembic** (merge migration — ver §8).
-  - 🔴 **Plugar a auditoria nos services:** chamar `registrar_auditoria` nas operações sensíveis
-    (OS/coleta/laudo/faturamento/financeiro) — o helper existe, mas ainda não é invocado.
-  - 🟡 **RBAC:** atribuir perfis por padrão e revisar granularidade + testes de gate.
-  - 🟡 **BI/LGPD:** anonimização do paciente no BI; profundidade/atualização do ETL; gestão da
-    `LGPD_ENCRYPTION_KEY`.
-  - 🟢 **Deploy** (definir alvo) + envs de produção; *leaked password* / hardening do Auth0.
+  - ✅ **LGPD:** CPF em repouso criptografado (Fernet) + hash SHA-256 + máscara na UI; **rotação de chave**
+    via `python -m src.lgpd.rotacao`.
+  - ✅ **BI:** esquema estrela + ETL + dashboards; `id_origem` do paciente **anonimizado por hash** e
+    **`tempo_ciclo_os_horas`** (coleta→laudo) populado como indicador.
+- **Itens resolvidos nesta fase (antes "a desenvolver"):**
+  - ✅ **Heads paralelas do Alembic** — mergepoint `0012` (§8).
+  - ✅ **Auditoria plugada** nas operações sensíveis (OS/coleta/laudo/lote/baixa de título/glosa).
+  - ✅ **RBAC:** perfil por padrão no login (bootstrap admin + `visualizador`) + testes de gate/granularidade.
+  - ✅ **BI/LGPD:** anonimização por hash, `tempo_ciclo` no ETL, rotação da `LGPD_ENCRYPTION_KEY`.
+  - ✅ **Deploy:** `DEPLOY.md` + `.env.production.example` (hardening Auth0/segredos/LGPD). Falta só
+    **executar** num alvo com credenciais.
+- **Evolução (opcional):** ETL incremental/agendado; rotação de chave automatizada; mais KPIs de BI.
 - **Dependências:** **transversal** — `db.py`, RBAC e auditoria tocam todas as stacks; alinhar no grupo
   antes de mudar. O BI consome eventos/dados de A, B e C.
 
@@ -501,7 +516,7 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
 - **`DEPLOY.md` + `.env.production.example`** (guia + hardening) — **Stack D**.
 - **Issues #8/#9 (hardening laboratorial):** service bloqueia laudo com resultado não revisado e valida
   responsável técnico ativo — **Stack B**.
-- **138 testes — suíte completa verde** (validada em banco limpo via docker).
+- **147 testes — suíte completa verde** (validada em banco limpo via docker).
 
 **🔴 Alta (destrava/consolida)**
 - _(vazio — resolvidos nesta leva.)_
@@ -560,7 +575,7 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
 
 ---
 
-> **Próximo passo sugerido:** as quatro stacks estão implementadas e a **suíte está verde (138 testes)**.
+> **Próximo passo sugerido:** as quatro stacks estão implementadas e a **suíte está verde (147 testes)**.
 > Os itens de operação/acabamento e o backlog médio/baixo foram resolvidos (RBAC com perfil padrão,
 > auditoria financeira, anonimização por hash no BI, busca/paginação, guia de deploy). O que resta é
 > **evolução e execução**: **(1)** aprofundar o ETL do BI (incremental + indicadores); **(2)** automatizar a
@@ -572,6 +587,13 @@ uma da outra. O que é **transversal** (auth, `db.py`, RBAC, navegação/layout,
 
 ## 10. Changelog da resenha
 
+- **2026-07-27** — Pendências por stack fechadas, **suíte verde (147 testes)**. **Stack A:** paginação
+  server-side de OS (busca por código/paciente + status + páginas, percorrendo todas as OS) e paginação de
+  pacientes — fatia vertical repo→service→página, com testes. **Stack B:** mais testes do service
+  laboratorial (laudo já liberado, laudo duplicado, auditoria de resultado). **Stack C:** aba "Conciliações"
+  expondo divergências (fluxo de caixa por período já existia). **Stack D:** testes de gate/granularidade
+  RBAC; ETL popula `tempo_ciclo_os_horas` (coleta→laudo); utilitário de **rotação da chave LGPD**
+  (`python -m src.lgpd.rotacao`). Head do Alembic segue `0013_bi_paciente_hash`.
 - **2026-07-26 (4)** — Backlog médio/baixo resolvido, **suíte verde (138 testes)**: **RBAC com perfil por
   padrão** (bootstrap: 1º usuário = `admin`, demais = `visualizador`), encerrando o acesso plano; **auditoria
   financeira** (baixa de título a receber/pagar e glosa); **BI com `id_origem` anonimizado por hash SHA-256**
