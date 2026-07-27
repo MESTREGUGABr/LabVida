@@ -3,8 +3,6 @@ from decimal import Decimal
 import streamlit as st
 from pydantic import ValidationError
 
-from src.atendimento.autorizacao.dtos import AutorizacaoCreate, StatusAutorizacao
-from src.atendimento.autorizacao.service import listar_autorizacoes, registrar_autorizacao
 from src.atendimento.ordem_servico.dtos import (
     OrdemServicoCreate,
     OsItemInput,
@@ -43,7 +41,6 @@ from src.ui_components import (
 )
 from src.ui_theme import ACCENT_ORANGE
 from src.ui_icons import (
-    ICONE_AUTORIZACAO,
     ICONE_BUSCA,
     ICONE_CONVENIO,
     ICONE_HISTORICO,
@@ -224,7 +221,7 @@ def _render_listar() -> None:
 
     renderizar_secao(
         titulo=f"{ICONE_BUSCA} Detalhar Ordem de Servico",
-        descricao="Selecione uma OS para ver itens, historico e autorizacoes",
+        descricao="Selecione uma OS para ver itens, historico e cancelamento",
     )
 
     opcoes = {o.codigo_os: o.id for o in ordens}
@@ -235,7 +232,6 @@ def _render_listar() -> None:
     with session_scope() as session:
         itens = listar_itens(session, ordem_id)
         historico = listar_historico(session, ordem_id)
-        autorizacoes = listar_autorizacoes(session, ordem_id)
 
     col_itens, col_hist = st.columns(2)
 
@@ -274,8 +270,6 @@ def _render_listar() -> None:
     st.markdown("<br>", unsafe_allow_html=True)
 
     _render_cancelamento(ordem_id, ordem, itens, procedimentos)
-
-    _render_autorizacoes(ordem_id, autorizacoes)
 
 
 def _render_cancelamento(ordem_id, ordem, itens, procedimentos) -> None:
@@ -326,55 +320,6 @@ def _executar_cancelamento(acao, mensagem_sucesso: str, erros: tuple[type[Except
         st.error(str(error))
     else:
         st.success(mensagem_sucesso)
-        st.rerun()
-
-
-def _render_autorizacoes(ordem_id, autorizacoes) -> None:
-    renderizar_secao(
-        titulo=f"{ICONE_AUTORIZACAO} Autorizacoes de Convenio",
-        descricao="Consultar e registrar autorizacoes da operadora para esta OS",
-    )
-
-    if autorizacoes:
-        st.dataframe(
-            [
-                {
-                    "Guia": a.numero_guia,
-                    "Status": a.status,
-                    "Validade": a.validade.strftime("%d/%m/%Y") if a.validade else "\u2014",
-                }
-                for a in autorizacoes
-            ],
-            hide_index=True,
-            width="stretch",
-        )
-
-    with st.form(f"form_autorizacao_{ordem_id}", clear_on_submit=True):
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            numero_guia = st.text_input("Numero da guia")
-        with col2:
-            status = st.selectbox("Status", options=list(StatusAutorizacao))
-        with col3:
-            validade = st.date_input("Validade (opcional)", value=None, format="DD/MM/YYYY")
-        submitted = st.form_submit_button("Registrar autorizacao", type="primary")
-
-    if not submitted:
-        return
-
-    try:
-        dto = AutorizacaoCreate(
-            ordem_servico_id=ordem_id,
-            numero_guia=numero_guia,
-            status=status,
-            validade=validade,
-        )
-        with session_scope() as session:
-            registrar_autorizacao(session, dto)
-    except (ValidationError, ValueError) as error:
-        st.error(_mensagem(error))
-    else:
-        st.success("Autorizacao registrada")
         st.rerun()
 
 

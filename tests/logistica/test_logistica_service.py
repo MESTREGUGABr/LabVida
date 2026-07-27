@@ -149,6 +149,71 @@ def test_recebimento_com_integridade_falsa_rejeita_amostra(session: Session) -> 
     assert historico[2].status == StatusAmostra.REJEITADA
 
 
+def test_recebimento_rejeita_amostra_individualmente(session: Session) -> None:
+    base = montar_base(session)
+    central = criar_unidade(session, UnidadeCreate(nome="Laboratório Central", tipo="CENTRAL"))
+
+    ordem = abrir_os(
+        session,
+        OrdemServicoCreate(
+            paciente_id=base.paciente_id,
+            unidade_id=base.unidade_id,
+            convenio_id=None,
+            itens=[OsItemInput(procedimento_id=base.procedimento_id, valor_negociado=Decimal("100"))],
+        ),
+        base.usuario_id,
+    )
+    amostra_ok = registrar_coleta(
+        session,
+        ColetaCreate(
+            ordem_servico_id=ordem.id,
+            tipo_material=TipoMaterial.SANGUE,
+            coletor_usuario_id=base.usuario_id,
+        ),
+    )
+    amostra_ruim = registrar_coleta(
+        session,
+        ColetaCreate(
+            ordem_servico_id=ordem.id,
+            tipo_material=TipoMaterial.URINA,
+            coletor_usuario_id=base.usuario_id,
+        ),
+    )
+
+    malote = criar_malote(
+        session,
+        MaloteCreate(
+            unidade_origem_id=base.unidade_id,
+            unidade_destino_id=central.id,
+            enviado_por_usuario_id=base.usuario_id,
+        ),
+    )
+    adicionar_amostra_ao_malote(session, malote.id, amostra_ok.id)
+    adicionar_amostra_ao_malote(session, malote.id, amostra_ruim.id)
+    despachar_malote(session, malote.id, base.usuario_id)
+
+    protocolo = receber_malote(
+        session,
+        ProtocoloRecebimentoCreate(
+            malote_id=malote.id,
+            recebido_por_usuario_id=base.usuario_id,
+            amostras_rejeitadas={amostra_ruim.id},
+            observacao="Tubo de urina com vazamento",
+        ),
+    )
+
+    # Houve recusa parcial: protocolo não é íntegro.
+    assert protocolo.integridade_ok is False
+
+    hist_ok = listar_historico_amostra(session, amostra_ok.id)
+    hist_ruim = listar_historico_amostra(session, amostra_ruim.id)
+    assert hist_ok[-1].status == StatusAmostra.RECEBIDA
+    assert hist_ruim[-1].status == StatusAmostra.REJEITADA
+
+    # A OS ainda avança porque tem ao menos uma amostra aceita.
+    assert obter_os(session, ordem.id).status == StatusOrdemServico.EM_ANALISE
+
+
 def test_nao_permite_despachar_malote_sem_amostras(session: Session) -> None:
     base = montar_base(session)
     central = criar_unidade(session, UnidadeCreate(nome="Laboratório Central", tipo="CENTRAL"))

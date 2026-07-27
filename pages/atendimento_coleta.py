@@ -7,8 +7,9 @@ from src.atendimento.amostra.errors import (
     OrdemServicoInexistente,
 )
 from src.atendimento.amostra.service import listar_amostras, registrar_coleta
-from src.atendimento.ordem_servico.dtos import StatusOrdemServico
-from src.atendimento.ordem_servico.service import listar_os
+from src.atendimento.ordem_servico.dtos import StatusOrdemServico, StatusOsItem
+from src.atendimento.ordem_servico.service import listar_itens, listar_os
+from src.cadastro.procedimento.service import listar_procedimentos_ativos
 from src.cadastro.service import listar_pacientes_ativos
 from src.db import session_scope
 from src.ui import renderizar_menu, shell, usuario_id_logado
@@ -62,6 +63,33 @@ def main() -> None:
         )
 
     ordem_id = opcoes[label]
+
+    # Issue #15: mostrar o que a OS pede, para o coletor saber o que coletar.
+    with session_scope() as session:
+        itens = listar_itens(session, ordem_id)
+        procedimentos = {p.id: p.nome for p in listar_procedimentos_ativos(session)}
+
+    itens_ativos = [i for i in itens if i.status != StatusOsItem.CANCELADO]
+    st.markdown(f"**{ICONE_OS} Exames solicitados nesta OS**", unsafe_allow_html=True)
+    if itens_ativos:
+        st.dataframe(
+            [
+                {
+                    "Procedimento": procedimentos.get(i.procedimento_id, "—"),
+                    "Status do item": i.status,
+                }
+                for i in itens_ativos
+            ],
+            hide_index=True,
+            width="stretch",
+        )
+        st.caption(
+            "Registre uma coleta por tipo de material necessário para cobrir estes exames."
+        )
+    else:
+        st.caption("Esta OS não possui procedimentos ativos.")
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
     if st.button("Registrar Coleta", type="primary", width="stretch"):
         try:

@@ -12,6 +12,7 @@ from src.logistica.malote.service import (
     listar_malotes_por_unidade_origem,
     obter_malote,
 )
+from src.logistica.recebimento.service import listar_amostras_do_malote
 from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import renderizar_cabecalho, renderizar_secao
 from src.ui_icons import ICONE_MALOTE
@@ -104,9 +105,22 @@ def main() -> None:
                 st.write("**Despachar Malote**")
                 with session_scope() as session:
                     malote_atual = obter_malote(session, malote_id)
+                    amostras_no_malote = listar_amostras_do_malote(session, malote_id)
 
-                if malote_atual and malote_atual.itens:
-                    st.write(f"Total de itens no malote: **{len(malote_atual.itens)}**")
+                if malote_atual and amostras_no_malote:
+                    st.write(f"Total de itens no malote: **{len(amostras_no_malote)}**")
+                    # Issue #5: mostrar o conteúdo do malote para dar certeza antes de despachar.
+                    st.dataframe(
+                        [
+                            {
+                                "Código de barras": a.codigo_barras,
+                                "Material": a.tipo_material.value,
+                            }
+                            for a in amostras_no_malote
+                        ],
+                        hide_index=True,
+                        width="stretch",
+                    )
                     if st.button("Despachar Malote (Em Transito)", type="primary"):
                         try:
                             with session_scope() as session:
