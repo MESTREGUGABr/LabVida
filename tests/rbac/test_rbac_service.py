@@ -94,6 +94,39 @@ def test_gate_exigir_permissao_negado(session: Session) -> None:
         exigir_permissao(session, usuario.id, "laboratorial:liberar_laudo")
 
 
+def test_gate_e_granular_por_permissao(session: Session) -> None:
+    # Perfil com apenas UMA permissão é autorizado nela e negado nas demais.
+    p = _criar_permissao(session, "atendimento:abrir_os")
+    _criar_permissao(session, "laboratorial:liberar_laudo")
+    perfil = service.criar_perfil(session, PerfilCreate(nome="atendente"))
+    service.atribuir_permissao_ao_perfil(session, perfil.id, p.id)
+    usuario = sincronizar_usuario(session, "granular@labvida.test", "Granular")
+    service.vincular_usuario_ao_perfil(session, usuario.id, perfil.id)
+
+    assert verificar_permissao(session, usuario.id, "atendimento:abrir_os") is True
+    assert verificar_permissao(session, usuario.id, "laboratorial:liberar_laudo") is False
+    with pytest.raises(PermissaoNegada):
+        exigir_permissao(session, usuario.id, "laboratorial:liberar_laudo")
+
+
+def test_trocar_perfil_muda_permissoes(session: Session) -> None:
+    abrir = _criar_permissao(session, "atendimento:abrir_os")
+    liberar = _criar_permissao(session, "laboratorial:liberar_laudo")
+    perfil_atend = service.criar_perfil(session, PerfilCreate(nome="atendente"))
+    perfil_lab = service.criar_perfil(session, PerfilCreate(nome="laboratorio"))
+    service.atribuir_permissao_ao_perfil(session, perfil_atend.id, abrir.id)
+    service.atribuir_permissao_ao_perfil(session, perfil_lab.id, liberar.id)
+
+    usuario = sincronizar_usuario(session, "troca@labvida.test", "Troca")
+    service.vincular_usuario_ao_perfil(session, usuario.id, perfil_atend.id)
+    assert verificar_permissao(session, usuario.id, "atendimento:abrir_os") is True
+
+    # Ao trocar de perfil, as permissões acompanham.
+    service.vincular_usuario_ao_perfil(session, usuario.id, perfil_lab.id)
+    assert verificar_permissao(session, usuario.id, "atendimento:abrir_os") is False
+    assert verificar_permissao(session, usuario.id, "laboratorial:liberar_laudo") is True
+
+
 def test_listar_permissoes_do_usuario(session: Session) -> None:
     p1 = _criar_permissao(session, "atendimento:abrir_os")
     p2 = _criar_permissao(session, "atendimento:coletar")
