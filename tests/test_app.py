@@ -9,6 +9,27 @@ PROJECT_ROOT = Path(__file__).parent.parent
 
 
 @pytest.fixture()
+def usuario_logado(monkeypatch) -> dict:
+    """Simula a sessao pos-login: usuario sincronizado do Auth0 (shell exige user["id"]).
+
+    O menu lateral usa st.page_link, que exige o registro de paginas MPA — indisponivel
+    quando o AppTest roda uma pagina isolada. Neutralizamos o menu para focar na pagina.
+    """
+    from src.db import session_scope
+    from src.usuario.service import sincronizar_usuario
+
+    monkeypatch.setattr("src.ui.renderizar_menu", lambda *args, **kwargs: None)
+
+    with session_scope() as session:
+        usuario = sincronizar_usuario(session, "operador@labvida.test", "Operador Teste")
+        return {
+            "id": str(usuario.id),
+            "name": "Operador Teste",
+            "email": "operador@labvida.test",
+        }
+
+
+@pytest.fixture()
 def paciente_ativo() -> Iterator[None]:
     from src.cadastro.dtos import PacienteCreate
     from src.cadastro.models import Paciente
@@ -64,17 +85,17 @@ def test_cadastro_pacientes_redirects_when_not_logged_in(monkeypatch) -> None:
     assert not app.exception
 
 
-def test_cadastro_pacientes_substitui_janela_padrao_por_limite_tecnico() -> None:
+def test_cadastro_pacientes_substitui_janela_padrao_por_limite_tecnico(usuario_logado) -> None:
     app = AppTest.from_file(str(PROJECT_ROOT / "pages" / "cadastro_pacientes.py"))
-    app.session_state["user"] = {"sub": "test-user"}
+    app.session_state["user"] = usuario_logado
     app.run()
 
     assert app.date_input[0].min == date(1000, 1, 1)
 
 
-def test_edicao_paciente_substitui_janela_padrao_por_limite_tecnico(paciente_ativo) -> None:
+def test_edicao_paciente_substitui_janela_padrao_por_limite_tecnico(usuario_logado, paciente_ativo) -> None:
     app = AppTest.from_file(str(PROJECT_ROOT / "pages" / "cadastro_pacientes.py"))
-    app.session_state["user"] = {"sub": "test-user"}
+    app.session_state["user"] = usuario_logado
     app.run()
 
     assert app.date_input[1].min == date(1000, 1, 1)
