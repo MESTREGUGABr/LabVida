@@ -13,7 +13,7 @@ from src.atendimento.amostra.dtos import StatusAmostra
 from src.db import session_scope
 from src.faturamento.lote_faturamento.models import LoteFaturamento
 from src.laboratorial.models import Laudo, StatusLaudo
-from src.ui import renderizar_menu, shell
+from src.ui import formatar_brl, renderizar_menu, shell
 from src.ui_components import (
     renderizar_cabecalho,
     renderizar_empty_state,
@@ -127,7 +127,7 @@ def _renderizar_kpis() -> None:
         )
 
     with col4:
-        valor_fmt = f"R$ {faturamento_mes:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        valor_fmt = formatar_brl(float(faturamento_mes))
         renderizar_kpi_card(
             rotulo="Faturamento do mes",
             valor=valor_fmt,

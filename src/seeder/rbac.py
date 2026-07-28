@@ -31,6 +31,7 @@ _PERMISSOES = [
     ("atendimento:visualizar_os", "Visualizar Ordens de Serviço"),
     ("atendimento:abrir_os", "Abrir Ordem de Serviço"),
     ("atendimento:coletar", "Registrar coleta de amostra"),
+    ("atendimento:cancelar_os", "Cancelar itens e Ordens de Serviço"),
     # --- Logística ---
     ("logistica:visualizar_malotes", "Visualizar malotes e protocolos"),
     ("logistica:despachar_malote", "Criar e despachar malotes"),
@@ -66,6 +67,7 @@ _ADMIN = [
     "cadastro:procedimentos:ler", "cadastro:procedimentos:escrever",
     "cadastro:unidades:ler", "cadastro:unidades:escrever",
     "atendimento:visualizar_os", "atendimento:abrir_os", "atendimento:coletar",
+    "atendimento:cancelar_os",
     "logistica:visualizar_malotes", "logistica:despachar_malote", "logistica:receber_malote",
     "laboratorial:registrar_resultado", "laboratorial:liberar_laudo",
     "faturamento:visualizar_lotes", "faturamento:gerenciar_lotes", "faturamento:registrar_glosa",

@@ -36,3 +36,7 @@ class ConvenioNaoConfereComLaudo(FaturamentoError):
 
 class ValorFaturadoInvalido(FaturamentoError):
     """Lançada quando o valor faturado é menor ou igual a zero."""
+
+
+class LoteReprovadoPreAuditoria(FaturamentoError):
+    """Lançada quando o lote não passa na pré-auditoria antes do fechamento."""

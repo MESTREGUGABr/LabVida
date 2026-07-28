@@ -18,7 +18,16 @@ from src.ui_icons import ICONE_ADICIONAR, ICONE_BUSCA, ICONE_PRODUTIVIDADE, ICON
 
 
 def _listar_os_itens(session: Session):
-    return session.scalars(select(OsItem)).all()
+    from src.atendimento.ordem_servico.dtos import StatusOrdemServico, StatusOsItem
+    from src.atendimento.ordem_servico.models import OrdemServico
+    return session.scalars(
+        select(OsItem)
+        .join(OsItem.ordem_servico)
+        .where(
+            OrdemServico.status == StatusOrdemServico.EM_ANALISE,
+            OsItem.status != StatusOsItem.CANCELADO,
+        )
+    ).all()
 
 
 def main() -> None:
@@ -103,6 +112,7 @@ def main() -> None:
                                         usuario_id=usuario_id,
                                     ),
                                 )
+                                session.commit()
                                 st.toast("Resultado atualizado!", icon="\u2705")
                                 st.rerun()
                             except ValueError as e:
@@ -154,6 +164,7 @@ def main() -> None:
                                 usuario_id=usuario_id,
                             )
                         )
+                        session.commit()
                         st.toast("Resultado inserido com sucesso!", icon="\u2705")
                         st.rerun()
                     except ValueError as e:

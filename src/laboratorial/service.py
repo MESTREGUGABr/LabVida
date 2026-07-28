@@ -120,7 +120,8 @@ class LaboratorialService:
 
     # --- Resultado ---
     def registrar_resultado(self, dto: ResultadoCreate) -> Resultado:
-        # Criar resultado
+        self._validar_amostra_recebida(dto.os_item_id)
+
         resultado = Resultado(
             os_item_id=dto.os_item_id,
             equipamento_id=dto.equipamento_id,
@@ -138,7 +139,7 @@ class LaboratorialService:
             valor_novo=dto.valor
         )
         self.repository.save_auditoria(auditoria)
-        self.repository.session.commit()
+        self.repository.session.flush()
         self.repository.session.refresh(resultado)
         return resultado
 
@@ -171,7 +172,7 @@ class LaboratorialService:
             )
             self.repository.save_auditoria(auditoria)
 
-        self.repository.session.commit()
+        self.repository.session.flush()
         self.repository.session.refresh(resultado)
         return resultado
 
@@ -192,7 +193,7 @@ class LaboratorialService:
             responsavel_tecnico_id=dto.responsavel_tecnico_id,
         )
         laudo = self.repository.save_laudo(laudo)
-        self.repository.session.commit()
+        self.repository.session.flush()
         self.repository.session.refresh(laudo)
         return laudo
 
@@ -257,7 +258,7 @@ class LaboratorialService:
             )
 
         laudo = self.repository.save_laudo(laudo)
-        self.repository.session.commit()
+        self.repository.session.flush()
         self.repository.session.refresh(laudo)
         return laudo
 
@@ -296,3 +297,23 @@ class LaboratorialService:
 
     def obter_laudo_por_os_item(self, os_item_id: UUID) -> Laudo | None:
         return self.repository.get_laudo_by_os_item(os_item_id)
+
+    def _validar_amostra_recebida(self, os_item_id: UUID) -> None:
+        from src.atendimento.amostra.dtos import StatusAmostra
+        from src.atendimento.amostra.models import Amostra
+
+        item = self.repository.session.get(OsItem, os_item_id)
+        if item is None:
+            raise ValueError("Item da OS não encontrado")
+
+        amostra = self.repository.session.scalar(
+            select(Amostra).where(
+                Amostra.ordem_servico_id == item.ordem_servico_id,
+                Amostra.status == StatusAmostra.RECEBIDA,
+            ).limit(1)
+        )
+        if amostra is None:
+            raise ValueError(
+                "A amostra precisa ser recebida no laboratório central "
+                "antes de registrar resultados"
+            )

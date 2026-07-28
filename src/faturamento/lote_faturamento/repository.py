@@ -83,7 +83,8 @@ def contar_laudos_pendentes_por_convenio(session: Session, convenio_id: UUID | N
 def listar_laudos_liberados_por_convenio(session: Session, convenio_id: UUID | None) -> list[dict]:
     subquery_faturados = select(GuiaItem.laudo_id)
     stmt = (
-        select(Laudo.id, Laudo.os_item_id, Laudo.status, Laudo.liberado_em, OsItem.procedimento_id)
+        select(Laudo.id, Laudo.os_item_id, Laudo.status, Laudo.liberado_em,
+               OsItem.procedimento_id, OsItem.valor_negociado)
         .join(OsItem, Laudo.os_item_id == OsItem.id)
         .join(OrdemServico, OsItem.ordem_servico_id == OrdemServico.id)
         .where(
@@ -98,6 +99,7 @@ def listar_laudos_liberados_por_convenio(session: Session, convenio_id: UUID | N
             "laudo_id": r.id,
             "os_item_id": r.os_item_id,
             "procedimento_id": r.procedimento_id,
+            "valor_negociado": float(r.valor_negociado) if r.valor_negociado else 50.0,
             "status": r.status.value,
             "liberado_em": r.liberado_em,
         }

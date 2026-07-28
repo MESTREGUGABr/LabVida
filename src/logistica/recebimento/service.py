@@ -22,6 +22,7 @@ from src.logistica.recebimento.errors import (
     MaloteNaoEstaEmTransito,
     UsuarioRecebedorInvalido,
 )
+from src.auditoria import registrar_auditoria
 from src.logistica.recebimento.models import AmostraMovimentacao, ProtocoloRecebimento
 from src.usuario import repository as usuario_repository
 
@@ -93,6 +94,19 @@ def receber_malote(session: Session, dto: ProtocoloRecebimentoCreate) -> Protoco
             os_service.registrar_transicao(
                 session, ordem, StatusOrdemServico.EM_ANALISE, dto.recebido_por_usuario_id
             )
+
+    registrar_auditoria(
+        session,
+        dto.recebido_por_usuario_id,
+        entidade="malote",
+        entidade_id=malote.id,
+        acao="RECEBER_MALOTE",
+        dados={
+            "codigo_malote": malote.codigo_malote,
+            "integridade_ok": not houve_rejeicao,
+            "amostras_rejeitadas": len(rejeitadas),
+        },
+    )
 
     session.commit()
     session.refresh(protocolo)

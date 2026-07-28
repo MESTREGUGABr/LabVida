@@ -31,9 +31,20 @@ def registrar_coleta(session: Session, dto: ColetaCreate) -> AmostraRead:
     if ordem.status in _STATUS_OS_BLOQUEIA_COLETA:
         raise ColetaNaoPermitida("Ordem de Serviço não permite novas coletas")
 
+    from src.atendimento.autorizacao.service import possui_autorizacao_valida
+    if ordem.convenio_id is not None and not possui_autorizacao_valida(session, ordem.id):
+        raise ColetaNaoPermitida("OS de convênio sem autorização válida")
+
     coletor = usuario_repository.obter_por_id(session, dto.coletor_usuario_id)
     if coletor is None or not coletor.ativo:
         raise ColetorInvalido("Coletor inválido ou inativo")
+
+    from sqlalchemy import select
+    from src.rbac.models import Perfil
+    from src.rbac.repository import usuario_tem_permissao
+    if session.scalar(select(Perfil.id).limit(1)) is not None:
+        if not usuario_tem_permissao(session, coletor.id, "atendimento:coletar"):
+            raise ColetorInvalido("Coletor sem permissão para registrar coleta")
 
     amostra = Amostra(
         ordem_servico_id=ordem.id,

@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy.orm import Session
 
 from src.atendimento.amostra.dtos import ColetaCreate, StatusAmostra, TipoMaterial
-from src.atendimento.amostra.errors import ColetorInvalido, OrdemServicoInexistente
+from src.atendimento.amostra.errors import ColetorInvalido, ColetaNaoPermitida, OrdemServicoInexistente
 from src.atendimento.amostra.service import listar_amostras, registrar_coleta
 from src.atendimento.ordem_servico.dtos import (
     OrdemServicoCreate,
@@ -78,3 +78,60 @@ def test_coleta_rejeita_coletor_invalido(session: Session) -> None:
                 coletor_usuario_id=uuid4(),
             ),
         )
+
+
+def test_coleta_rejeita_os_convenio_sem_autorizacao_valida(session: Session) -> None:
+    from src.atendimento.ordem_servico.dtos import OrdemServicoCreate as OSDto, OsItemInput as OI
+
+    base = montar_base(session)
+    ordem = abrir_os(
+        session,
+        OSDto(
+            paciente_id=base.paciente_id,
+            unidade_id=base.unidade_id,
+            convenio_id=base.convenio_id,
+            itens=[OI(procedimento_id=base.procedimento_id, valor_negociado=Decimal("50"))],
+        ),
+        base.usuario_id,
+    )
+
+    with pytest.raises(ColetaNaoPermitida, match="sem autorização válida"):
+        registrar_coleta(
+            session,
+            ColetaCreate(
+                ordem_servico_id=ordem.id,
+                tipo_material=TipoMaterial.SANGUE,
+                coletor_usuario_id=base.usuario_id,
+            ),
+        )
+
+
+def test_coleta_rejeita_sem_permissao(session: Session) -> None:
+    from src.rbac.models import Perfil
+    from src.usuario.service import sincronizar_usuario
+
+    base = montar_base(session)
+    ordem = _abrir_os(session, base)
+
+    perfil = Perfil(nome="coleta_test", descricao="Sem coleta")
+    session.add(perfil)
+    session.flush()
+
+    coletor_sem_permissao = sincronizar_usuario(
+        session, "semcoleta@labvida.test", "Sem Coleta"
+    )
+    coletor_sem_permissao.perfil_id = perfil.id
+    session.flush()
+
+    with pytest.raises(ColetorInvalido, match="sem permissão"):
+        registrar_coleta(
+            session,
+            ColetaCreate(
+                ordem_servico_id=ordem.id,
+                tipo_material=TipoMaterial.SANGUE,
+                coletor_usuario_id=coletor_sem_permissao.id,
+            ),
+        )
+
+    session.query(Perfil).filter_by(id=perfil.id).delete()
+    session.flush()

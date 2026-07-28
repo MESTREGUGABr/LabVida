@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 from src.db import session_scope
-from src.ui import renderizar_menu, shell
+from src.ui import formatar_brl, renderizar_menu, shell
 from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
 from src.ui_icons import ICONE_FINANCEIRO
 
@@ -66,6 +66,11 @@ def main() -> None:
             titulo="Nenhum dado financeiro",
             mensagem="Execute o ETL primeiro para popular os indicadores financeiros.",
         )
+        if st.button("Carregar dados do BI", type="primary"):
+            from src.bi.etl import executar_etl
+            with st.spinner("Executando ETL..."):
+                executar_etl()
+            st.rerun()
         return
 
     raw_faturado = totais["total_faturado"].iloc[0] if not totais.empty else 0
@@ -75,8 +80,8 @@ def main() -> None:
     taxa_glosa = (total_glosado / total_faturado * 100) if total_faturado else 0
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Total Faturado", f"R$ {total_faturado:,.2f}")
-    col2.metric("Total Glosado", f"R$ {total_glosado:,.2f}")
+    col1.metric("Total Faturado", formatar_brl(float(total_faturado)))
+    col2.metric("Total Glosado", formatar_brl(float(total_glosado)))
     col3.metric("Taxa de Glosa", f"{taxa_glosa:.1f}%")
 
     col1, col2 = st.columns(2)

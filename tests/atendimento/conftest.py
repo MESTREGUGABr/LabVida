@@ -27,6 +27,9 @@ _TABELAS = (
     "unidades",
     "usuarios",
     "pacientes",
+    "perfil_permissao",
+    "permissoes",
+    "perfis",
 )
 
 

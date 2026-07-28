@@ -9,7 +9,7 @@ from src.faturamento.lote_faturamento.dtos import GuiaItemCreate, LoteFaturament
 from src.faturamento.lote_faturamento.service import adicionar_guia_item, criar_lote, fechar_lote, listar_lotes
 from src.financeiro.titulo_pagar.dtos import StatusTitulo
 from src.financeiro.titulo_pagar.models import TituloPagar
-from src.financeiro.titulo_receber.errors import TituloReceberJaBaixado, TituloReceberNaoEncontrado
+from src.financeiro.titulo_receber.errors import FinanceiroError, TituloReceberJaBaixado, TituloReceberNaoEncontrado
 from src.financeiro.titulo_receber.service import (
     baixar_titulo as baixar_receber,
     listar_pendentes,
@@ -117,3 +117,34 @@ def test_baixar_titulo_pagar_registra_auditoria(session: Session) -> None:
     assert len(logs) == 1
     assert logs[0].entidade_id == titulo.id
     assert logs[0].usuario_id == base.usuario_id
+
+
+def test_baixar_titulo_rejeita_sem_permissao(session: Session) -> None:
+    from src.financeiro.titulo_receber.models import TituloReceber
+    from src.rbac.models import Perfil
+    from src.usuario.service import sincronizar_usuario
+
+    base = montar_base(session)
+
+    perfil = Perfil(nome="financeiro_test", descricao="Sem financeiro")
+    session.add(perfil)
+    session.flush()
+
+    usuario_sem = sincronizar_usuario(session, "semfinanceiro@labvida.test", "Sem Financeiro")
+    usuario_sem.perfil_id = perfil.id
+    session.flush()
+
+    titulo = TituloReceber(
+        lote_faturamento_id=base.lote_id,
+        valor=100.00,
+        vencimento=date.today() + timedelta(days=30),
+        status="PENDENTE",
+    )
+    session.add(titulo)
+    session.commit()
+
+    with pytest.raises(FinanceiroError, match="sem permissão"):
+        baixar_receber(session, titulo.id, 100.00, usuario_id=usuario_sem.id)
+
+    session.query(Perfil).filter_by(id=perfil.id).delete()
+    session.flush()

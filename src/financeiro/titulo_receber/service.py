@@ -43,6 +43,15 @@ def baixar_titulo(
     if titulo.status != StatusTitulo.PENDENTE:
         raise TituloReceberJaBaixado("Título já foi baixado ou cancelado")
 
+    if usuario_id is not None:
+        from sqlalchemy import select
+        from src.rbac.models import Perfil
+        from src.rbac.repository import usuario_tem_permissao
+        if session.scalar(select(Perfil.id).limit(1)) is not None:
+            if not usuario_tem_permissao(session, usuario_id, "financeiro:baixar_titulo"):
+                from src.financeiro.titulo_receber.errors import FinanceiroError
+                raise FinanceiroError("Usuário sem permissão para baixar título")
+
     divergencia = titulo.valor - valor_pago
 
     titulo.status = StatusTitulo.PAGO

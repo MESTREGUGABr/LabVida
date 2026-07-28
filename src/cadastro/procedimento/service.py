@@ -15,9 +15,10 @@ from src.cadastro.procedimento.dtos import (
 )
 from src.cadastro.procedimento.errors import CodigoTussDuplicado, ProcedimentoNaoEncontrado
 from src.cadastro.procedimento.models import Procedimento, ProcedimentoValor
+from src.auditoria import registrar_auditoria
 
 
-def criar_procedimento(session: Session, dto: ProcedimentoCreate) -> ProcedimentoRead:
+def criar_procedimento(session: Session, dto: ProcedimentoCreate, usuario_id: UUID | None = None) -> ProcedimentoRead:
     if repository.obter_por_codigo_tuss(session, dto.codigo_tuss):
         raise CodigoTussDuplicado("Procedimento já cadastrado com este código TUSS")
 
@@ -30,6 +31,12 @@ def criar_procedimento(session: Session, dto: ProcedimentoCreate) -> Procediment
     repository.salvar(session, procedimento)
     session.commit()
     session.refresh(procedimento)
+
+    if usuario_id is not None:
+        registrar_auditoria(session, usuario_id, entidade="procedimento",
+            entidade_id=procedimento.id, acao="CRIAR_PROCEDIMENTO",
+            dados={"codigo_tuss": procedimento.codigo_tuss, "nome": procedimento.nome})
+
     return ProcedimentoRead.model_validate(procedimento)
 
 
@@ -37,7 +44,7 @@ def listar_procedimentos_ativos(session: Session) -> list[ProcedimentoRead]:
     return [ProcedimentoRead.model_validate(p) for p in repository.listar_ativos(session)]
 
 
-def definir_valor(session: Session, dto: ProcedimentoValorCreate) -> ProcedimentoValorRead:
+def definir_valor(session: Session, dto: ProcedimentoValorCreate, usuario_id: UUID | None = None) -> ProcedimentoValorRead:
     if repository.obter_por_id(session, dto.procedimento_id) is None:
         raise ProcedimentoNaoEncontrado("Procedimento não encontrado")
     if convenio_repository.obter_por_id(session, dto.convenio_id) is None:
@@ -52,6 +59,12 @@ def definir_valor(session: Session, dto: ProcedimentoValorCreate) -> Procediment
     repository.salvar_valor(session, valor)
     session.commit()
     session.refresh(valor)
+
+    if usuario_id is not None:
+        registrar_auditoria(session, usuario_id, entidade="procedimento_valor",
+            entidade_id=valor.id, acao="DEFINIR_VALOR_PROCEDIMENTO",
+            dados={"procedimento_id": str(dto.procedimento_id), "valor": str(dto.valor)})
+
     return ProcedimentoValorRead.model_validate(valor)
 
 

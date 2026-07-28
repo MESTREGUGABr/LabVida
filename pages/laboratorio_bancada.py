@@ -146,15 +146,19 @@ def _render_novo_resultado(item, equipamentos) -> None:
                 st.error("Informe o analito e o valor encontrado.")
                 return
             with session_scope() as session:
-                LaboratorialService(session).registrar_resultado(
-                    ResultadoCreate(
-                        os_item_id=item.id,
-                        equipamento_id=equipamento_options[equipamento],
-                        analito=analito.strip(),
-                        valor=valor.strip(),
-                        usuario_id=usuario_id_logado(),
+                try:
+                    LaboratorialService(session).registrar_resultado(
+                        ResultadoCreate(
+                            os_item_id=item.id,
+                            equipamento_id=equipamento_options[equipamento],
+                            analito=analito.strip(),
+                            valor=valor.strip(),
+                            usuario_id=usuario_id_logado(),
+                        )
                     )
-                )
+                except ValueError as e:
+                    st.error(str(e))
+                    return
                 session.commit()
             st.success("Resultado registrado e enviado para revisão.")
             st.rerun()

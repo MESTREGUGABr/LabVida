@@ -8,9 +8,10 @@ from src.cadastro.convenio.errors import ConvenioNaoEncontrado
 from src.cadastro.convenio.models import Convenio
 from src.cadastro.errors import CnpjConvenioDuplicado, NomeConvenioDuplicado
 from src.cadastro.repository import obter_convenio_por_cnpj, obter_convenio_por_nome_normalizado
+from src.auditoria import registrar_auditoria
 
 
-def criar_convenio(session: Session, dto: ConvenioCreate) -> ConvenioRead:
+def criar_convenio(session: Session, dto: ConvenioCreate, usuario_id: UUID | None = None) -> ConvenioRead:
     nome_normalizado = dto.nome.casefold()
 
     if obter_convenio_por_nome_normalizado(session, nome_normalizado):
@@ -32,6 +33,12 @@ def criar_convenio(session: Session, dto: ConvenioCreate) -> ConvenioRead:
     repository.salvar(session, convenio)
     session.commit()
     session.refresh(convenio)
+
+    if usuario_id is not None:
+        registrar_auditoria(session, usuario_id, entidade="convenio",
+            entidade_id=convenio.id, acao="CRIAR_CONVENIO",
+            dados={"nome": convenio.nome})
+
     return ConvenioRead.model_validate(convenio)
 
 
@@ -48,12 +55,18 @@ def obter_convenio_por_id(session: Session, convenio_id: UUID) -> ConvenioRead:
     return ConvenioRead.model_validate(convenio)
 
 
-def alternar_status(session: Session, convenio_id: UUID, ativo: bool) -> ConvenioRead:
+def alternar_status(session: Session, convenio_id: UUID, ativo: bool, usuario_id: UUID | None = None) -> ConvenioRead:
     convenio = _obter_convenio_ou_falhar(session, convenio_id)
     convenio.ativo = ativo
     convenio.status = StatusConvenio.ATIVO if ativo else StatusConvenio.INATIVO
     session.commit()
     session.refresh(convenio)
+
+    if usuario_id is not None:
+        registrar_auditoria(session, usuario_id, entidade="convenio",
+            entidade_id=convenio.id, acao="ALTERAR_STATUS_CONVENIO",
+            dados={"nome": convenio.nome, "ativo": ativo})
+
     return ConvenioRead.model_validate(convenio)
 
 

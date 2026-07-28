@@ -8,6 +8,7 @@ from src.financeiro.movimento_caixa.models import MovimentoCaixa
 from src.financeiro.titulo_pagar import repository
 from src.financeiro.titulo_pagar.dtos import StatusTitulo, TituloPagarRead
 from src.financeiro.titulo_pagar.errors import TituloPagarJaBaixado, TituloPagarNaoEncontrado
+from src.financeiro.titulo_receber.errors import FinanceiroError
 
 
 def obter_titulo(session: Session, titulo_id: UUID) -> TituloPagarRead:
@@ -32,6 +33,15 @@ def baixar_titulo(
         raise TituloPagarNaoEncontrado("Título a pagar não encontrado")
     if titulo.status != StatusTitulo.PENDENTE:
         raise TituloPagarJaBaixado("Título já foi baixado ou cancelado")
+
+    if usuario_id is not None:
+        from sqlalchemy import select
+        from src.rbac.models import Perfil
+        from src.rbac.repository import usuario_tem_permissao
+        if session.scalar(select(Perfil.id).limit(1)) is not None:
+            if not usuario_tem_permissao(session, usuario_id, "financeiro:baixar_titulo"):
+                from src.financeiro.titulo_receber.errors import FinanceiroError
+                raise FinanceiroError("Usuário sem permissão para baixar título")
 
     titulo.status = StatusTitulo.PAGO
 
