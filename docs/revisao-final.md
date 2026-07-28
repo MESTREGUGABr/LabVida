@@ -404,17 +404,18 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | Regras **totalmente cobertas** ✅ | 22 (59%) |
 | Regras **parcialmente cobertas** ⚠️ | 10 (27%) |
 | Regras **não cobertas** ❌ | 5 (14%) |
-| Bugs críticos | 4 |
-| Bugs médios | 8 |
-| Bugs menores | 4 |
-| UX issues sistêmicas | 7 |
-| UX issues pontuais | ~40 |
+| Bugs críticos | 4 (1 resolvido, 3 pendentes) |
+| Bugs médios | 8 (2 resolvidos, 6 pendentes) |
+| Bugs menores | 4 (3 resolvidos, 1 pendente) |
+| UX issues sistêmicas | 7 (1 resolvido, 6 pendentes) |
+| UX issues pontuais | ~40 (~5 resolvidos por correlação) |
 | Funcionalidades ausentes | 29 |
 | Test gaps significativos | 10 áreas |
-| Issues de infraestrutura | 6 |
+| Issues de infraestrutura | 6 (1 resolvido, 5 pendentes) |
 | Histórias de cancelamento da OS | 12/12 (100%) ✅ |
+| **Total de testes passando** | **93/93** ✅ |
 
-### Nota geral: 7.5/10
+### Nota geral: 8.5/10 (após correções)
 
 O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são:
 
@@ -424,12 +425,27 @@ O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são
 - **RBAC e LGPD** implementados com boas práticas (Fernet, SHA-256, anonimização no BI)
 - **Separação OLTP/OLAP** com star schema para BI
 
-Os pontos que precisam de atenção imediata:
+### Correções aplicadas (27/07/2026) — 6 bugs + 1 crítico resolvidos
 
-1. **Unificar ConvenioService** (Bug #2) — está em produção sem validação
+| Bug | Descrição | Arquivos |
+|-----|-----------|----------|
+| #4 / I1 | `alembic/env.py` agora importa `rbac`, `auditoria`, `bi` | `alembic/env.py` |
+| #2 | `ConvenioService` unificado com validação de unicidade | `convenio/service.py`, `dtos.py`, `cadastro/service.py` |
+| UX | `cadastro_convenios.py` — erro handling + campos novos (cnpj, telefone, email) | `pages/cadastro_convenios.py` |
+| #3 | Botão Liberar Laudo desabilitado com resultados não revisados | `pages/laboratorio_laudos.py` |
+| #16 | `time.sleep()` artificiais removidos (laudos + resultados) | `pages/laboratorio_laudos.py`, `laboratorio_resultados.py` |
+| #13 | UUIDs substituídos por `codigo_os` nos selectboxes | `pages/laboratorio_laudos.py`, `laboratorio_resultados.py` |
+| #6 | RBAC: `remover_permissao_do_perfil` + `desvincular_usuario_do_perfil` | `src/rbac/`, `pages/admin_usuarios.py` |
+| 🔴 | `shell()` corrigido — desvincular perfil bloqueia acesso, não libera | `src/ui.py`, `tests/rbac/`, `tests/test_app.py` |
+
+**93/93 testes passando.**
+
+### Pendências principais (não resolvidas nesta sessão)
+
+1. ~~Unificar ConvenioService~~ ✅ Corrigido
 2. **Adicionar validação de recebimento no service laboratorial** (Bug #1) — bypass da regra de negócio
 3. **Implementar autorização de convênio** (Bug #3) — tabela existe mas não é usada
-4. **Corrigir `alembic/env.py`** (Bug #4 / I1) — migrations futuras serão cegas
+4. ~~Corrigir `alembic/env.py`~~ ✅ Corrigido
 5. **Pré-auditoria de guias TISS** (F1/F2) — funcionalidade crítica do módulo de faturamento
 6. **Auditoria para CRUD de cadastros** (F22-F25) — 46% das operações sem trilha de auditoria
 
