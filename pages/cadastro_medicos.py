@@ -5,7 +5,7 @@ from src.cadastro.medico.dtos import UFS_VALIDAS, MedicoCreate
 from src.cadastro.medico.errors import CrmDuplicado
 from src.cadastro.medico.service import criar_medico, listar_medicos_ativos
 from src.db import session_scope
-from src.ui import renderizar_menu, shell
+from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import renderizar_cabecalho, renderizar_empty_state
 from src.ui_icons import ICONE_MEDICO
 
@@ -33,7 +33,7 @@ def main() -> None:
                 nome=nome, crm=crm, uf_crm=uf_crm, responsavel_tecnico=responsavel_tecnico
             )
             with session_scope() as session:
-                criar_medico(session, dto)
+                criar_medico(session, dto, usuario_id_logado())
         except (ValidationError, ValueError) as error:
             st.error(_mensagem(error))
         except CrmDuplicado as error:

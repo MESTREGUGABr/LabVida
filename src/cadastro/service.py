@@ -9,9 +9,10 @@ from src.cadastro.errors import (
 )
 from src.cadastro.models import Paciente
 from src.cadastro import repository
+from src.auditoria import registrar_auditoria
 
 
-def criar_paciente(session: Session, dto: PacienteCreate) -> PacienteRead:
+def criar_paciente(session: Session, dto: PacienteCreate, usuario_id: UUID | None = None) -> PacienteRead:
     if repository.obter_por_cpf(session, dto.cpf):
         raise CpfPacienteDuplicado("Paciente já cadastrado com este CPF")
 
@@ -26,6 +27,12 @@ def criar_paciente(session: Session, dto: PacienteCreate) -> PacienteRead:
     repository.salvar(session, paciente)
     session.commit()
     session.refresh(paciente)
+
+    if usuario_id is not None:
+        registrar_auditoria(session, usuario_id, entidade="paciente",
+            entidade_id=paciente.id, acao="CRIAR_PACIENTE",
+            dados={"nome": paciente.nome})
+
     return PacienteRead.model_validate(paciente)
 
 
@@ -38,7 +45,7 @@ def obter_paciente_por_id(session: Session, paciente_id: UUID) -> PacienteRead:
     return PacienteRead.model_validate(paciente)
 
 
-def atualizar_paciente(session: Session, paciente_id: UUID, dto: PacienteUpdate) -> PacienteRead:
+def atualizar_paciente(session: Session, paciente_id: UUID, dto: PacienteUpdate, usuario_id: UUID | None = None) -> PacienteRead:
     paciente = _obter_paciente_ou_falhar(session, paciente_id)
 
     if dto.cpf is not None and dto.cpf != paciente.cpf:
@@ -58,13 +65,24 @@ def atualizar_paciente(session: Session, paciente_id: UUID, dto: PacienteUpdate)
 
     session.commit()
     session.refresh(paciente)
+
+    if usuario_id is not None:
+        registrar_auditoria(session, usuario_id, entidade="paciente",
+            entidade_id=paciente.id, acao="ATUALIZAR_PACIENTE",
+            dados={"nome": paciente.nome})
+
     return PacienteRead.model_validate(paciente)
 
 
-def inativar_paciente(session: Session, paciente_id: UUID) -> None:
+def inativar_paciente(session: Session, paciente_id: UUID, usuario_id: UUID | None = None) -> None:
     paciente = _obter_paciente_ou_falhar(session, paciente_id)
     paciente.ativo = False
     session.commit()
+
+    if usuario_id is not None:
+        registrar_auditoria(session, usuario_id, entidade="paciente",
+            entidade_id=paciente.id, acao="INATIVAR_PACIENTE",
+            dados={"nome": paciente.nome})
 
 
 def _obter_paciente_ou_falhar(session: Session, paciente_id: UUID) -> Paciente:

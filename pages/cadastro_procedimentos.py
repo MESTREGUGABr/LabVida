@@ -14,7 +14,7 @@ from src.cadastro.procedimento.service import (
 )
 from src.cadastro.convenio.errors import ConvenioNaoEncontrado
 from src.db import session_scope
-from src.ui import renderizar_menu, shell
+from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import renderizar_cabecalho
 from src.ui_icons import ICONE_PROCEDIMENTO
 
@@ -49,7 +49,7 @@ def _render_procedimentos() -> None:
         try:
             dto = ProcedimentoCreate(codigo_tuss=codigo_tuss, nome=nome, setor=setor or None)
             with session_scope() as session:
-                criar_procedimento(session, dto)
+                criar_procedimento(session, dto, usuario_id_logado())
         except (ValidationError, ValueError) as error:
             st.error(_mensagem(error))
         except CodigoTussDuplicado as error:
@@ -99,7 +99,7 @@ def _render_valores() -> None:
             vigencia_inicio=vigencia,
         )
         with session_scope() as session:
-            definir_valor(session, dto)
+            definir_valor(session, dto, usuario_id_logado())
     except (ValidationError, ValueError) as error:
         st.error(_mensagem(error))
     except (ProcedimentoNaoEncontrado, ConvenioNaoEncontrado) as error:

@@ -6,7 +6,7 @@ from src.cadastro.convenio.errors import ConvenioNaoEncontrado
 from src.cadastro.convenio.service import alternar_status, criar_convenio, listar_convenios
 from src.cadastro.errors import CnpjConvenioDuplicado, NomeConvenioDuplicado
 from src.db import session_scope
-from src.ui import renderizar_menu, shell
+from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_status_badge
 from src.ui_icons import ICONE_CONVENIO
 
@@ -40,7 +40,7 @@ def main() -> None:
                 registro_ans=registro_ans or None,
             )
             with session_scope() as session:
-                criar_convenio(session, dto)
+                criar_convenio(session, dto, usuario_id_logado())
         except (ValidationError, ValueError, NomeConvenioDuplicado, CnpjConvenioDuplicado) as error:
             st.error(_mensagem(error))
         else:
@@ -82,7 +82,7 @@ def main() -> None:
         if col_acao.button(rotulo, key=f"status_{convenio.id}"):
             try:
                 with session_scope() as session:
-                    alternar_status(session, convenio.id, ativo=not ativo)
+                    alternar_status(session, convenio.id, ativo=not ativo, usuario_id=usuario_id_logado())
             except ConvenioNaoEncontrado as error:
                 st.error(str(error))
             else:

@@ -14,7 +14,7 @@ from src.cadastro.service import (
     obter_paciente_por_id,
 )
 from src.db import session_scope
-from src.ui import renderizar_menu, shell
+from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import (
     renderizar_cabecalho,
     renderizar_empty_state,
@@ -92,7 +92,7 @@ def _render_cadastro() -> None:
             sexo=sexo,
         )
         with session_scope() as session:
-            criar_paciente(session, dto)
+            criar_paciente(session, dto, usuario_id_logado())
     except (ValidationError, ValueError) as error:
         st.error(_mensagem_validacao(error))
     except CpfPacienteDuplicado as error:
@@ -230,7 +230,7 @@ def _render_form_edicao(paciente: PacienteRead) -> None:
             sexo=sexo,
         )
         with session_scope() as session:
-            atualizar_paciente(session, paciente.id, dto)
+            atualizar_paciente(session, paciente.id, dto, usuario_id_logado())
     except (ValidationError, ValueError) as error:
         st.error(_mensagem_validacao(error))
     except (CpfPacienteDuplicado, PacienteNaoEncontrado) as error:
@@ -249,7 +249,7 @@ def _render_inativacao(paciente_id: UUID) -> None:
 
     try:
         with session_scope() as session:
-            inativar_paciente(session, paciente_id)
+            inativar_paciente(session, paciente_id, usuario_id_logado())
     except PacienteNaoEncontrado as error:
         st.error(str(error))
     else:

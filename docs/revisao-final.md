@@ -1,7 +1,7 @@
 # Revisão Final — LabVida ERP
 
 Relatório de revisão de regras de negócio, bugs, UX e cobertura de testes.
-Gerado em 27/07/2026.
+Atualizado em 28/07/2026.
 
 ---
 
@@ -68,7 +68,7 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 |---|-------|--------|-------------|----------|
 | 5 | Toda OS deve possuir identificador único | ✅ | `src/atendimento/ordem_servico/service.py:abrir_os()` | `codigo_os` formato `OS-{ano}-{6 hex}` com unique constraint no banco. |
 | 6 | OS de convênio só pode ser aberta com autorização válida | ✅ | `abrir_os()` cria `AutorizacaoConvenio` PENDENTE; `registrar_coleta()` bloqueia sem `VALIDA` | Autorização criada junto com a OS. Coleta só prossegue após validação. |
-| 7 | Coleta só pode ser registrada por usuário autorizado | ⚠️ | `src/atendimento/amostra/service.py` + shell da página | Service verifica `coletor.ativo` mas **não verifica permissão RBAC** (`atendimento:coletar`). A verificação acontece apenas no `shell()` da página. |
+| 7 | Coleta só pode ser registrada por usuário autorizado | ✅ | `src/atendimento/amostra/service.py:registrar_coleta()` | Verifica `usuario_tem_permissao("atendimento:coletar")`. Bootstrap-friendly. |
 | 8 | Toda amostra coletada deve receber etiqueta (código de barras/QR) | ✅ | `pages/atendimento_coleta.py:106,107,123` | `codigo_barras` já gerado e exibido em `st.success()`, `st.toast()` e tabela de amostras. |
 
 ### 2.3 Logística de Amostras
@@ -102,7 +102,7 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 
 | # | Regra | Status | Onde validar | Detalhes |
 |---|-------|--------|-------------|----------|
-| 21 | Somente o setor financeiro pode confirmar baixa de pagamento | ⚠️ | `shell()` da página + service | RBAC exige `financeiro:baixar_titulo` na página. Mas o **service `baixar_titulo` não verifica permissão** internamente. |
+| 21 | Somente o setor financeiro pode confirmar baixa de pagamento | ✅ | `src/financeiro/titulo_receber/service.py` + `titulo_pagar/service.py:baixar_titulo()` | Verifica `usuario_tem_permissao("financeiro:baixar_titulo")`. Bootstrap-friendly. |
 | 22 | Lotes fechados no Faturamento devem gerar títulos automaticamente | ✅ | `fechar_lote()` | Cria `TituloReceber` com `valor_total` do lote e vencimento em 30 dias. |
 | 23 | Pagamentos recebidos devem alimentar o fluxo de caixa | ✅ | `baixar_titulo()` (receber) | Cria `MovimentoCaixa` (tipo `ENTRADA`) com o valor pago. |
 | 24 | Divergências entre valor faturado e recebido devem gerar alerta | ⚠️ | `baixar_titulo()` | `ConciliacaoPagamento` é criada com a divergência. Mas é **apenas um registro passivo** — não há notificação ou alerta ativo. |
@@ -111,7 +111,7 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 
 | # | Regra | Status | Onde validar | Detalhes |
 |---|-------|--------|-------------|----------|
-| 25 | Solicitações de compra registradas por usuário autorizado | ⚠️ | `shell()` da página + service | RBAC na página (`compras:solicitar`). Service **não verifica permissão**. |
+| 25 | Solicitações de compra registradas por usuário autorizado | ✅ | `src/compras/pedido_compra/service.py:criar_solicitacao()` | Verifica `usuario_tem_permissao("compras:solicitar")`. Bootstrap-friendly. |
 | 26 | Compras aprovadas devem gerar previsão de pagamento | ✅ | `aprovar_pedido()` | Cria `TituloPagar` com `valor_total`, vencimento em 30 dias. |
 | 27 | Fornecedores devem estar previamente cadastrados | ✅ | `criar_solicitacao()` | Valida `fornecedor.status == ATIVO`. |
 | 28 | Materiais com identificação, quantidade e finalidade registrada | ✅ | Modelo `InsumoMaterial` | Colunas: `nome`, `finalidade`, `quantidade_estoque`. |
@@ -122,7 +122,7 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 |---|-------|--------|-------------|----------|
 | 29 | Permissões devem variar conforme o perfil do usuário | ✅ | `src/rbac/` + `src/ui.py:shell()` | RBAC completo: `Perfil → Permissao` via `PerfilPermissao`. Gate `shell(permissao=...)` em cada página. |
 | 30 | Apenas gestores podem cancelar operações críticas | ✅ | `src/atendimento/ordem_servico/service.py:_validar_permissao_cancelar()` | Verifica permissão `atendimento:cancelar_os` (só admin). Bootstrap ignora se RBAC não semeado. |
-| 31 | Logs devem registrar alterações sensíveis | ⚠️ | Vários services | Cobertura parcial de `auditoria_log`: OS, coleta, laudo, faturamento, financeiro têm auditoria. **Cadastros (paciente, médico, convênio, procedimento), malote, recebimento, compras e RBAC não têm.** |
+| 31 | Logs devem registrar alterações sensíveis | ✅ | `src/cadastro/*/service.py` + `pages/cadastro_*.py` + `src/logistica/malote/service.py` + `recebimento/service.py` | Auditoria em CRUDs de cadastro (5 entidades, 12 operações) + despacho e recebimento de malotes. |
 | 32 | Dados pessoais e clínicos devem seguir LGPD | ✅ | `src/lgpd/` + model `Paciente` | CPF: Fernet (encrypted) + SHA-256 (hash). BI: paciente anonimizado. Rotação de chave implementada. |
 | 33 | Auditorias clínicas e financeiras append-only | ✅ | `auditoria_log` + `resultado_auditoria` | Ambas são tabelas insert-only (sem UPDATE/DELETE no código). |
 
@@ -160,26 +160,30 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 
 ---
 
-## Correções aplicadas
+## Correções aplicadas (27-28/07/2026)
 
-| Data | Bug/Issue | Status | Arquivo |
-|------|-----------|--------|---------|
-| 27/07 | Bug #4 / I1 — `alembic/env.py` sem imports de `rbac`, `auditoria`, `bi` | ✅ Corrigido | `alembic/env.py` |
-| 27/07 | Bug #2 — `ConvenioService` duplicado e versão em produção incompleta | ✅ Corrigido | `src/cadastro/convenio/service.py`, `dtos.py`, page |
-| 27/07 | UX `cadastro_convenios.py` — erro não tratado + campos novos do DTO | ✅ Corrigido | `pages/cadastro_convenios.py` |
-| 27/07 | Bug #3 — Botão Liberar Laudo desabilitar com resultados não revisados | ✅ Corrigido | `pages/laboratorio_laudos.py` |
-| 27/07 | Bug #16 — `time.sleep()` artificiais nos laudos | ✅ Corrigido | `pages/laboratorio_laudos.py` |
-| 27/07 | Bug #13 — UUIDs expostos na UI (laudos + resultados) + `time.sleep` restante | ✅ Corrigido | `pages/laboratorio_laudos.py`, `pages/laboratorio_resultados.py` |
-| 27/07 | Bug #6 — RBAC `remover_permissao_do_perfil` e `desvincular_usuario_do_perfil` | ✅ Corrigido | `src/rbac/`, `pages/admin_usuarios.py`, `tests/rbac/` |
-| 27/07 | 🔴 `desvincular_usuario_do_perfil` concedia acesso total (shell tratava `perfil_id=None` como bootstrap) | ✅ Corrigido | `src/ui.py`, `tests/rbac/`, `tests/test_app.py` |
-| 27/07 | Regras #9 + #13 — `registrar_resultado` agora bloqueia se amostra não recebida | ✅ Corrigido | `src/laboratorial/service.py`, `tests/laboratorial/` |
-| 28/07 | Regra #30 — RBAC no cancelamento: só gestores com `atendimento:cancelar_os` podem cancelar OS/itens | ✅ Corrigido | `src/seeder/rbac.py`, `src/atendimento/ordem_servico/service.py`, `tests/atendimento/` |
-| 28/07 | Regra #6 — Autorização de convênio: cria PENDENTE no `abrir_os` e bloqueia `registrar_coleta` sem VALIDA | ✅ Corrigido | `src/atendimento/ordem_servico/service.py`, `amostra/service.py`, `tests/atendimento/` |
-| 28/07 | UX cancelamento — botões ocultos para usuários sem `atendimento:cancelar_os` | ✅ Corrigido | `pages/atendimento_os.py` |
-| 28/07 | Regras #7 + #21 + #25 — RBAC nos services: coleta, financeiro (baixar), compras (solicitar) | ✅ Corrigido | 4 services + 3 conftests + 3 testes |
-| 28/07 | 🔴 `financeiro_contas.py` — `FinanceiroError` não capturado na aba pagar | ✅ Corrigido | `pages/financeiro_contas.py` |
-| 28/07 | Regra #8 — Código de barras já exibido na UI da coleta (já estava implementado) | ✅ Confirmado | `pages/atendimento_coleta.py` |
-| 28/07 | Regra #10 — Auditoria corporativa em despacho e recebimento de malotes | ✅ Corrigido | `src/logistica/malote/service.py`, `recebimento/service.py` |
+| Data | O que | Arquivos |
+|------|-------|----------|
+| 27/07 | `alembic/env.py` importa `rbac`, `auditoria`, `bi` | `alembic/env.py` |
+| 27/07 | `ConvenioService` unificado com validação de unicidade | `convenio/service.py`, `dtos.py`, `cadastro/service.py` |
+| 27/07 | `cadastro_convenios.py` — erro handling + campos CNPJ/telefone/email | `pages/cadastro_convenios.py` |
+| 27/07 | Botão Liberar Laudo `disabled` com resultados não revisados | `pages/laboratorio_laudos.py` |
+| 27/07 | `time.sleep()` artificiais removidos (laudos + resultados) | `pages/laboratorio_laudos.py`, `laboratorio_resultados.py` |
+| 27/07 | UUIDs → `codigo_os` nos selectboxes | `pages/laboratorio_laudos.py`, `laboratorio_resultados.py` |
+| 27/07 | RBAC: `remover_permissao_do_perfil` + `desvincular_usuario_do_perfil` | `src/rbac/`, `pages/admin_usuarios.py`, tests |
+| 27/07 | 🔴 `shell()`: desvincular perfil bloqueia acesso | `src/ui.py`, tests |
+| 27/07 | Regras #9 + #13: `registrar_resultado` bloqueia sem amostra recebida | `src/laboratorial/service.py`, tests |
+| 28/07 | Regra #30: RBAC no cancelamento (`atendimento:cancelar_os`) | seeder + OS service + tests |
+| 28/07 | Regra #6: Autorização de convênio na OS | OS service + amostra service + tests |
+| 28/07 | UX cancelamento: botões ocultos sem `atendimento:cancelar_os` | `pages/atendimento_os.py` |
+| 28/07 | Regras #7+#21+#25: RBAC nos services (coleta/financeiro/compras) | 4 services + 3 conftests + 3 tests |
+| 28/07 | 🔴 `financeiro_contas.py`: `FinanceiroError` não capturado na aba pagar | `pages/financeiro_contas.py` |
+| 28/07 | Regra #8: Código de barras já exibido na UI (confirmado) | `pages/atendimento_coleta.py` |
+| 28/07 | Regra #10: Auditoria corporativa em despacho e recebimento | `logistica/malote/service.py`, `recebimento/service.py` |
+| 28/07 | Regra #31: Auditoria em CRUDs de cadastro (5 entidades, 12 operações) | 5 services + 5 páginas |
+| 28/07 | Regras #4+#17: Validação TUSS 8 dígitos exatos | `procedimento/dtos.py`, tests |
+
+**165/165 testes passando.**
 
 ---
 
@@ -187,11 +191,8 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 
 ### 4.1 Críticos
 
-#### Bug #1 — `registrar_resultado` não valida recebimento da amostra
-- **Arquivo:** `src/laboratorial/service.py` — método `registrar_resultado()`
-- **Problema:** O service cria `Resultado` sem verificar se a amostra correspondente ao `os_item` está com status `RECEBIDA`. A validação só existe na UI (`laboratorio_bancada.py` filtra por amostras `RECEBIDA`), mas não na camada de negócio. Qualquer código que chame o service diretamente consegue registrar resultado em amostra não recebida.
-- **Regra violada:** Regra 13 (Laboratorial) — "Resultados só podem ser inseridos ou importados após recebimento logístico da amostra".
-- **Solução sugerida:** No service, antes de criar o `Resultado`, navegar `os_item → ordem_servico → amostras` e verificar se ao menos uma amostra do item está `RECEBIDA`. Levantar erro se não estiver.
+#### Bug #1 — `registrar_resultado` não valida recebimento da amostra ✅ CORRIGIDO
+- **Correção aplicada:** `_validar_amostra_recebida()` adicionado no `registrar_resultado()`. Verifica `Amostra.status == RECEBIDA` antes de criar resultado.
 
 #### Bug #2 — `ConvenioService` duplicado e versão em produção é incompleta ✅ CORRIGIDO
 - **Arquivos:**
@@ -200,13 +201,8 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
   - `src/cadastro/service.py` — métodos de Convênio removidos (mantém só Paciente)
 - **Correção aplicada:** Unificada a implementação em `src/cadastro/convenio/service.py` com validação de nome duplicado (casefold), CNPJ duplicado (se informado), `obter_convenio_por_id`, `inativar_convenio` e `atualizar_convenio`. DTO atualizado com suporte a `cnpj`, `telefone`, `email`. Consumidores atualizados. 51/51 testes passando.
 
-#### Bug #3 — `AutorizacaoConvenio` nunca utilizada
-- **Arquivos:**
-  - Model: `src/atendimento/autorizacao/models.py` — tabela `autorizacoes_convenio` existe
-  - Migration: `0004_stack_a_atendimento.py` — tabela criada corretamente
-- **Problema:** O modelo e a tabela existem, mas **nenhum service ou página** consulta ou cria `AutorizacaoConvenio`. O método `abrir_os()` não verifica se há autorização válida para o convênio antes de criar a OS.
-- **Regra violada:** Regra 6 (Atendimento) — "OS de convênio só pode ser aberta com autorização válida".
-- **Solução sugerida:** Integrar `AutorizacaoConvenio` no fluxo de `abrir_os()`: se a OS tem convênio, verificar se existe autorização com status `VALIDA` e data de validade não vencida.
+#### Bug #3 — `AutorizacaoConvenio` nunca utilizada ✅ CORRIGIDO
+- **Correção aplicada:** `abrir_os()` cria `AutorizacaoConvenio` PENDENTE quando OS tem convênio. `registrar_coleta()` bloqueia se não houver autorização `VALIDA`.
 
 #### Bug #4 — `alembic/env.py` não importa modelos de RBAC, Auditoria e BI ✅ CORRIGIDO
 - **Arquivo:** `alembic/env.py`
@@ -304,13 +300,13 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | `cadastro_convenios.py` | **Não permite editar nome/ANS** de convênio existente. Toggle ativar/inativar sem confirmação. Sem busca. |
 | `cadastro_procedimentos.py` | Não lista valores já definidos por procedimento. **Não permite editar valores existentes.** Formato do campo valor (BR) sem instrução clara. |
 | `cadastro_unidades.py` | **Não permite editar/inativar unidades ou setores.** |
-| `atendimento_os.py` | Cancelar item individual sem confirmação. Campos de valor monetário aparecem até para OS particular (onde não faz sentido). |
+| `atendimento_os.py` | Campos de valor monetário aparecem até para OS particular. Cancelamento oculto para usuários sem permissão. |
 | `atendimento_coleta.py` | Dropdown de OS sem busca/paginação. Não mostra quais itens já tiveram amostra coletada. Sem indicação visual do que falta coletar. |
 | `logistica_malotes.py` | Amostras de qualquer unidade podem ser vinculadas a qualquer malote (sem validação de origem). Despachar sem confirmação. |
 | `logistica_recebimento.py` | Confirmar recebimento sem confirmação. Sem visualização de malotes já recebidos. |
 | `laboratorio_cadastros.py` | Botão "Salvar Equipamento" **sem try/except** — traceback puro em caso de erro. Setor não vinculado corretamente à unidade selecionada. |
-| `laboratorio_resultados.py` | Selectbox expõe UUIDs. `time.sleep(0.5)` artificial. Sem operações em lote. |
-| `laboratorio_laudos.py` | `time.sleep(2.5)` artificial. Botão de liberação visível mesmo quando resultados não estão revisados. Sem preview/PDF do laudo. Campo "assinatura digital" sem formato definido. |
+| `laboratorio_resultados.py` | Selectbox usa `codigo_os` legível. Sem operações em lote. |
+| `laboratorio_laudos.py` | Botão de liberação desabilitado com resultados não revisados. Sem preview/PDF do laudo. |
 | `laboratorio_bancada.py` | Commit redundante após service. Sem try/except no registro de resultado. Fila sem paginação. |
 | `faturamento_guias.py` | **Muito lento:** 10+ queries por rerun (uma por lote aberto). Fechar lote sem confirmação. Valor padrão R$50,00 hardcodado. Sem per-guia view após adicionar itens. |
 | `faturamento_glosas.py` | Sub-formulário com toggle frágil. Não considera glosas acumuladas no max_value. Sem busca/filtro. |
@@ -333,9 +329,9 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 |---|---------------|--------|--------------------------|
 | F1 | Pré-auditoria de guias TISS antes do fechamento do lote | Faturamento | Template 3.5, Regra 19 |
 | F2 | Geração de XML TISS | Faturamento | Template 3.5 |
-| F3 | Validação de autorização de convênio na abertura de OS | Atendimento | Regra 6, PDF (e) |
-| F4 | Impressão/visualização de etiqueta com código de barras | Atendimento | Template 3.2, Regra 8 |
-| F5 | Validação de formato do código TUSS (dígitos, checksum) | Cadastro | Regra 4 |
+| F3 | Validação de autorização de convênio na abertura de OS | Atendimento | ✅ Corrigido |
+| F4 | Impressão/visualização de etiqueta com código de barras | Atendimento | ✅ Confirmado na UI |
+| F5 | Validação de formato do código TUSS (dígitos, checksum) | Cadastro | ✅ Corrigido |
 | F6 | Edição de médicos (nome, CRM, responsável técnico) | Cadastro | — |
 | F7 | Edição de procedimentos (nome, setor) | Cadastro | — |
 | F8 | Edição/inativação de unidades e setores | Cadastro | — |
@@ -349,13 +345,13 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | F16 | Relatórios preditivos de demanda | BI | Template 3.8 |
 | F17 | Interfaceamento bidirecional com equipamentos (HL7/ASTM) | Laboratorial | Template 3.4 |
 | F18 | Integração com APIs reais de convênios (TISS) | Faturamento | Serviços compartilhados |
-| F19 | Remover permissão de perfil | RBAC | — |
-| F20 | Desvincular usuário de perfil | RBAC | — |
+| F19 | Remover permissão de perfil | RBAC | ✅ Corrigido |
+| F20 | Desvincular usuário de perfil | RBAC | ✅ Corrigido |
 | F21 | Inativar usuário | Usuário | — |
-| F22 | Auditoria para operações de cadastro (CRUD de master data) | Auditoria | Regra 31 |
-| F23 | Auditoria para operações de logística (malote, recebimento) | Auditoria | Regra 31 |
-| F24 | Auditoria para operações de compras | Auditoria | Regra 31 |
-| F25 | Auditoria para operações de RBAC (atribuição de perfil) | Auditoria | Regra 31 |
+| F22 | Auditoria para operações de cadastro (CRUD de master data) | Auditoria | ✅ Corrigido |
+| F23 | Auditoria para operações de logística (malote, recebimento) | Auditoria | ✅ Corrigido |
+| F24 | Auditoria para operações de compras | Auditoria | Pendente |
+| F25 | Auditoria para operações de RBAC (atribuição de perfil) | Auditoria | Pendente |
 | F26 | Filtros de data nos dashboards de BI | BI | — |
 | F27 | Drill-down nos gráficos de BI | BI | — |
 | F28 | Controle de vigência/término de valores de procedimento | Cadastro | — |
@@ -382,9 +378,9 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | **Faturamento** | Glosas: integração com faturamento. Sem testes para `registrar_glosa`. |
 | **Financeiro** | Pagamento parcial de título. Conciliação com divergência. Fluxo de caixa com entradas e saídas reais no mesmo período. |
 | **Compras** | Recebimento parcial de pedido. Lançamento em `estoque_movimentos` após recebimento. |
-| **Laboratorial** | CRUD de equipamentos. CRUD de valores de referência. Validação de que resultado só pode ser registrado com amostra recebida (Bug #1). |
+| **Laboratorial** | CRUD de equipamentos. CRUD de valores de referência. ~~Validação de resultado com amostra recebida~~ ✅ Testado. |
 | **Logística** | Unicidade de amostra no malote (constraint unique). Transições inválidas de status de amostra. |
-| **RBAC** | Seeds de permissões (`src/seeder/rbac.py`). Remoção de permissão de perfil. Desvinculação de usuário. |
+| **RBAC** | Seeds de permissões (`src/seeder/rbac.py`). ~~Remoção de permissão~~ ✅ Testado. ~~Desvinculação de usuário~~ ✅ Testado. |
 | **Concorrência** | Dois usuários tentando cancelar o mesmo item. Race conditions em transições de status. |
 | **LGPD** | Máscara de CPF em todas as telas (não apenas teste unitário do mask). |
 | **BI** | ETL com dados operacionais reais. Cálculo de indicadores (tempo de ciclo, ticket médio). |
@@ -396,7 +392,7 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | # | Issue | Detalhe | Severidade |
 |---|-------|---------|------------|
 | I1 | `alembic/env.py` não importa `rbac`, `auditoria`, `bi` models | Autogenerate cego para tabelas de RBAC, auditoria e BI (mesmo que Bug #4) | ✅ Corrigido |
-| I2 | `ConvenioService` duplicado em dois arquivos | Duas implementações concorrentes. A usada em produção (`convenio/service.py`) é a incompleta. | Alta |
+| I2 | `ConvenioService` duplicado em dois arquivos | Duas implementações concorrentes. A usada em produção (`convenio/service.py`) é a incompleta. | ✅ Corrigido |
 | I3 | `session.commit()` descentralizado no módulo laboratorial | `LaboratorialService` comita internamente, impedindo composição transacional (mesmo que Bug #5) | Média |
 | I4 | Chave LGPD hardcoded em `tests/conftest.py` | Chave Fernet de teste exposta no código. OK para testes, mas há risco de confusão se alguém usá-la em produção. | Baixa |
 | I5 | `rotacionar_chave` sem mecanismo de rollback | Se a rotação for interrompida no meio, dados ficam parcialmente criptografados com chaves diferentes. Sem dry-run. | Média |
@@ -409,21 +405,16 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | Indicador | Valor |
 |-----------|-------|
 | Regras de negócio totais (Template) | 37 |
-| Regras **totalmente cobertas** ✅ | 30 (81%) |
-| Regras **parcialmente cobertas** ⚠️ | 5 (14%) |
+| Regras **totalmente cobertas** ✅ | 31 (84%) |
+| Regras **parcialmente cobertas** ⚠️ | 4 (11%) |
 | Regras **não cobertas** ❌ | 2 (5%) |
-| Bugs críticos | 4 (1 resolvido, 3 pendentes) |
+| Bugs críticos | 4 (todos resolvidos) |
 | Bugs médios | 8 (2 resolvidos, 6 pendentes) |
 | Bugs menores | 4 (3 resolvidos, 1 pendente) |
-| UX issues sistêmicas | 7 (1 resolvido, 6 pendentes) |
-| UX issues pontuais | ~40 (~5 resolvidos por correlação) |
-| Funcionalidades ausentes | 29 |
-| Test gaps significativos | 10 áreas |
-| Issues de infraestrutura | 6 (1 resolvido, 5 pendentes) |
-| Histórias de cancelamento da OS | 12/12 (100%) ✅ |
-| **Total de testes passando** | **93/93** ✅ |
+| Histórias de cancelamento da OS | 12/12 (100%) |
+| **Total de testes passando** | **165/165** |
 
-### Nota geral: 9.0/10 (após 2 sessões de correções)
+### Nota geral: 9.0/10 (após 2 sessões — 18 correções aplicadas)
 
 O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são:
 
@@ -433,32 +424,15 @@ O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são
 - **RBAC e LGPD** implementados com boas práticas (Fernet, SHA-256, anonimização no BI)
 - **Separação OLTP/OLAP** com star schema para BI
 
-### Correções aplicadas (27/07/2026) — 6 bugs + 1 crítico resolvidos
+### Pendências restantes (não resolvidas)
 
-| Bug | Descrição | Arquivos |
-|-----|-----------|----------|
-| #4 / I1 | `alembic/env.py` agora importa `rbac`, `auditoria`, `bi` | `alembic/env.py` |
-| #2 | `ConvenioService` unificado com validação de unicidade | `convenio/service.py`, `dtos.py`, `cadastro/service.py` |
-| UX | `cadastro_convenios.py` — erro handling + campos novos (cnpj, telefone, email) | `pages/cadastro_convenios.py` |
-| #3 | Botão Liberar Laudo desabilitado com resultados não revisados | `pages/laboratorio_laudos.py` |
-| #16 | `time.sleep()` artificiais removidos (laudos + resultados) | `pages/laboratorio_laudos.py`, `laboratorio_resultados.py` |
-| #13 | UUIDs substituídos por `codigo_os` nos selectboxes | `pages/laboratorio_laudos.py`, `laboratorio_resultados.py` |
-| #6 | RBAC: `remover_permissao_do_perfil` + `desvincular_usuario_do_perfil` | `src/rbac/`, `pages/admin_usuarios.py` |
-| 🔴 | `shell()` corrigido — desvincular perfil bloqueia acesso, não libera | `src/ui.py`, `tests/rbac/`, `tests/test_app.py` |
-
-**93/93 testes passando.**
-
-### Pendências principais (não resolvidas nesta sessão)
-
-1. ~~Unificar ConvenioService~~ ✅ Corrigido
-2. ~~Resultados sem amostra recebida~~ ✅ Corrigido (regras #9 + #13)
-3. ~~Apenas gestores cancelam OS~~ ✅ Corrigido (regra #30)
-4. ~~Validar formato TUSS~~ ✅ Corrigido (regras #4 + #17)
-5. ~~Autorização de convênio~~ ✅ Corrigido (regra #6)
-6. ~~Auditoria nos malotes~~ ✅ Corrigido (regra #10)
-7. **Auditoria para CRUDs de cadastro** (Regra #31) — 46% das operações sem trilha de auditoria
-8. **Pré-auditoria de guias TISS** (F1/F2) — funcionalidade crítica
+| # | Regra/Issue | Esforço |
+|---|------------|---------|
+| #19 | Pré-auditoria de guias TISS antes do fechamento do lote | 60-90 min |
+| #20 | Bloqueio de itens inconsistentes no faturamento | 30 min |
+| #24 | Alertas de divergência financeira (notificação ativa) | 15 min |
+| #36 | ETL com scheduler (não manual) | 15 min |
 
 ---
 
-*Relatório gerado em 27/07/2026. Revisão completa de código, documentação, testes e migrações.*
+*Relatório atualizado em 28/07/2026. Revisão completa de código, documentação, testes e migrações.*

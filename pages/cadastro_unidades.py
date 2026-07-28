@@ -10,7 +10,7 @@ from src.cadastro.unidade.service import (
     listar_unidades_ativas,
 )
 from src.db import session_scope
-from src.ui import renderizar_menu, shell
+from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import renderizar_cabecalho
 from src.ui_icons import ICONE_UNIDADE
 
@@ -45,7 +45,7 @@ def _render_unidades() -> None:
         try:
             dto = UnidadeCreate(nome=nome, tipo=tipo, endereco=endereco or None)
             with session_scope() as session:
-                criar_unidade(session, dto)
+                criar_unidade(session, dto, usuario_id_logado())
         except (ValidationError, ValueError) as error:
             st.error(_mensagem(error))
         else:
@@ -80,7 +80,7 @@ def _render_setores() -> None:
         try:
             dto = SetorCreate(unidade_id=unidade_id, nome=nome)
             with session_scope() as session:
-                criar_setor(session, dto)
+                criar_setor(session, dto, usuario_id_logado())
         except (ValidationError, ValueError) as error:
             st.error(_mensagem(error))
         except UnidadeNaoEncontrada as error:
