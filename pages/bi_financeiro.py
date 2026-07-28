@@ -66,6 +66,11 @@ def main() -> None:
             titulo="Nenhum dado financeiro",
             mensagem="Execute o ETL primeiro para popular os indicadores financeiros.",
         )
+        if st.button("Carregar dados do BI", type="primary"):
+            from src.bi.etl import executar_etl
+            with st.spinner("Executando ETL..."):
+                executar_etl()
+            st.rerun()
         return
 
     raw_faturado = totais["total_faturado"].iloc[0] if not totais.empty else 0

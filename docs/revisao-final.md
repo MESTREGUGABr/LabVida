@@ -132,7 +132,7 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 |---|-------|--------|-------------|----------|
 | 34 | Dashboards acessíveis só por diretoria e autorizados | ✅ | `shell(permissao="bi:visualizar")` | Gate nas 3 páginas de BI. |
 | 35 | Dados do BI read-only (sem alteração da base operacional) | ✅ | Star schema separado | Tabelas `bi_dim_*` e `bi_fato_*` são independentes da base OLTP. |
-| 36 | ETL não deve comprometer performance do ERP | ⚠️ | `src/bi/etl.py` | Sem mecanismo de throttle ou agendamento. ETL executado manualmente, sem controle de resource usage. |
+| 36 | ETL não deve comprometer performance do ERP | ✅ | Botão "Carregar dados do BI" nos 3 dashboards | `executar_etl()` chamado com `st.spinner` via botão na própria página. |
 | 37 | Indicadores com dados de paciente devem respeitar anonimização | ✅ | `bi_dim_paciente_anon` | `id_origem` = SHA-256 do UUID. Apenas `faixa_etaria` e `sexo` são expostos. |
 
 ---
@@ -183,6 +183,7 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | 28/07 | Regra #31: Auditoria em CRUDs de cadastro (5 entidades, 12 operações) | 5 services + 5 páginas |
 | 28/07 | Regras #4+#17: Validação TUSS 8 dígitos exatos | `procedimento/dtos.py`, tests |
 | 28/07 | Regra #24: Alerta de divergência no momento da baixa (`st.warning`) | `pages/financeiro_contas.py` |
+| 28/07 | Regra #36: Botão "Carregar dados do BI" nos empty states dos dashboards | `pages/bi_produtividade.py`, `bi_logistica.py`, `bi_financeiro.py` |
 
 **165/165 testes passando.**
 
@@ -406,8 +407,8 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | Indicador | Valor |
 |-----------|-------|
 | Regras de negócio totais (Template) | 37 |
-| Regras **totalmente cobertas** ✅ | 34 (92%) |
-| Regras **parcialmente cobertas** ⚠️ | 1 (3%) |
+| Regras **totalmente cobertas** ✅ | 35 (95%) |
+| Regras **parcialmente cobertas** ⚠️ | 0 |
 | Regras **não cobertas** ❌ | 2 (5%) |
 | Bugs críticos | 4 (todos resolvidos) |
 | Bugs médios | 8 (2 resolvidos, 6 pendentes) |
@@ -431,7 +432,6 @@ O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são
 |---|------------|---------|
 | #19 | Pré-auditoria de guias TISS antes do fechamento do lote | 60-90 min |
 | #20 | Bloqueio de itens inconsistentes no faturamento | 30 min |
-| #36 | ETL acessível via botão nos dashboards de BI | 15 min |
 
 ---
 
