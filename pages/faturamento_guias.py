@@ -123,10 +123,29 @@ def _render_lotes_abertos(lotes, todos_convenios) -> None:
         nome_convenio = todos_convenios.get(lote.convenio_id, _PARTICULAR)
         total_itens = sum(len(g.itens) for g in lote.guias)
 
-        with st.expander(
-            f"{lote.codigo_lote} — {nome_convenio} — {total_itens} itens — R$ {lote.valor_total:.2f}",
-            expanded=total_itens == 0,
-        ):
+        toggle_key = f"expand_lote_{lote.id}"
+        if toggle_key not in st.session_state:
+            st.session_state[toggle_key] = total_itens == 0
+
+        aberto = st.session_state[toggle_key]
+        prefixo = "\u2013" if aberto else "+"
+
+        col_toggle, col_label = st.columns([0.5, 9.5])
+        with col_toggle:
+            if st.button(
+                prefixo,
+                key=f"btn_lote_{lote.id}",
+                use_container_width=True,
+            ):
+                st.session_state[toggle_key] = not aberto
+                st.rerun()
+        with col_label:
+            st.markdown(
+                f"**{lote.codigo_lote}** \u2014 {nome_convenio} \u2014 "
+                f"{total_itens} itens \u2014 R$ {lote.valor_total:.2f}"
+            )
+
+        if aberto:
             with session_scope() as session:
                 laudos_pendentes = listar_laudos_pendentes_por_convenio(session, lote.convenio_id)
 

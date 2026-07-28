@@ -15,8 +15,8 @@ from src.db import session_scope
 from src.rbac.gate import verificar_permissao
 from src.rbac.models import Perfil
 from src.rbac.service import listar_permissoes_do_usuario
-from src.ui_css import injetar_css_global, injetar_toggle_dark_mode
-from src.ui_icons import ICONES_MAPA, ICONE_HOME, ICONE_SAIR, ICONE_TEMA
+from src.ui_css import injetar_css_global
+from src.ui_icons import ICONES_MAPA, ICONE_HOME, ICONE_SAIR
 
 
 def formatar_brl(valor: float) -> str:
@@ -191,17 +191,27 @@ def renderizar_menu(usuario_id: UUID) -> None:
             nome = user.get("name", "")
             email = user.get("email", "")
             iniciais = "".join(p[0].upper() for p in nome.split()[:2]) if nome else "??"
+            picture = user.get("picture", "")
+            if picture:
+                avatar = (
+                    f'<img src="{picture}" style="width:36px;height:36px;'
+                    f'border-radius:50%;object-fit:cover;margin-bottom:6px;" alt="">'
+                )
+            else:
+                avatar = (
+                    f'<div style="'
+                    f'display:inline-flex;align-items:center;justify-content:center;'
+                    f'width:36px;height:36px;border-radius:50%;'
+                    f'background:linear-gradient(135deg, #1565C0, #00897B);'
+                    f'color:#fff;font-size:14px;font-weight:700;'
+                    f'margin-bottom:6px;'
+                    f'">{iniciais}</div>'
+                )
             st.sidebar.markdown(
                 f"""
                 <div style="padding:8px 14px 12px 14px;text-align:center;
                 border-radius:8px;margin:0 8px;">
-                    <div style="
-                        display:inline-flex;align-items:center;justify-content:center;
-                        width:36px;height:36px;border-radius:50%;
-                        background:linear-gradient(135deg, #1565C0, #00897B);
-                        color:#fff;font-size:14px;font-weight:700;
-                        margin-bottom:6px;
-                    ">{iniciais}</div>
+                    {avatar}
                     <p style="margin:0;font-size:13px;font-weight:600;color:#F1F5F9;">
                         {nome}
                     </p>
@@ -218,7 +228,20 @@ def renderizar_menu(usuario_id: UUID) -> None:
             unsafe_allow_html=True,
         )
 
-        st.page_link("pages/home.py", label="Inicio", icon="🏠")
+        st.sidebar.markdown(
+            f"""<a href="/home" target="_self" style="
+                display:inline-flex;align-items:center;gap:8px;
+                width:calc(100% - 28px);padding:8px 14px;margin:0 14px;
+                border-radius:8px;text-decoration:none;
+                color:#F1F5F9;font-size:13px;font-weight:500;
+                transition:all 0.2s ease;"
+                onmouseover="this.style.background='rgba(21,101,192,0.12)';"
+                onmouseout="this.style.background='transparent';">
+                <span style="display:inline-flex;width:20px;height:20px;flex-shrink:0;">{ICONE_HOME}</span>
+                Inicio
+            </a>""",
+            unsafe_allow_html=True,
+        )
 
         st.sidebar.markdown(
             "<hr style='border-color:#1E3A5F;border-width:0.5px;opacity:0.4;margin:10px 14px;'>",
@@ -262,19 +285,10 @@ def renderizar_menu(usuario_id: UUID) -> None:
 
         st.sidebar.markdown(
             f"""
-            <div style="display:flex;gap:8px;padding:0 8px;">
-                <a href="#" onclick="var d=document.body.getAttribute('data-theme');if(d==='dark'){{document.body.removeAttribute('data-theme');sessionStorage.setItem('lv_dark_mode','false');}}else{{document.body.setAttribute('data-theme','dark');sessionStorage.setItem('lv_dark_mode','true');}}return false;"
-                   style="display:inline-flex;align-items:center;justify-content:center;
-                   width:40px;height:40px;border-radius:8px;border:1px solid #1E3A5F;
-                   color:#F1F5F9;text-decoration:none;transition:all 0.2s ease;flex-shrink:0;"
-                   onmouseover="this.style.background='rgba(21,101,192,0.15)';this.style.borderColor='#2196F3';this.style.color='#64B5F6';"
-                   onmouseout="this.style.background='transparent';this.style.borderColor='#1E3A5F';this.style.color='#F1F5F9';"
-                   title="Alternar modo escuro">
-                    {ICONE_TEMA}
-                </a>
+            <div style="padding:0 8px;">
                 <a href="{logout_url}" target="_self"
                    style="display:inline-flex;align-items:center;justify-content:center;gap:8px;
-                   flex:1;height:40px;border-radius:8px;border:1px solid #1E3A5F;
+                   width:100%;height:40px;border-radius:8px;border:1px solid #1E3A5F;
                    color:#F1F5F9;text-decoration:none;font-size:13px;font-weight:500;
                    transition:all 0.2s ease;"
                    onmouseover="this.style.background='rgba(21,101,192,0.15)';this.style.borderColor='#2196F3';this.style.color='#64B5F6';"

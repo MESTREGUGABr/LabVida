@@ -30,6 +30,8 @@ def sincronizar_usuario(session: Session, email: str, nome: str) -> UsuarioRead:
     else:
         usuario.nome = nome_normalizado
         usuario.ativo = True
+        if usuario.perfil_id is None:
+            _atribuir_perfil_inicial(session, usuario)
 
     session.commit()
     session.refresh(usuario)
