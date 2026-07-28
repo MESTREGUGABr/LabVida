@@ -1,64 +1,96 @@
-# LabVida — ERP para Laboratorio de Analises Clinicas
+# LabVida — ERP para Laboratório de Análises Clínicas
 
-Projeto academico da disciplina **Sistemas de Informacao e Tecnologias (SIT)** —
-Bacharelado em Ciencia da Computacao, **UFAPE** (Garanhuns - PE, 2026).
+Projeto acadêmico da disciplina **Sistemas de Informação e Tecnologias (SIT)** —
+Bacharelado em Ciência da Computação, **UFAPE** (Garanhuns - PE, 2026.1).
+Professor: **Dr. Assuero Fonseca Ximenes**
 
-O **LabVida** e um ERP academico para uma rede regional de laboratorios de analises clinicas
-(um laboratorio central + quatro unidades de coleta). O projeto parte de um diagnostico organizacional
-real — baixa integracao entre sistemas, logistica manual de amostras, faturamento de convenios critico,
-ausencia de indicadores gerenciais — e propoe uma arquitetura de ERP integrada para resolve-lo.
+O **LabVida** é um ERP acadêmico para uma rede regional de laboratórios de análises clínicas
+(um laboratório central + quatro unidades de coleta). O projeto parte de um diagnóstico organizacional
+real — baixa integração entre sistemas, logística manual de amostras, faturamento de convênios crítico,
+ausência de indicadores gerenciais — e propõe uma arquitetura de ERP integrada para resolvê-lo.
 
-## Equipe 
-
-teste
+## Equipe
 
 - Aline Fernanda Soares Silva
 - Clauderson Branco Xavier
 - Gustavo Ferreira Wanderley
 - Victor Alexandre Saraiva Pimentel
 
-## Visao geral do ERP
+---
 
-O sistema e organizado em modulos especializados que refletem os setores reais do laboratorio, com
-um fluxo operacional integrado em torno da **Ordem de Servico (OS)**:
+## Requisitos de Software e Versões Utilizadas
+
+Para a execução e avaliação do sistema, assegure-se de que os softwares abaixo estejam instalados:
+
+| Software / Tecnologia | Versão Mínima / Utilizada | Finalidade |
+|---|---|---|
+| **Python** | `3.12+` | Linguagem base da aplicação |
+| **PostgreSQL** | `16+` | Banco de Dados Relacional |
+| **Streamlit** | `1.60.0` (congelada no `requirements.txt`) | Interface de usuário (Frontend/Dashboard) |
+| **Docker** | `24+` | Containerização da aplicação |
+| **Docker Compose** | `v2+` | Orquestração de contêineres (App + PostgreSQL) |
+
+---
+
+## Visão Geral do ERP
+
+O sistema é organizado em módulos especializados que refletem os setores reais do laboratório, com
+um fluxo operacional integrado em torno da **Ordem de Serviço (OS)**:
 
 ```
-Cadastro → Atendimento e Coleta → Logistica de Amostras → Laboratorial → Faturamento → Financeiro
+Cadastro → Atendimento e Coleta → Logística de Amostras → Laboratorial → Faturamento → Financeiro
                                                                                           ↳ BI (alimentado por todos)
                                                               Compras → (insumos / contas a pagar)
 ```
 
-| Modulo | Responsabilidade |
+| Módulo | Responsabilidade |
 |---|---|
-| **Cadastro** | Pacientes, medicos, convenios, procedimentos (TUSS/TISS), unidades, setores |
-| **Atendimento e Coleta** | Abertura de OS, validacao de convenio, coleta e etiquetagem de amostras |
-| **Logistica de Amostras** | Cadeia de custodia, malotes, rastreamento e recebimento no laboratorio central |
-| **Laboratorial** | Execucao de exames, interfaceamento com equipamentos, liberacao de laudos |
-| **Faturamento** | Pre-auditoria de guias, geracao de XML TISS, lotes e controle de glosas |
-| **Financeiro** | Contas a receber/pagar, fluxo de caixa, conciliacao, rentabilidade |
+| **Cadastro** | Pacientes, médicos, convênios, procedimentos (TUSS/TISS), unidades, setores |
+| **Atendimento e Coleta** | Abertura de OS, validação de convênio, coleta e etiquetagem de amostras |
+| **Logística de Amostras** | Cadeia de custódia, malotes, rastreamento e recebimento no laboratório central |
+| **Laboratorial** | Execução de exames, interfaceamento com equipamentos, liberação de laudos |
+| **Faturamento** | Pré-auditoria de guias, geração de XML TISS, lotes e controle de glosas |
+| **Financeiro** | Contas a receber/pagar, fluxo de caixa, conciliação, rentabilidade |
 | **Compras** | Fornecedores, pedidos, recebimento de insumos, estoque |
-| **BI** | Dashboards e indicadores (read-only), alimentado por todos os modulos via ETL |
+| **BI** | Dashboards e indicadores (read-only), alimentado por todos os módulos via ETL |
 
-## Status de implementacao
+---
 
-| Modulo | Status |
+## Status de Implementação
+
+| Módulo | Status |
 |---|---|
-| Cadastro | ✅ Concluido |
-| Atendimento e Coleta | ✅ Concluido |
-| Logistica de Amostras | ✅ Concluido |
-| Laboratorial | ✅ Concluido |
-| Faturamento | ✅ Concluido  |
-| Financeiro | ✅ Concluido  |
-| Compras | ✅ Concluido  |
-| BI | ⏳ Pendente |
+| **Cadastro** | ✅ Concluído |
+| **Atendimento e Coleta** | ✅ Concluído |
+| **Logística de Amostras** | ✅ Concluído |
+| **Laboratorial** | ✅ Concluído |
+| **Faturamento** | ✅ Concluído  |
+| **Financeiro** | ✅ Concluído  |
+| **Compras** | ✅ Concluído  |
+| **BI** | ⏳ Pendente |
 
-## Estrutura do repositorio
+---
+
+## Arquitetura do Banco de Dados e Migrações (Alembic)
+
+> **Nota sobre o gerenciamento de banco de dados:**
+> O projeto utiliza o **Alembic** integrado ao **SQLAlchemy** para o controle de migrações e criação do esquema relacional, em vez de scripts SQL estáticos (`.sql`). 
+> 
+> **Por que utilizar Alembic/ORM em vez de `.sql` estático?**
+> 1. **Alinhamento com Python e ORM**: As migrações são escritas e versionadas em Python nativo (`alembic/versions/`), garantindo sincronização direta com as entidades do SQLAlchemy.
+> 2. **Rastreabilidade e Evolução**: Permite controle de versão histórico do banco de dados, migrações incrementais e reversão (*rollback*) automatizada.
+> 3. **Inicialização Automática**: Ao subir o container Docker ou executar a aplicação, o Alembic aplica automaticamente todas as migrações até a revisão mais recente (`alembic upgrade head`), garantindo reconstrução total do banco em qualquer ambiente sem necessidade de importação manual de scripts SQL.
+> 4. **Povoamento Automatizado (Seeder)**: Para geração de dados de teste e demonstração funcional, o projeto inclui um módulo de geração de dados reais (`python -m src.seeder`).
+
+---
+
+## Estrutura do Repositório
 
 ```
 LabVida/
 ├── app.py                         → Tela de login (Google via Auth0)
 ├── pages/
-│   ├── home.py                    → Home pos-login
+│   ├── home.py                    → Home pós-login
 │   ├── cadastro_*.py              → Cadastros (Pacientes, Convênios, Médicos, Procedimentos, Unidades)
 │   ├── atendimento_*.py           → Ordens de Serviço e Coleta
 │   ├── logistica_*.py             → Malotes e Recebimento
@@ -67,8 +99,8 @@ LabVida/
 │   ├── financeiro_*.py            → Contas a Receber/Pagar e Fluxo de Caixa
 │   └── compras_*.py               → Fornecedores, Pedidos e Estoque
 ├── src/
-│   ├── auth.py                    → Autenticacao OAuth 2.0 / OIDC com Auth0
-│   ├── config.py                  → Carga de config (.env)
+│   ├── auth.py                    → Autenticação OAuth 2.0 / OIDC com Auth0
+│   ├── config.py                  → Carga de configuração (.env)
 │   ├── db.py                      → Engine SQLAlchemy + session_scope()
 │   ├── ui.py                      → Helpers Streamlit (exigir_login)
 │   ├── cadastro/                  → Pacientes, Convênios, Médicos, Procedimentos, Unidades
@@ -80,190 +112,175 @@ LabVida/
 │   ├── compras/                   → Fornecedores, Pedidos de Compra e Estoque
 │   ├── usuario/                   → Identidade do Auth0
 │   └── seeder/                    → Dados de exemplo (Faker)
-├── alembic.ini                    → Configuracao do Alembic
-├── alembic/                       → Migrations do banco
-├── docker-compose.yml             → App, PostgreSQL e servicos de teste
-├── Dockerfile                     → Imagem Python/Streamlit
-├── Makefile                       → Comandos comuns do projeto
-├── mise.toml                      → Versao Python para desenvolvimento local
-├── requirements.txt               → Dependencias Python
-├── tests/                         → Testes automatizados
-├── CONTEXT.md                     → Glossario de dominio
-├── README.md
-├── LICENSE
-└── docs/
-    ├── adr/                       → Decisoes arquiteturais
-    ├── Entrega 1/                  → Modelagem organizacional do ERP
-    ├── Entrega 2/                  → Modelagem da base de dados
-    ├── Entrega 3/                  → Integracao organizacional
-    ├── diagramas/                  → Diagramas Mermaid (.mmd) da modelagem de dados
-    └── Templates/                  → Template padrao dos documentos da equipe
+├── alembic.ini                    → Configuração do Alembic
+├── alembic/                       → Migrações do banco de dados
+├── docker-compose.yml             → Serviços Docker (App Streamlit + PostgreSQL 16)
+├── Dockerfile                     → Imagem Python 3.12 / Streamlit
+├── Makefile                       → Comandos utilitários do projeto
+├── requirements.txt               → Dependências congeladas (pip freeze)
+├── .env.exemplo                   → Modelo de variáveis de ambiente
+├── tests/                         → Testes automatizados (pytest)
+├── CONTEXT.md                     → Glossário de domínio
+├── README.md                      → Documentação principal
+└── LICENSE
 ```
 
-## Stack de implementacao
+---
 
-- **Python 3.12**+
-- **Streamlit** (frontend)
-- **Auth0** (login com Google, sem custo)
-- **httpx** (requisicoes HTTP para OAuth)
-- **PostgreSQL**
-- **Docker Compose**
-- **SQLAlchemy**
-- **Alembic**
-- **Pydantic**
-- **pytest**
+## Como Executar (Opção 1: Utilizando Docker — Recomendado)
 
-## Como executar (desenvolvimento local)
+Suba toda a aplicação (Streamlit + Banco PostgreSQL) de forma totalmente automatizada:
 
-### 1. Configurar Auth0
+### 1. Configurar variáveis de ambiente
 
-O login usa **Auth0** (plano gratuito, ate 7.000 usuarios) como intermediario para login com Google.
-
-a) Crie uma conta gratuita em [auth0.com](https://auth0.com)
-
-b) No Dashboard, crie uma aplicacao do tipo **Regular Web Application**
-
-c) Em **Settings**, configure:
-   - **Allowed Callback URLs**: `http://localhost:8501`
-   - **Allowed Logout URLs**: `http://localhost:8501`
-
-d) Em **Connections**, desative `Username-Password-Authentication` e mantenha apenas `google-oauth2` ativo
-
-e) Copie **Domain**, **Client ID** e **Client Secret**
-
-f) Copie `.env.example` para `.env`:
+Copie o arquivo de exemplo `.env.exemplo` para `.env`:
 
 ```bash
-copy .env.example .env
+# Linux / macOS:
+cp .env.exemplo .env
+
+# Windows (CMD):
+copy .env.exemplo .env
 ```
 
-g) Preencha as variaveis de Auth0 no `.env`:
+### 2. Construir e Iniciar os Containers
+
+Execute o comando do Docker Compose:
+
+```bash
+docker compose up --build -d
+```
+
+> **O que acontece ao rodar o comando acima:**
+> - O PostgreSQL 16 é iniciado e configurado automaticamente.
+> - O contêiner da aplicação Python aguarda o banco ficar saudável (*healthcheck*).
+> - As migrações do banco são aplicadas automaticamente (`alembic upgrade head`).
+> - O servidor Streamlit é iniciado na porta 8501.
+
+### 3. Acessar a Aplicação
+
+Abra o navegador no endereço:
+
+```text
+http://localhost:8501
+```
+
+### 4. Parar os Containers
+
+Para interromper os serviços:
+
+```bash
+docker compose down
+```
+
+---
+
+## Como Executar (Opção 2: Desenvolvimento Local sem Docker)
+
+### 1. Configurar Variáveis de Ambiente e Auth0
+
+O login utiliza **Auth0** (plano gratuito, até 7.000 usuários) para login social com o Google.
+
+a) Copie `.env.exemplo` para `.env`:
+
+```bash
+cp .env.exemplo .env
+```
+
+b) Preencha as credenciais do Auth0 no `.env` (caso deseje autenticação remota):
 
 ```dotenv
 AUTH0_DOMAIN=SEU_DOMINIO.auth0.com
 AUTH0_CLIENT_ID=SEU_CLIENT_ID
 AUTH0_CLIENT_SECRET=SEU_CLIENT_SECRET
 APP_BASE_URL=http://localhost:8501
+DATABASE_URL=postgresql+psycopg://labvida:labvida@localhost:5432/labvida
 ```
 
-O mesmo `.env` e usado no desenvolvimento local e pelo Docker Compose. Variaveis de ambiente do shell sobrescrevem valores do `.env`.
-
-### 2. Criar ambiente virtual e instalar dependencias
+### 2. Criar Ambiente Virtual e Instalar Dependências
 
 ```bash
-python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
+python3 -m venv .venv
+
+# Linux / macOS:
+source .venv/bin/activate
+
+# Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+
+# Instalar dependências congeladas:
+pip install -r requirements.txt
 ```
 
-### 3. Executar o app
+### 3. Criar Banco de Dados e Aplicar Migrações
+
+Garantindo que o servidor PostgreSQL esteja em execução localmente:
 
 ```bash
-.venv\Scripts\streamlit run app.py
+# Aplica a estrutura de tabelas via Alembic:
+alembic upgrade head
+
+# Opcional: popula o banco com dados de exemplo/demonstração:
+python -m src.seeder
 ```
 
-Acesse: `http://localhost:8501`
-
-### 4. Fluxo de login
-
-```
-Tela de login → "Entrar com Google" → Auth0 → Google → LabVida Home
-                                                              ↓
-                                                           "Sair"
-```
-
-## Como executar (Docker)
-
-Suba o LabVida com Docker Compose:
+### 4. Executar o Streamlit
 
 ```bash
-docker compose up -d
+streamlit run app.py
 ```
 
-O Docker Compose le o `.env` automaticamente.
+Acesse no navegador: `http://localhost:8501`
 
-Acesse:
+---
 
-```text
-http://localhost:8501
-```
+## Usuários e Autenticação de Acesso
 
-Tambem e possivel usar o Makefile:
+O sistema utiliza autenticação segura via **OAuth 2.0 / OpenID Connect (Auth0)** integrada à conta Google. 
+
+* **Usuário Padrão:** Qualquer conta Google válida cadastrada/autorizada no Auth0.
+* **Usuário em Modo de Teste / Dev:** No ambiente local/Docker sem credenciais Auth0 configuradas, o sistema permite navegação no modo de desenvolvimento para testes de módulos.
+
+---
+
+## Comandos Úteis (Makefile)
+
+Caso possua a ferramenta `make` instalada:
 
 ```bash
-make up
+make help        # Lista todos os comandos disponíveis
+make up          # Sobe os containers Docker
+make down        # Para os containers Docker
+make build       # Reconstrói as imagens Docker
+make logs        # Exibe os logs dos containers
+make migrate     # Executa migrações do banco (alembic upgrade head)
+make test        # Executa a suíte de testes com pytest
 ```
 
-## Makefile
+---
 
-O Makefile funciona tanto no **Windows** quanto no **Unix** (usa apenas recursos nativos do GNU Make + Docker CLI). No Windows, instale via Winget:
+## Testes Automatizados
 
-```bash
-winget install GnuWin32.Make
-```
-
-Apos a instalacao, reinicie o terminal.
-
-## Comandos comuns
-
-```bash
-make help
-make up
-make down
-make restart
-make build
-make logs
-make test
-make migrate
-make revision msg="criar tabela paciente"
-make clean
-```
-
-## Testes
-
-Execute todos os testes com:
+Para executar os testes da aplicação:
 
 ```bash
 # Via Make (com Docker):
 make test
 
-# Ou localmente (sem Docker):
-.venv\Scripts\pytest tests/ -v
+# Localmente:
+pytest tests/ -v
 ```
 
-O comando `make test` sobe um PostgreSQL de teste, aplica as migrations, executa o pytest e remove o banco de teste ao final.
+---
 
-## Entregas
+## Documentação das Entregas
 
-### Entrega 01 — Modelagem organizacional do ERP
-Define os modulos, responsabilidades, fluxo operacional, integracoes entre setores, impactos automaticos
-e regras de negocio. Um complemento adiciona a **arquitetura tecnica** (camadas, stack, modulo core,
-hierarquia arquitetural e diagramas).
+* **Entrega 01 — Modelagem Organizacional do ERP:** [docs/Entrega 1/](docs/Entrega%201/)
+* **Entrega 02 — Modelagem da Base de Dados:** [docs/Entrega 2/](docs/Entrega%202/)
+* **Entrega 03 — Integração Organizacional:** [docs/Entrega 3/](docs/Entrega%203/)
 
-- [Documento da Entrega 01 (PDF)](docs/Entrega%201/-1%C2%AA%20Entrega-%20SI%20-%20LabVida.pdf)
-- [Complemento — Arquitetura Tecnica](docs/Entrega%201/Entrega-01-Complemento-Arquitetura-Tecnica.md)
+---
 
-### Entrega 02 — Modelagem da base de dados
-Traduz a arquitetura organizacional em um modelo de dados relacional (PostgreSQL): modelo conceitual,
-modelo logico com dicionario de dados por modulo, regras de integridade, rastreabilidade/auditoria e
-um modelo dimensional (esquema estrela) para o BI.
+## Licença
 
-- [Documento da Entrega 02 — Modelagem de BD](docs/Entrega%202/Entrega-02-Modelagem-BD.md)
-- [Planejamento da Entrega 02](docs/Entrega%202/PLANEJAMENTO-Entrega-02.md)
-
-#### Diagramas
-Arquivos `.mmd` ([Mermaid](https://mermaid.js.org/)) — renderizam direto no GitHub ou em [mermaid.live](https://mermaid.live):
-
-- [MER Conceitual](docs/diagramas/MER-conceitual.mmd) — entidades e relacionamentos (alto nivel)
-- [MER Logico](docs/diagramas/MER-logico.mmd) — tabelas, atributos, PKs, FKs e cardinalidades
-- [BI — Esquema Estrela](docs/diagramas/BI-esquema-estrela.mmd) — modelo dimensional (fatos e dimensoes)
-
-### Entrega 03 — Integracao organizacional
-Detalha como os modulos do ERP LabVida se integram por meio do fluxo operacional da Ordem de Servico,
-eventos entre setores, rastreabilidade organizacional e impactos automaticos entre atendimento, coleta,
-logistica, laboratorio, faturamento, financeiro, compras, auditoria e BI.
-
-- [Documento da Entrega 03 — Integracao Organizacional](docs/Entrega%203/Entrega-03-Integracao-Organizacional.md)
-
-## Licenca
-
-Distribuido sob a licenca definida em [LICENSE](LICENSE).
+Distribuído sob a licença definida em [LICENSE](LICENSE).
