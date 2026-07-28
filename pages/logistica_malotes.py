@@ -43,11 +43,12 @@ def main() -> None:
     tab_nomes = ["Criar e Despachar Malote", "Historico de Malotes"]
     aba = st.radio("Seção", tab_nomes, horizontal=True, key="tab_malote", label_visibility="collapsed")
 
+    origem_opcoes = {f"{u.nome} ({u.tipo})": u.id for u in (unidades_coleta or unidades)}
+
     if aba == tab_nomes[0]:
         renderizar_secao(titulo="Criar Novo Malote")
         col1, col2 = st.columns(2)
         with col1:
-            origem_opcoes = {f"{u.nome} ({u.tipo})": u.id for u in (unidades_coleta or unidades)}
             origem_label = st.selectbox("Unidade de Origem (Posto de Coleta)", options=list(origem_opcoes.keys()), key="origem")
             origem_id = origem_opcoes[origem_label]
 
@@ -135,6 +136,12 @@ def main() -> None:
                     st.caption("Adicione pelo menos uma amostra antes de despachar.")
 
     elif aba == tab_nomes[1]:
+        origem_label = st.selectbox(
+            "Unidade de Origem (Posto de Coleta)",
+            options=list(origem_opcoes.keys()),
+            key="origem_historico",
+        )
+        origem_id = origem_opcoes[origem_label]
         with session_scope() as session:
             todos_malotes = listar_malotes_por_unidade_origem(session, origem_id)
 
