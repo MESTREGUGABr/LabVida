@@ -4,6 +4,8 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.orm import Session
 
+from src.atendimento.amostra.dtos import StatusAmostra
+from src.atendimento.amostra.models import Amostra
 from src.atendimento.ordem_servico.dtos import StatusOrdemServico, StatusOsItem
 from src.atendimento.ordem_servico.models import OrdemServico, OsItem, OsStatusHistorico
 from src.cadastro.dtos import SexoPaciente
@@ -15,6 +17,20 @@ from src.laboratorial.dtos import LaudoCreate, LaudoUpdate, ResultadoCreate, Res
 from src.laboratorial.models import StatusLaudo, StatusResultado
 from src.usuario.models import Usuario
 from src.laboratorial.service import LaboratorialService
+
+
+def _criar_amostra_recebida(session: Session, ordem_servico_id) -> Amostra:
+    import uuid
+
+    amostra = Amostra(
+        ordem_servico_id=ordem_servico_id,
+        codigo_barras=f"AM{uuid.uuid4().hex[:12]}",
+        tipo_material="Sangue",
+        status=StatusAmostra.RECEBIDA,
+    )
+    session.add(amostra)
+    session.flush()
+    return amostra
 
 
 def _registrar_resultado_revisado(service, os_item_id, usuario_id, analito="Hemoglobina") -> None:
@@ -90,6 +106,7 @@ def test_liberar_laudo_atualiza_os_item_para_resultado_liberado(session: Session
     )
     session.add(ordem)
     session.flush()
+    _criar_amostra_recebida(session, ordem.id)
     item = OsItem(
         ordem_servico_id=ordem.id,
         procedimento_id=procedimento.id,
@@ -151,6 +168,7 @@ def test_os_com_varios_itens_so_conclui_apos_liberar_todos_os_laudos(
     )
     session.add(ordem)
     session.flush()
+    _criar_amostra_recebida(session, ordem.id)
     item_1 = OsItem(
         ordem_servico_id=ordem.id,
         procedimento_id=procedimento_1.id,
@@ -234,6 +252,7 @@ def _montar_cenario_laudo(
     )
     session.add(ordem)
     session.flush()
+    _criar_amostra_recebida(session, ordem.id)
     item = OsItem(
         ordem_servico_id=ordem.id,
         procedimento_id=procedimento.id,

@@ -75,7 +75,7 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 
 | # | Regra | Status | Onde validar | Detalhes |
 |---|-------|--------|-------------|----------|
-| 9 | Nenhuma amostra analisada sem registro de recebimento | ⚠️ | `laboratorio_bancada.py` (UI apenas) | A UI da bancada filtra por amostras `RECEBIDA`. Mas o **service `registrar_resultado` não valida** — bypass possível via API ou outro código. |
+| 9 | Nenhuma amostra analisada sem registro de recebimento | ✅ | `src/laboratorial/service.py:_validar_amostra_recebida()` | `registrar_resultado` valida `Amostra.status == RECEBIDA` antes de criar resultado. |
 | 10 | Toda movimentação da amostra gera registro de auditoria | ⚠️ | `src/logistica/malote/service.py` + `recebimento/service.py` | `AmostraMovimentacao` é criada (cadeia de custódia). Mas **não há registro em `auditoria_log`** — apenas a cadeia de custódia é registrada, não a trilha de auditoria corporativa. |
 | 11 | Malotes devem possuir origem, destino, data, hora e responsável | ✅ | Modelo `Malote` | Todos os campos presentes: `unidade_origem_id`, `unidade_destino_id`, `criado_em`, `despachado_em`, `enviado_por_usuario_id`. |
 | 12 | Amostras divergentes ou danificadas devem ser bloqueadas | ✅ | `src/logistica/recebimento/service.py:receber_malote()` | Suporta rejeição individual via `dto.amostras_rejeitadas`. Amostras rejeitadas vão para status `REJEITADA`. |
@@ -84,7 +84,7 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 
 | # | Regra | Status | Onde validar | Detalhes |
 |---|-------|--------|-------------|----------|
-| 13 | Resultados só podem ser inseridos após recebimento logístico | ❌ | `src/laboratorial/service.py:registrar_resultado()` | **Mesma issue da regra 9.** A validação só existe na UI (`laboratorio_bancada.py`). O service não verifica se a amostra está `RECEBIDA`. |
+| 13 | Resultados só podem ser inseridos após recebimento logístico | ✅ | `src/laboratorial/service.py:_validar_amostra_recebida()` | Valida antes de criar `Resultado`. Mesma validação da regra #9. |
 | 14 | Liberação final do laudo só por responsável técnico autorizado | ✅ | `src/laboratorial/service.py:atualizar_laudo()` | Valida: `medico.ativo == True`, `medico.responsavel_tecnico == True`, existência de `responsavel_tecnico_id`. |
 | 15 | Toda alteração em resultado clínico gera auditoria imutável | ✅ | `src/laboratorial/service.py:atualizar_resultado()` | `ResultadoAuditoria` append-only com `valor_anterior` e `valor_novo`. |
 | 16 | Resultados importados de equipamentos vinculados à OS | ✅ | Modelo `Resultado` | FK `os_item_id` → `os_itens.id` → `ordens_servico.id`. |
@@ -172,6 +172,7 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | 27/07 | Bug #13 — UUIDs expostos na UI (laudos + resultados) + `time.sleep` restante | ✅ Corrigido | `pages/laboratorio_laudos.py`, `pages/laboratorio_resultados.py` |
 | 27/07 | Bug #6 — RBAC `remover_permissao_do_perfil` e `desvincular_usuario_do_perfil` | ✅ Corrigido | `src/rbac/`, `pages/admin_usuarios.py`, `tests/rbac/` |
 | 27/07 | 🔴 `desvincular_usuario_do_perfil` concedia acesso total (shell tratava `perfil_id=None` como bootstrap) | ✅ Corrigido | `src/ui.py`, `tests/rbac/`, `tests/test_app.py` |
+| 27/07 | Regras #9 + #13 — `registrar_resultado` agora bloqueia se amostra não recebida | ✅ Corrigido | `src/laboratorial/service.py`, `tests/laboratorial/` |
 
 ---
 
@@ -443,8 +444,8 @@ O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são
 ### Pendências principais (não resolvidas nesta sessão)
 
 1. ~~Unificar ConvenioService~~ ✅ Corrigido
-2. **Adicionar validação de recebimento no service laboratorial** (Bug #1) — bypass da regra de negócio
-3. **Implementar autorização de convênio** (Bug #3) — tabela existe mas não é usada
+2. ~~Resultados sem amostra recebida~~ ✅ Corrigido (regras #9 + #13)
+3. **Implementar autorização de convênio** (Regra #6) — tabela existe mas não é usada
 4. ~~Corrigir `alembic/env.py`~~ ✅ Corrigido
 5. **Pré-auditoria de guias TISS** (F1/F2) — funcionalidade crítica do módulo de faturamento
 6. **Auditoria para CRUD de cadastros** (F22-F25) — 46% das operações sem trilha de auditoria
