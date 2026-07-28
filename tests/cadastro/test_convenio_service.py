@@ -3,16 +3,17 @@ from collections.abc import Iterator
 import pytest
 from sqlalchemy.orm import Session
 
-from src.cadastro.dtos import ConvenioCreate, ConvenioUpdate
-from src.cadastro.errors import CnpjConvenioDuplicado, ConvenioNaoEncontrado, NomeConvenioDuplicado
-from src.cadastro.models import Convenio
-from src.cadastro.service import (
+from src.cadastro.convenio.dtos import ConvenioCreate, ConvenioUpdate
+from src.cadastro.convenio.service import (
     atualizar_convenio,
     criar_convenio,
     inativar_convenio,
     listar_convenios,
     obter_convenio_por_id,
 )
+from src.cadastro.convenio.errors import ConvenioNaoEncontrado
+from src.cadastro.errors import CnpjConvenioDuplicado, NomeConvenioDuplicado
+from src.cadastro.models import Convenio
 from src.db import session_scope
 
 

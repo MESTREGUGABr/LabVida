@@ -23,7 +23,13 @@ def usuario_logado(monkeypatch) -> dict:
 
     email = f"operador_{uuid.uuid4().hex[:8]}@labvida.test"
     with session_scope() as session:
+        from src.rbac.repository import obter_perfil_por_nome
+
         usuario = sincronizar_usuario(session, email, "Operador Teste")
+        admin = obter_perfil_por_nome(session, "admin")
+        if admin is not None and usuario.perfil_id is None:
+            usuario.perfil_id = admin.id
+            session.commit()
         return {
             "id": str(usuario.id),
             "name": "Operador Teste",

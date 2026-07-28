@@ -72,3 +72,14 @@ def usuario_tem_permissao(session: Session, usuario_id: UUID, codigo_permissao: 
             Permissao.codigo == codigo_permissao,
         )
     ) is not None
+
+
+def remover_permissao(session: Session, perfil_id: UUID, permissao_id: UUID) -> None:
+    vinculo = session.scalar(
+        select(PerfilPermissao).where(
+            PerfilPermissao.perfil_id == perfil_id,
+            PerfilPermissao.permissao_id == permissao_id,
+        )
+    )
+    if vinculo is not None:
+        session.delete(vinculo)

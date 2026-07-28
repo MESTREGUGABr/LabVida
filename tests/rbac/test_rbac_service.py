@@ -23,7 +23,11 @@ def session() -> Iterator[Session]:
             s.query(t).delete()
         s.commit()
         yield s
-        s.rollback()
+        from src.usuario.models import Usuario
+        s.query(Usuario).update({"perfil_id": None})
+        for t in [PerfilPermissao, Permissao, Perfil]:
+            s.query(t).delete()
+        s.commit()
 
 
 def _criar_permissao(session: Session, codigo: str) -> Permissao:
@@ -141,3 +145,62 @@ def test_listar_permissoes_do_usuario(session: Session) -> None:
     codigos = {p.codigo for p in permissoes}
     assert "atendimento:abrir_os" in codigos
     assert "atendimento:coletar" in codigos
+
+
+def test_remover_permissao_do_perfil(session: Session) -> None:
+    p1 = _criar_permissao(session, "atendimento:abrir_os")
+    p2 = _criar_permissao(session, "atendimento:coletar")
+    perfil = service.criar_perfil(session, PerfilCreate(nome="atendente"))
+    service.atribuir_permissao_ao_perfil(session, perfil.id, p1.id)
+    service.atribuir_permissao_ao_perfil(session, perfil.id, p2.id)
+
+    assert len(service.listar_permissoes_do_perfil(session, perfil.id)) == 2
+
+    service.remover_permissao_do_perfil(session, perfil.id, p1.id)
+    permissoes = service.listar_permissoes_do_perfil(session, perfil.id)
+
+    assert len(permissoes) == 1
+    assert permissoes[0].codigo == "atendimento:coletar"
+
+
+def test_desvincular_usuario_do_perfil(session: Session) -> None:
+    p = _criar_permissao(session, "atendimento:abrir_os")
+    perfil = service.criar_perfil(session, PerfilCreate(nome="atendente"))
+    service.atribuir_permissao_ao_perfil(session, perfil.id, p.id)
+    usuario = sincronizar_usuario(session, "desvincular@labvida.test", "Desvincular")
+    service.vincular_usuario_ao_perfil(session, usuario.id, perfil.id)
+
+    assert verificar_permissao(session, usuario.id, "atendimento:abrir_os") is True
+
+    service.desvincular_usuario_do_perfil(session, usuario.id)
+    assert verificar_permissao(session, usuario.id, "atendimento:abrir_os") is False
+    assert len(service.listar_permissoes_do_usuario(session, usuario.id)) == 0
+
+
+def test_remover_permissao_inexistente_nao_quebra(session: Session) -> None:
+    p = _criar_permissao(session, "atendimento:abrir_os")
+    perfil = service.criar_perfil(session, PerfilCreate(nome="atendente"))
+    service.atribuir_permissao_ao_perfil(session, perfil.id, p.id)
+    service.remover_permissao_do_perfil(session, perfil.id, p.id)
+
+    service.remover_permissao_do_perfil(session, perfil.id, p.id)
+
+    assert len(service.listar_permissoes_do_perfil(session, perfil.id)) == 0
+
+
+def test_desvincular_bloqueia_acesso_quando_existem_perfis(session: Session) -> None:
+    p = _criar_permissao(session, "atendimento:abrir_os")
+    perfil = service.criar_perfil(session, PerfilCreate(nome="atendente"))
+    service.atribuir_permissao_ao_perfil(session, perfil.id, p.id)
+    usuario = sincronizar_usuario(session, "bloqueado@labvida.test", "Bloqueado")
+    service.vincular_usuario_ao_perfil(session, usuario.id, perfil.id)
+
+    assert verificar_permissao(session, usuario.id, "atendimento:abrir_os") is True
+
+    service.desvincular_usuario_do_perfil(session, usuario.id)
+
+    assert verificar_permissao(session, usuario.id, "atendimento:abrir_os") is False
+    assert len(service.listar_permissoes_do_usuario(session, usuario.id)) == 0
+
+    with pytest.raises(PermissaoNegada):
+        exigir_permissao(session, usuario.id, "atendimento:abrir_os")

@@ -131,7 +131,7 @@ def _render_usuarios() -> None:
             with sub_col1:
                 novo_label = st.selectbox(
                     "Perfil",
-                    options=["— Manter atual —"] + list(perfis_opcoes.keys()),
+                    options=["— Manter atual —", "🗑 Remover perfil"] + list(perfis_opcoes.keys()),
                     key=f"sel_perfil_{usuario.id}",
                     label_visibility="collapsed",
                     placeholder="Alterar perfil...",
@@ -142,9 +142,12 @@ def _render_usuarios() -> None:
                 ):
                     try:
                         with session_scope() as sess:
-                            rbac_service.vincular_usuario_ao_perfil(
-                                sess, usuario.id, perfis_opcoes[novo_label]
-                            )
+                            if novo_label == "🗑 Remover perfil":
+                                rbac_service.desvincular_usuario_do_perfil(sess, usuario.id)
+                            else:
+                                rbac_service.vincular_usuario_ao_perfil(
+                                    sess, usuario.id, perfis_opcoes[novo_label]
+                                )
                         st.toast("Perfil atualizado!", icon="\u2705")
                         st.rerun()
                     except (UsuarioNaoEncontrado, PerfilNaoEncontrado) as e:
@@ -228,10 +231,9 @@ def _render_perfis() -> None:
             st.markdown("<br><br>", unsafe_allow_html=True)
 
             if perms:
-                # grid 2 colunas
-                cols = st.columns(2)
                 for j, p in enumerate(perms):
-                    with cols[j % 2]:
+                    col_info, col_acao = st.columns([8, 1])
+                    with col_info:
                         st.markdown(
                             f"""<div style="padding:6px 10px;margin:2px 0;border-radius:6px;
                             background:{NEUTRAL_50};border:1px solid {NEUTRAL_200};font-size:12px;">
@@ -240,6 +242,12 @@ def _render_perfis() -> None:
                             </div>""",
                             unsafe_allow_html=True,
                         )
+                    with col_acao:
+                        if st.button("✕", key=f"rem_perm_{perfil.id}_{p.id}", help="Remover permissão"):
+                            with session_scope() as sess:
+                                rbac_service.remover_permissao_do_perfil(sess, perfil.id, p.id)
+                            st.toast(f"Permissão removida!", icon="🗑")
+                            st.rerun()
             else:
                 st.caption("Nenhuma permissao atribuida.")
 

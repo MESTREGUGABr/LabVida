@@ -77,3 +77,27 @@ def vincular_usuario_ao_perfil(session: Session, usuario_id: UUID, perfil_id: UU
 
     usuario.perfil_id = perfil_id
     session.commit()
+
+
+def remover_permissao_do_perfil(
+    session: Session, perfil_id: UUID, permissao_id: UUID
+) -> None:
+    perfil = repository.obter_perfil_por_id(session, perfil_id)
+    if perfil is None:
+        raise PerfilNaoEncontrado(f"Perfil '{perfil_id}' não encontrado")
+
+    permissao = session.get(Permissao, permissao_id)
+    if permissao is None:
+        raise PerfilNaoEncontrado(f"Permissão '{permissao_id}' não encontrada")
+
+    repository.remover_permissao(session, perfil_id, permissao_id)
+    session.commit()
+
+
+def desvincular_usuario_do_perfil(session: Session, usuario_id: UUID) -> None:
+    usuario = usuario_repository.obter_por_id(session, usuario_id)
+    if usuario is None:
+        raise UsuarioNaoEncontrado("Usuário não encontrado")
+
+    usuario.perfil_id = None
+    session.commit()
