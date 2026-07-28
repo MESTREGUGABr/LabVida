@@ -8,7 +8,9 @@ O **LabVida** e um ERP academico para uma rede regional de laboratorios de anali
 real — baixa integracao entre sistemas, logistica manual de amostras, faturamento de convenios critico,
 ausencia de indicadores gerenciais — e propoe uma arquitetura de ERP integrada para resolve-lo.
 
-## Equipe
+## Equipe 
+
+teste
 
 - Aline Fernanda Soares Silva
 - Clauderson Branco Xavier
