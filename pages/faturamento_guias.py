@@ -149,8 +149,9 @@ def _render_lotes_abertos(lotes, todos_convenios) -> None:
                         st.write(f"Item OS `{str(laudo_info['os_item_id'])[:12]}...`")
                     with c3:
                         valor_key = f"vlr_{lote.id}_{laudo_id}"
+                        valor_default = float(laudo_info.get("valor_negociado", 50.0))
                         valor = st.number_input(
-                            "R$", min_value=0.01, value=50.00, step=1.0,
+                            "R$", min_value=0.01, value=valor_default, step=1.0,
                             key=valor_key, label_visibility="collapsed",
                         )
                     with c4:

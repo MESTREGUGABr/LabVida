@@ -29,12 +29,13 @@ def main() -> None:
         icone=ICONE_PROCEDIMENTO,
     )
 
-    tab_procedimento, tab_valor = st.tabs(["Procedimentos", "Valores por convênio"])
+    tab_nomes = ["Procedimentos", "Valores por convênio"]
+    aba = st.radio("Seção", tab_nomes, horizontal=True, key="tab_proc", label_visibility="collapsed")
 
-    with tab_procedimento:
+    if aba == tab_nomes[0]:
         _render_procedimentos()
 
-    with tab_valor:
+    elif aba == tab_nomes[1]:
         _render_valores()
 
 

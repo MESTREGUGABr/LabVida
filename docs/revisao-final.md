@@ -184,6 +184,8 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | 28/07 | Regras #4+#17: Validação TUSS 8 dígitos exatos | `procedimento/dtos.py`, tests |
 | 28/07 | Regra #24: Alerta de divergência no momento da baixa (`st.warning`) | `pages/financeiro_contas.py` |
 | 28/07 | Regras #19+#20: Pré-auditoria TISS com `validar_lote()` + `LoteReprovadoPreAuditoria` | `src/faturamento/lote_faturamento/`, `pages/faturamento_guias.py` |
+| 28/07 | Batch 1: `st.spinner()` global + `formatar_brl()` + remover `commit()` interno do lab | `src/ui.py`, `pages/home.py`, `bi_financeiro.py`, `laboratorial/service.py`, `resultados.py` |
+| 28/07 | Batch 2: Valor faturamento da tabela + paginação coleta + confirmação UX + tab index | `faturamento/repository.py`, `guias.py`, `coleta.py`, `pacientes.py`, `malotes.py`, `compras.py`, `procedimentos.py` |
 
 **165/165 testes passando. 100% das regras de negócio implementadas.**
 
@@ -223,7 +225,7 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 - **Problema:** A página chama `session.commit()` após chamar métodos do `LaboratorialService`, que já commitaram internamente (Bug #5). Isso causa double-commit desnecessário.
 - **Solução sugerida:** Corrigir junto com o Bug #5.
 
-#### Bug #7 — `atendimento_coleta.py` carrega todas as OS sem paginação
+#### Bug #7 — `atendimento_coleta.py` carrega todas as OS sem paginação ✅ CORRIGIDO
 - **Arquivo:** `pages/atendimento_coleta.py` — linha 33
 - **Problema:** `listar_os(session)` é chamado sem limite de resultados. Se houver 10.000+ OS no banco, a página carrega tudo em memória e trava.
 - **Solução sugerida:** Adicionar paginação ou filtro por status + busca textual, como já existe em `atendimento_os.py`.
@@ -240,10 +242,8 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 - **Problema:** O aviso "Nem todos os resultados foram digitados e REVISADOS" é exibido na tela, mas o botão "Salvar e LIBERAR Laudo" continua visível e funcional. O service bloqueia corretamente (lança `ValueError`), então o laudo não é liberado. Mas o UX é enganoso — o usuário clica, vê erro, e não entende por que o botão estava disponível.
 - **Correção aplicada:** Adicionado `disabled=not todos_revisados` ao botão. Agora o botão fica cinza e não-clicável enquanto houver resultados pendentes de revisão ou sem resultados.
 
-#### Bug #10 — `faturamento_guias.py` usa valor fixo `50.00` como padrão
-- **Arquivo:** `pages/faturamento_guias.py`
-- **Problema:** O valor padrão dos campos de faturamento é hardcodado como `50.00`, em vez de buscar o valor contratado da tabela `procedimento_valores` ou o valor negociado em `os_item.valor_negociado`.
-- **Solução sugerida:** Buscar o valor correto: primeiro `os_item.valor_negociado` (se definido), caso contrário `procedimento_valor.vigente` para o convênio.
+#### Bug #10 — `faturamento_guias.py` usa valor fixo `50.00` como padrão ✅ CORRIGIDO
+- **Correção aplicada:** Repository retorna `valor_negociado` do `OsItem` na query de laudos pendentes. Página usa esse valor como default no `number_input`.
 
 #### Bug #11 — Dupla representação de estado em Convênio
 - **Arquivos:** Model `Convenio` (`src/cadastro/convenio/models.py`) + service
@@ -284,12 +284,12 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 
 | # | Issue | Páginas afetadas | Severidade |
 |---|-------|-----------------|------------|
-| **U1** | **Zero `st.spinner()` no projeto inteiro** — queries longas travam a UI em silêncio, sem feedback visual. | Todas as 26 | Alta |
-| **U2** | **Ações destrutivas sem confirmação** — Inativar paciente, inativar convênio, despachar malote, fechar lote, aprovar/receber pedido, cancelar item OS. Um clique executa ação irreversível. | 12 páginas | Alta |
-| **U3** | **`st.rerun()` reseta tab index** — Em páginas com múltiplas abas, após salvar um registro o sistema volta para a primeira aba. Usuário perde contexto. | 8 páginas | Média |
+| **U1** | ~~Zero st.spinner()~~ ✅ Parcial — spinner no menu (26 páginas) — queries longas travam a UI em silêncio, sem feedback visual. | Todas as 26 | Alta |
+| **U2** | ~~Ações destrutivas sem confirmação~~ ✅ Parcial — checkbox em inativar, despachar, aprovar — Inativar paciente, inativar convênio, despachar malote, fechar lote, aprovar/receber pedido, cancelar item OS. Um clique executa ação irreversível. | 12 páginas | Alta |
+| **U3** | ~~st.rerun() reseta tab index~~ ✅ Parcial — 3 páginas com radio+elif — Em páginas com múltiplas abas, após salvar um registro o sistema volta para a primeira aba. Usuário perde contexto. | 8 páginas | Média |
 | **U4** | **`st.session_state` toggle para sub-formulários** — Padrão frágil usado em faturamento, financeiro e compras. Apenas um formulário pode estar aberto por vez; colapsam em reruns não relacionados. | 3 páginas | Média |
-| **U5** | **Empty states sem call-to-action** — Mensagens como "Cadastre X primeiro" não oferecem link ou botão para navegar até a página de cadastro. | 10+ páginas | Baixa |
-| **U6** | **Queries sem paginação** — Vão quebrar com volume real de dados de produção. | 4 páginas | Alta |
+| **U5** | ~~Empty states sem call-to-action~~ ✅ Parcial — BI dashboards com botão ETL — Mensagens como "Cadastre X primeiro" não oferecem link ou botão para navegar até a página de cadastro. | 10+ páginas | Baixa |
+| **U6** | ~~Queries sem paginação~~ ✅ Parcial — coleta filtra por status — Vão quebrar com volume real de dados de produção. | 4 páginas | Alta |
 | **U7** | **Sem tratamento de erro para queries de listagem** — Se o banco estiver offline, o usuário vê um traceback completo do Streamlit em vez de mensagem amigável. | 18+ páginas | Média |
 
 ### 5.2 Por Página
@@ -429,7 +429,7 @@ O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são
 
 **Nenhuma regra de negócio pendente.** Todas as 37 regras do Template LabVida estão implementadas. ✅
 
-**9 bugs não-críticos pendentes** (performance/UX): #5, #6, #7, #8, #10, #11, #12, #14, #15.
+**7 bugs não-críticos pendentes** (performance/UX): #5, #6, #8, #11, #12, #14, #15.
 
 ---
 

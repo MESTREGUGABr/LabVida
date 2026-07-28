@@ -244,7 +244,8 @@ def _render_inativacao(paciente_id: UUID) -> None:
     st.divider()
     st.warning("Inativar remove o Paciente da listagem de ativos, sem exclusao fisica.")
 
-    if not st.button("Inativar Paciente", type="secondary"):
+    confirmar = st.checkbox("Confirmo a inativação deste paciente")
+    if not st.button("Inativar Paciente", type="secondary", disabled=not confirmar):
         return
 
     try:

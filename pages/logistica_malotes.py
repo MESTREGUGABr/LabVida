@@ -40,9 +40,10 @@ def main() -> None:
         st.warning("Nenhuma unidade cadastrada no sistema.")
         return
 
-    tab1, tab2 = st.tabs(["Criar e Despachar Malote", "Historico de Malotes"])
+    tab_nomes = ["Criar e Despachar Malote", "Historico de Malotes"]
+    aba = st.radio("Seção", tab_nomes, horizontal=True, key="tab_malote", label_visibility="collapsed")
 
-    with tab1:
+    if aba == tab_nomes[0]:
         renderizar_secao(titulo="Criar Novo Malote")
         col1, col2 = st.columns(2)
         with col1:
@@ -121,7 +122,8 @@ def main() -> None:
                         hide_index=True,
                         width="stretch",
                     )
-                    if st.button("Despachar Malote (Em Transito)", type="primary"):
+                    confirmar = st.checkbox("Confirmo o despacho do malote")
+                    if st.button("Despachar Malote (Em Transito)", type="primary", disabled=not confirmar):
                         try:
                             with session_scope() as session:
                                 despachar_malote(session, malote_id, usuario_id)
@@ -132,7 +134,7 @@ def main() -> None:
                 else:
                     st.caption("Adicione pelo menos uma amostra antes de despachar.")
 
-    with tab2:
+    elif aba == tab_nomes[1]:
         with session_scope() as session:
             todos_malotes = listar_malotes_por_unidade_origem(session, origem_id)
 

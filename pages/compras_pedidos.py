@@ -27,11 +27,12 @@ def main() -> None:
         icone=ICONE_PEDIDO,
     )
 
-    tab1, tab2 = st.tabs(["Novo Pedido", "Acompanhar"])
+    tab_nomes = ["Novo Pedido", "Acompanhar"]
+    aba = st.radio("Seção", tab_nomes, horizontal=True, key="tab_compras", label_visibility="collapsed")
 
-    with tab1:
+    if aba == tab_nomes[0]:
         _render_novo_pedido()
-    with tab2:
+    elif aba == tab_nomes[1]:
         _render_acompanhar()
 
 
@@ -110,8 +111,9 @@ def _render_acompanhar() -> None:
                 renderizar_status_badge(p.status, tipo)
                 if p.status == "RASCUNHO":
                     col_a, col_b = st.columns(2)
+                    confirmar = st.checkbox("Confirmo a aprovação", key=f"confirm_aprovar_{p.id}")
                     with col_a:
-                        if st.button("Aprovar", key=f"aprovar_{p.id}"):
+                        if st.button("Aprovar", key=f"aprovar_{p.id}", disabled=not confirmar):
                             try:
                                 with session_scope() as session:
                                     aprovar_pedido(session, p.id)

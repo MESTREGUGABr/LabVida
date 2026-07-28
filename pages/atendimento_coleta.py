@@ -34,7 +34,9 @@ def main() -> None:
     )
 
     with session_scope() as session:
-        ordens = [o for o in listar_os(session) if o.status not in _STATUS_BLOQUEADO]
+        ordens = [o for o in listar_os(session, status=StatusOrdemServico.ABERTA) if o.status not in _STATUS_BLOQUEADO]
+        if not ordens:
+            ordens = [o for o in listar_os(session, status=StatusOrdemServico.COLETADA) if o.status not in _STATUS_BLOQUEADO]
         pacientes = {p.id: p.nome for p in listar_pacientes_ativos(session)}
 
     if not ordens:
