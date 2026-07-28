@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from src.atendimento.amostra import repository as amostra_repository
 from src.atendimento.amostra.dtos import StatusAmostra
+from src.auditoria import registrar_auditoria
 from src.cadastro.unidade import repository as unidade_repository
 from src.logistica.malote import repository
 from src.logistica.malote.dtos import MaloteCreate, MaloteRead, StatusMalote
@@ -104,6 +105,18 @@ def despachar_malote(session: Session, malote_id: UUID, usuario_id: UUID) -> Mal
                 ocorrido_em=_agora(),
             )
             movimentacao_repository.salvar_movimentacao(session, mov)
+
+    registrar_auditoria(
+        session,
+        usuario_id,
+        entidade="malote",
+        entidade_id=malote.id,
+        acao="DESPACHAR_MALOTE",
+        dados={
+            "codigo_malote": malote.codigo_malote,
+            "amostras": len(malote.itens),
+        },
+    )
 
     session.commit()
     session.refresh(malote)

@@ -69,14 +69,14 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 | 5 | Toda OS deve possuir identificador único | ✅ | `src/atendimento/ordem_servico/service.py:abrir_os()` | `codigo_os` formato `OS-{ano}-{6 hex}` com unique constraint no banco. |
 | 6 | OS de convênio só pode ser aberta com autorização válida | ✅ | `abrir_os()` cria `AutorizacaoConvenio` PENDENTE; `registrar_coleta()` bloqueia sem `VALIDA` | Autorização criada junto com a OS. Coleta só prossegue após validação. |
 | 7 | Coleta só pode ser registrada por usuário autorizado | ⚠️ | `src/atendimento/amostra/service.py` + shell da página | Service verifica `coletor.ativo` mas **não verifica permissão RBAC** (`atendimento:coletar`). A verificação acontece apenas no `shell()` da página. |
-| 8 | Toda amostra coletada deve receber etiqueta (código de barras/QR) | ⚠️ | `src/atendimento/amostra/service.py:registrar_coleta()` | `codigo_barras` é gerado (`AM{12 hex}`). **Não há visualização ou impressão da etiqueta na UI.** |
+| 8 | Toda amostra coletada deve receber etiqueta (código de barras/QR) | ✅ | `pages/atendimento_coleta.py:106,107,123` | `codigo_barras` já gerado e exibido em `st.success()`, `st.toast()` e tabela de amostras. |
 
 ### 2.3 Logística de Amostras
 
 | # | Regra | Status | Onde validar | Detalhes |
 |---|-------|--------|-------------|----------|
 | 9 | Nenhuma amostra analisada sem registro de recebimento | ✅ | `src/laboratorial/service.py:_validar_amostra_recebida()` | `registrar_resultado` valida `Amostra.status == RECEBIDA` antes de criar resultado. |
-| 10 | Toda movimentação da amostra gera registro de auditoria | ⚠️ | `src/logistica/malote/service.py` + `recebimento/service.py` | `AmostraMovimentacao` é criada (cadeia de custódia). Mas **não há registro em `auditoria_log`** — apenas a cadeia de custódia é registrada, não a trilha de auditoria corporativa. |
+| 10 | Toda movimentação da amostra gera registro de auditoria | ✅ | `src/logistica/malote/service.py:despachar_malote()` + `recebimento/service.py:receber_malote()` | `registrar_auditoria("DESPACHAR_MALOTE")` e `("RECEBER_MALOTE")` adicionados. Trilha corporativa completa em coleta, despacho e recebimento. |
 | 11 | Malotes devem possuir origem, destino, data, hora e responsável | ✅ | Modelo `Malote` | Todos os campos presentes: `unidade_origem_id`, `unidade_destino_id`, `criado_em`, `despachado_em`, `enviado_por_usuario_id`. |
 | 12 | Amostras divergentes ou danificadas devem ser bloqueadas | ✅ | `src/logistica/recebimento/service.py:receber_malote()` | Suporta rejeição individual via `dto.amostras_rejeitadas`. Amostras rejeitadas vão para status `REJEITADA`. |
 
@@ -177,6 +177,9 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | 28/07 | Regra #6 — Autorização de convênio: cria PENDENTE no `abrir_os` e bloqueia `registrar_coleta` sem VALIDA | ✅ Corrigido | `src/atendimento/ordem_servico/service.py`, `amostra/service.py`, `tests/atendimento/` |
 | 28/07 | UX cancelamento — botões ocultos para usuários sem `atendimento:cancelar_os` | ✅ Corrigido | `pages/atendimento_os.py` |
 | 28/07 | Regras #7 + #21 + #25 — RBAC nos services: coleta, financeiro (baixar), compras (solicitar) | ✅ Corrigido | 4 services + 3 conftests + 3 testes |
+| 28/07 | 🔴 `financeiro_contas.py` — `FinanceiroError` não capturado na aba pagar | ✅ Corrigido | `pages/financeiro_contas.py` |
+| 28/07 | Regra #8 — Código de barras já exibido na UI da coleta (já estava implementado) | ✅ Confirmado | `pages/atendimento_coleta.py` |
+| 28/07 | Regra #10 — Auditoria corporativa em despacho e recebimento de malotes | ✅ Corrigido | `src/logistica/malote/service.py`, `recebimento/service.py` |
 
 ---
 
@@ -406,9 +409,9 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | Indicador | Valor |
 |-----------|-------|
 | Regras de negócio totais (Template) | 37 |
-| Regras **totalmente cobertas** ✅ | 22 (59%) |
-| Regras **parcialmente cobertas** ⚠️ | 10 (27%) |
-| Regras **não cobertas** ❌ | 5 (14%) |
+| Regras **totalmente cobertas** ✅ | 30 (81%) |
+| Regras **parcialmente cobertas** ⚠️ | 5 (14%) |
+| Regras **não cobertas** ❌ | 2 (5%) |
 | Bugs críticos | 4 (1 resolvido, 3 pendentes) |
 | Bugs médios | 8 (2 resolvidos, 6 pendentes) |
 | Bugs menores | 4 (3 resolvidos, 1 pendente) |
@@ -420,7 +423,7 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | Histórias de cancelamento da OS | 12/12 (100%) ✅ |
 | **Total de testes passando** | **93/93** ✅ |
 
-### Nota geral: 8.5/10 (após correções)
+### Nota geral: 9.0/10 (após 2 sessões de correções)
 
 O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são:
 
@@ -452,8 +455,9 @@ O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são
 3. ~~Apenas gestores cancelam OS~~ ✅ Corrigido (regra #30)
 4. ~~Validar formato TUSS~~ ✅ Corrigido (regras #4 + #17)
 5. ~~Autorização de convênio~~ ✅ Corrigido (regra #6)
-7. **RBAC nos services** — coleta (#7), financeiro (#21), compras (#25)
-8. **Pré-auditoria de guias TISS** (F1/F2) — funcionalidade crítica do módulo de faturamento
+6. ~~Auditoria nos malotes~~ ✅ Corrigido (regra #10)
+7. **Auditoria para CRUDs de cadastro** (Regra #31) — 46% das operações sem trilha de auditoria
+8. **Pré-auditoria de guias TISS** (F1/F2) — funcionalidade crítica
 
 ---
 
