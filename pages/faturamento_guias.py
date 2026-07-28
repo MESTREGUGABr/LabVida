@@ -12,6 +12,7 @@ from src.faturamento.lote_faturamento.service import (
     fechar_lote,
     listar_laudos_pendentes_por_convenio,
     listar_lotes,
+    validar_lote,
 )
 from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import (
@@ -197,14 +198,44 @@ def _render_fechar_lote(lote) -> None:
         f"Ao fechar, sera gerado um titulo a receber de "
         f"**R$ {lote.valor_total:.2f}** com vencimento em **{venc.strftime('%d/%m/%Y')}**."
     )
-    if st.button("Finalizar Faturamento", type="primary", key=f"fechar_{lote.id}"):
-        try:
-            with session_scope() as session:
-                fechar_lote(session, lote.id, usuario_id_logado())
-            st.toast(f"Lote {lote.codigo_lote} fechado! Titulo a receber gerado.")
-            st.rerun()
-        except FaturamentoError as e:
-            st.error(str(e))
+
+    resultado_key = f"validacao_{lote.id}"
+    aprovado = st.session_state.get(resultado_key, False)
+
+    c_val, c_fech = st.columns([1, 1])
+    with c_val:
+        if st.button("Validar lote", type="secondary", key=f"validar_{lote.id}"):
+            try:
+                with session_scope() as session:
+                    resultado = validar_lote(session, lote.id)
+                if resultado["ok"]:
+                    st.session_state[resultado_key] = True
+                    st.toast("Pré-auditoria aprovada! O lote pode ser fechado.")
+                else:
+                    st.session_state[resultado_key] = False
+                    st.session_state[f"problemas_{lote.id}"] = resultado["problemas"]
+                st.rerun()
+            except FaturamentoError as e:
+                st.error(str(e))
+
+    problemas = st.session_state.get(f"problemas_{lote.id}")
+    if problemas:
+        for p in problemas:
+            st.error(p)
+        st.caption("Corrija os problemas antes de fechar o lote.")
+
+    with c_fech:
+        fechar_label = "Finalizar Faturamento" if aprovado else "Finalizar Faturamento (valide primeiro)"
+        if st.button(fechar_label, type="primary", key=f"fechar_{lote.id}", disabled=not aprovado):
+            try:
+                with session_scope() as session:
+                    fechar_lote(session, lote.id, usuario_id_logado())
+                st.session_state.pop(resultado_key, None)
+                st.session_state.pop(f"problemas_{lote.id}", None)
+                st.toast(f"Lote {lote.codigo_lote} fechado! Titulo a receber gerado.")
+                st.rerun()
+            except FaturamentoError as e:
+                st.error(str(e))
 
 
 def _render_historico(lotes, todos_convenios) -> None:

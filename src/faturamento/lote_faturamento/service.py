@@ -22,6 +22,7 @@ from src.faturamento.lote_faturamento.errors import (
     LaudoNaoLiberado,
     LoteJaFechado,
     LoteNaoEncontrado,
+    LoteReprovadoPreAuditoria,
     LoteSemItens,
     ValorFaturadoInvalido,
 )
@@ -92,6 +93,43 @@ def adicionar_guia_item(session: Session, lote_id: UUID, dto: GuiaItemCreate) ->
     return LoteFaturamentoRead.model_validate(lote)
 
 
+def validar_lote(session: Session, lote_id: UUID) -> dict:
+    """Pré-auditoria: valida todos os itens do lote antes do fechamento.
+    
+    Retorna {"ok": True/False, "problemas": [msg, ...]}.
+    """
+    from src.cadastro.procedimento.models import Procedimento
+
+    lote = repository.obter_lote_por_id(session, lote_id)
+    if lote is None:
+        raise LoteNaoEncontrado("Lote de faturamento não encontrado")
+
+    problemas = []
+    for guia in lote.guias:
+        for item in guia.itens:
+            prefixo = f"Guia {guia.codigo_tiss or guia.id}"
+
+            procedimento = session.get(Procedimento, item.procedimento_id)
+            codigo_tuss = procedimento.codigo_tuss if procedimento else "?"
+            if len(codigo_tuss) != 8 or not codigo_tuss.isdigit():
+                problemas.append(
+                    f"{prefixo}: código TUSS '{codigo_tuss}' inválido (deve ter 8 dígitos)"
+                )
+
+            if item.valor_faturado <= 0:
+                problemas.append(
+                    f"{prefixo}: valor faturado R$ {item.valor_faturado:.2f} inválido"
+                )
+
+            laudo = session.get(Laudo, item.laudo_id)
+            if laudo is None or laudo.status != StatusLaudo.LIBERADO:
+                problemas.append(
+                    f"{prefixo}: laudo não está mais liberado"
+                )
+
+    return {"ok": len(problemas) == 0, "problemas": problemas}
+
+
 def fechar_lote(session: Session, lote_id: UUID, usuario_id: UUID | None = None) -> LoteFaturamentoRead:
     lote = repository.obter_lote_por_id(session, lote_id)
     if lote is None:
@@ -102,6 +140,12 @@ def fechar_lote(session: Session, lote_id: UUID, usuario_id: UUID | None = None)
     tem_itens = any(len(g.itens) > 0 for g in lote.guias)
     if not tem_itens:
         raise LoteSemItens("Não é possível fechar um lote sem itens faturados")
+
+    resultado = validar_lote(session, lote_id)
+    if not resultado["ok"]:
+        raise LoteReprovadoPreAuditoria(
+            "Pré-auditoria reprovada:\n" + "\n".join(f"  - {p}" for p in resultado["problemas"])
+        )
 
     lote.status = StatusLote.FECHADO
     lote.fechado_em = _agora()
