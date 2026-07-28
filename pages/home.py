@@ -142,7 +142,6 @@ def _renderizar_os_recentes() -> None:
     renderizar_secao(
         titulo=f"{ICONE_OS} Ultimas Ordens de Servico",
         descricao="Ordens de Servico abertas recentemente no laboratorio",
-        rotulo_acao="Nova OS",
     )
 
     with session_scope() as session:
