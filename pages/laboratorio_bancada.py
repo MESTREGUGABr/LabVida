@@ -107,7 +107,8 @@ def _render_resultados(amostra, item, equipamentos) -> None:
     else:
         st.info("Nenhum resultado lançado para este exame.")
 
-    with st.expander("Registrar resultado", expanded=not resultados):
+    with st.container(border=True):
+        st.markdown("**+ Registrar resultado**")
         _render_novo_resultado(item, equipamentos)
 
 

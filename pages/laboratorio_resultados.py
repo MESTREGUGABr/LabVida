@@ -81,11 +81,10 @@ def main() -> None:
             for res in resultados_existentes:
                 status_label = res.status.value
                 status_type = "success" if res.status == StatusResultado.REVISADO else "warning"
-                with st.expander(
-                    f"{res.analito} — {res.valor} ({status_label})"
-                ):
+                with st.container(border=True):
                     col_info, col_status = st.columns([3, 1])
                     with col_info:
+                        st.markdown(f"**+ {res.analito} — {res.valor}**")
                         st.caption(f"Ultima alteracao: {res.importado_em.strftime('%d/%m/%Y %H:%M')}")
                     with col_status:
                         renderizar_status_badge(status_label, status_type)
