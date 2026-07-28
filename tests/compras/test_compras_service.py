@@ -8,6 +8,7 @@ from src.compras.insumo.dtos import InsumoCreate
 from src.compras.insumo.service import criar_insumo, listar_insumos
 from src.compras.pedido_compra.dtos import PedidoItemCreate, SolicitacaoCreate
 from src.compras.pedido_compra.errors import (
+    PedidoError,
     PedidoNaoPodeSerAprovado,
     PedidoNaoPodeSerCancelado,
     PedidoNaoPodeSerRecebido,
@@ -130,3 +131,29 @@ def test_nao_pode_cancelar_aprovado(session: Session) -> None:
 
     with pytest.raises(PedidoNaoPodeSerCancelado):
         cancelar_pedido(session, pedido.id)
+
+
+def test_criar_solicitacao_rejeita_sem_permissao(session: Session) -> None:
+    from src.rbac.models import Perfil
+    from src.usuario.service import sincronizar_usuario as sync
+
+    forn_id, insumo_id, _ = _montar_base(session)
+
+    perfil = Perfil(nome="compras_test", descricao="Sem compras")
+    session.add(perfil)
+    session.flush()
+
+    usuario_sem = sync(session, "semcompras@labvida.test", "Sem Compras")
+    usuario_sem.perfil_id = perfil.id
+    session.flush()
+
+    dto = SolicitacaoCreate(
+        fornecedor_id=forn_id,
+        itens=[PedidoItemCreate(insumo_material_id=insumo_id, quantidade=1, valor_unitario=10.0)],
+    )
+
+    with pytest.raises(PedidoError, match="sem permissão"):
+        criar_solicitacao(session, dto, usuario_sem.id)
+
+    session.query(Perfil).filter_by(id=perfil.id).delete()
+    session.flush()

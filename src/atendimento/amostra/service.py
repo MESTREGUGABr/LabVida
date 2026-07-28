@@ -39,6 +39,13 @@ def registrar_coleta(session: Session, dto: ColetaCreate) -> AmostraRead:
     if coletor is None or not coletor.ativo:
         raise ColetorInvalido("Coletor inválido ou inativo")
 
+    from sqlalchemy import select
+    from src.rbac.models import Perfil
+    from src.rbac.repository import usuario_tem_permissao
+    if session.scalar(select(Perfil.id).limit(1)) is not None:
+        if not usuario_tem_permissao(session, coletor.id, "atendimento:coletar"):
+            raise ColetorInvalido("Coletor sem permissão para registrar coleta")
+
     amostra = Amostra(
         ordem_servico_id=ordem.id,
         codigo_barras=_gerar_codigo_barras(session),

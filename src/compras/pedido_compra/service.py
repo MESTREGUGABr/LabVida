@@ -38,6 +38,14 @@ def criar_solicitacao(session: Session, dto: SolicitacaoCreate, usuario_id: UUID
     if not dto.itens:
         raise SolicitacaoSemItens("Pedido deve conter ao menos um item")
 
+    from sqlalchemy import select
+    from src.rbac.models import Perfil
+    from src.rbac.repository import usuario_tem_permissao
+    if session.scalar(select(Perfil.id).limit(1)) is not None:
+        if not usuario_tem_permissao(session, usuario_id, "compras:solicitar"):
+            from src.compras.pedido_compra.errors import PedidoError
+            raise PedidoError("Usuário sem permissão para criar solicitação de compra")
+
     fornecedor = fornecedor_repository.obter_por_id(session, dto.fornecedor_id)
     if fornecedor is None:
         raise FornecedorNaoEncontrado("Fornecedor não encontrado")

@@ -201,7 +201,7 @@ def _render_pagar() -> None:
                             st.toast(f"Título de R$ {t.valor:.2f} pago com sucesso!")
                             st.session_state.pop(f"form_pagar_{t.id}", None)
                             st.rerun()
-                        except (TituloPagarNaoEncontrado, TituloPagarJaBaixado) as e:
+                        except (TituloPagarNaoEncontrado, TituloPagarJaBaixado, FinanceiroError) as e:
                             st.error(str(e))
                 with c_cancel:
                     if st.button("Cancelar", key=f"cancel_pag_{t.id}"):

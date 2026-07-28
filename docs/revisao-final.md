@@ -176,6 +176,7 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | 28/07 | Regra #30 — RBAC no cancelamento: só gestores com `atendimento:cancelar_os` podem cancelar OS/itens | ✅ Corrigido | `src/seeder/rbac.py`, `src/atendimento/ordem_servico/service.py`, `tests/atendimento/` |
 | 28/07 | Regra #6 — Autorização de convênio: cria PENDENTE no `abrir_os` e bloqueia `registrar_coleta` sem VALIDA | ✅ Corrigido | `src/atendimento/ordem_servico/service.py`, `amostra/service.py`, `tests/atendimento/` |
 | 28/07 | UX cancelamento — botões ocultos para usuários sem `atendimento:cancelar_os` | ✅ Corrigido | `pages/atendimento_os.py` |
+| 28/07 | Regras #7 + #21 + #25 — RBAC nos services: coleta, financeiro (baixar), compras (solicitar) | ✅ Corrigido | 4 services + 3 conftests + 3 testes |
 
 ---
 
