@@ -277,9 +277,8 @@ def test_nao_libera_laudo_sem_resultados(session: Session) -> None:
             usuario_id=usuario.id,
         )
 
-    session.rollback()
-    session.refresh(laudo)
     assert laudo.status == StatusLaudo.RASCUNHO
+    session.rollback()
 
 
 def test_nao_libera_laudo_com_resultado_nao_revisado(session: Session) -> None:
@@ -301,9 +300,8 @@ def test_nao_libera_laudo_com_resultado_nao_revisado(session: Session) -> None:
             usuario_id=usuario.id,
         )
 
-    session.rollback()
-    session.refresh(laudo)
     assert laudo.status == StatusLaudo.RASCUNHO
+    session.rollback()
 
 
 def test_nao_libera_laudo_com_medico_nao_responsavel_tecnico(session: Session) -> None:
@@ -319,9 +317,8 @@ def test_nao_libera_laudo_com_medico_nao_responsavel_tecnico(session: Session) -
             usuario_id=usuario.id,
         )
 
-    session.rollback()
-    session.refresh(laudo)
     assert laudo.status == StatusLaudo.RASCUNHO
+    session.rollback()
 
 
 def test_nao_libera_laudo_com_medico_inativo(session: Session) -> None:
@@ -335,9 +332,8 @@ def test_nao_libera_laudo_com_medico_inativo(session: Session) -> None:
             usuario_id=usuario.id,
         )
 
-    session.rollback()
-    session.refresh(laudo)
     assert laudo.status == StatusLaudo.RASCUNHO
+    session.rollback()
 
 
 def test_laudo_liberado_nao_pode_ser_alterado(session: Session) -> None:

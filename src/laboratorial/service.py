@@ -193,7 +193,7 @@ class LaboratorialService:
             responsavel_tecnico_id=dto.responsavel_tecnico_id,
         )
         laudo = self.repository.save_laudo(laudo)
-        self.repository.session.commit()
+        self.repository.session.flush()
         self.repository.session.refresh(laudo)
         return laudo
 
@@ -258,7 +258,7 @@ class LaboratorialService:
             )
 
         laudo = self.repository.save_laudo(laudo)
-        self.repository.session.commit()
+        self.repository.session.flush()
         self.repository.session.refresh(laudo)
         return laudo
 

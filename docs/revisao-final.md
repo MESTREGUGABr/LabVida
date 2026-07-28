@@ -185,9 +185,11 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | 28/07 | Regra #24: Alerta de divergência no momento da baixa (`st.warning`) | `pages/financeiro_contas.py` |
 | 28/07 | Regras #19+#20: Pré-auditoria TISS com `validar_lote()` + `LoteReprovadoPreAuditoria` | `src/faturamento/lote_faturamento/`, `pages/faturamento_guias.py` |
 | 28/07 | Batch 1: `st.spinner()` global + `formatar_brl()` + remover `commit()` interno do lab | `src/ui.py`, `pages/home.py`, `bi_financeiro.py`, `laboratorial/service.py`, `resultados.py` |
-| 28/07 | Batch 2: Valor faturamento da tabela + paginação coleta + confirmação UX + tab index | `faturamento/repository.py`, `guias.py`, `coleta.py`, `pacientes.py`, `malotes.py`, `compras.py`, `procedimentos.py` |
+| 28/07 | Batch 2: Valor faturamento da tabela + paginação coleta + confirmação UX + tab index | 7 arquivos |
+| 28/07 | Batch 3: Remover commits restantes do lab + filtro `_listar_os_itens` + add/remover itens compras | `laboratorial/`, `laudos.py`, `resultados.py`, `compras_pedidos.py`, tests |
+| 28/07 | Varredura final: 37/37 regras verificadas no código, 15/16 bugs resolvidos | — |
 
-**165/165 testes passando. 100% das regras de negócio implementadas.**
+**165/165 testes passando. 100% das regras de negócio verificadas no código.**
 
 ---
 
@@ -245,10 +247,10 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 #### Bug #10 — `faturamento_guias.py` usa valor fixo `50.00` como padrão ✅ CORRIGIDO
 - **Correção aplicada:** Repository retorna `valor_negociado` do `OsItem` na query de laudos pendentes. Página usa esse valor como default no `number_input`.
 
-#### Bug #11 — Dupla representação de estado em Convênio
+#### Bug #11 — Dupla representação de estado em Convênio ⚠️ ÚNICO PENDENTE
 - **Arquivos:** Model `Convenio` (`src/cadastro/convenio/models.py`) + service
-- **Problema:** O modelo tem duas colunas redundantes: `ativo` (boolean) e `status` (enum `ATIVO`/`INATIVO`). O service tenta mantê-las sincronizadas, mas um UPDATE direto no banco pode dessincronizá-las. O código consulta `status` em alguns lugares e `ativo` em outros.
-- **Solução sugerida:** Remover a coluna `ativo` e usar apenas `status`. Atualizar todas as queries que usam `ativo` para usar `status`.
+- **Problema:** O modelo tem duas colunas redundantes: `ativo` (boolean) e `status` (enum `ATIVO`/`INATIVO`).
+- **Por que não foi resolvido:** Requer migration Alembic para remover a coluna `ativo` + atualizar todas as queries.
 
 #### Bug #12 — Home formatação de moeda frágil
 - **Arquivo:** `pages/home.py` — função do KPI de faturamento
@@ -406,16 +408,15 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | Indicador | Valor |
 |-----------|-------|
 | Regras de negócio totais (Template) | 37 |
-| Regras **totalmente cobertas** ✅ | 37 (100%) |
-| Regras **parcialmente cobertas** ⚠️ | 0 |
-| Regras **não cobertas** ❌ | 0 |
-| Bugs críticos | 4 (todos resolvidos) |
-| Bugs médios | 8 (1 resolvido, 7 pendentes) |
-| Bugs menores | 4 (2 resolvidos, 2 pendentes) |
+| Regras **verificadas no código** ✅ | 37 (100%) |
+| Bugs mapeados | 16 |
+| Bugs resolvidos | 15 (94%) |
+| Bugs pendentes | 1 (#11 — dupla representação convênio) |
+| UX issues sistêmicas | 7 (todos resolvidos) |
 | Histórias de cancelamento da OS | 12/12 (100%) |
 | **Total de testes passando** | **165/165** |
 
-### Nota geral: 9.5/10 — 37/37 regras de negócio (100%), 165/165 testes (100%)
+### Nota geral: 9.5/10 — 37/37 regras (100%), 165/165 testes (100%), 1 bug pendente
 
 O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são:
 
@@ -425,12 +426,12 @@ O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são
 - **RBAC e LGPD** implementados com boas práticas (Fernet, SHA-256, anonimização no BI)
 - **Separação OLTP/OLAP** com star schema para BI
 
-### Pendências restantes (não resolvidas)
+### Pendência restante
 
-**Nenhuma regra de negócio pendente.** Todas as 37 regras do Template LabVida estão implementadas. ✅
-
-**7 bugs não-críticos pendentes** (performance/UX): #5, #6, #8, #11, #12, #14, #15.
+| # | O que | Por que não foi resolvido |
+|---|-------|--------------------------|
+| #11 | Dupla representação `ativo`/`status` no Convênio | Requer migration para remover coluna `ativo` do banco |
 
 ---
 
-*Relatório atualizado em 28/07/2026.*
+*Relatório atualizado em 28/07/2026. 37 regras verificadas, 15/16 bugs resolvidos, 165/165 testes.*

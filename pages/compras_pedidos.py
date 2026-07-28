@@ -57,9 +57,11 @@ def _render_novo_pedido() -> None:
     st.write("**Itens do Pedido**")
     insumo_opcoes = {i.nome: i.id for i in insumos}
 
-    num_itens = st.number_input("Qtd de itens", 1, 10, 1, key="num_itens")
+    if "itens_count" not in st.session_state:
+        st.session_state["itens_count"] = 1
+
     itens = []
-    for idx in range(num_itens):
+    for idx in range(st.session_state["itens_count"]):
         col_a, col_b, col_c = st.columns([3, 1, 1])
         with col_a:
             insumo_label = st.selectbox(f"Insumo", options=list(insumo_opcoes.keys()), key=f"insumo_{idx}")
@@ -72,6 +74,15 @@ def _render_novo_pedido() -> None:
             quantidade=qtd,
             valor_unitario=valor,
         ))
+
+    col_add, col_del = st.columns(2)
+    if col_add.button("+ Adicionar item"):
+        st.session_state["itens_count"] += 1
+        st.rerun()
+    if col_del.button("- Remover último"):
+        if st.session_state["itens_count"] > 1:
+            st.session_state["itens_count"] -= 1
+            st.rerun()
 
     if st.button("Criar Pedido (Rascunho)", type="primary"):
         try:
