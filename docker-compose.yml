@@ -3,6 +3,7 @@ services:
     build: .
     command: >
       sh -c "alembic upgrade head &&
+      python -m src.seeder &&
       streamlit run app.py --server.address=0.0.0.0 --server.port=8501"
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://labvida:labvida@postgres:5432/labvida}
