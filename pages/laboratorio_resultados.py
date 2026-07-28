@@ -1,5 +1,3 @@
-import time
-
 import streamlit as st
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -44,7 +42,7 @@ def main() -> None:
             return
 
         opcoes_itens = {
-            f"OS {item.ordem_servico.id} - Proc {item.procedimento.nome}": item
+            f"{item.ordem_servico.codigo_os} — {item.procedimento.nome}": item
             for item in itens
             if item.ordem_servico
         }
@@ -106,7 +104,6 @@ def main() -> None:
                                     ),
                                 )
                                 st.toast("Resultado atualizado!", icon="\u2705")
-                                time.sleep(0.5)
                                 st.rerun()
                             except ValueError as e:
                                 st.error(str(e))
@@ -158,7 +155,6 @@ def main() -> None:
                             )
                         )
                         st.toast("Resultado inserido com sucesso!", icon="\u2705")
-                        time.sleep(0.5)
                         st.rerun()
                     except ValueError as e:
                         st.error(str(e))

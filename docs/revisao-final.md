@@ -165,8 +165,11 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | Data | Bug/Issue | Status | Arquivo |
 |------|-----------|--------|---------|
 | 27/07 | Bug #4 / I1 — `alembic/env.py` sem imports de `rbac`, `auditoria`, `bi` | ✅ Corrigido | `alembic/env.py` |
-| 27/07 | Bug #2 — `ConvenioService` duplicado e versão em produção incompleta | ✅ Corrigido | `src/cadastro/convenio/service.py`, `dtos.py`, imports |
+| 27/07 | Bug #2 — `ConvenioService` duplicado e versão em produção incompleta | ✅ Corrigido | `src/cadastro/convenio/service.py`, `dtos.py`, page |
 | 27/07 | UX `cadastro_convenios.py` — erro não tratado + campos novos do DTO | ✅ Corrigido | `pages/cadastro_convenios.py` |
+| 27/07 | Bug #3 — Botão Liberar Laudo desabilitar com resultados não revisados | ✅ Corrigido | `pages/laboratorio_laudos.py` |
+| 27/07 | Bug #16 — `time.sleep()` artificiais nos laudos | ✅ Corrigido | `pages/laboratorio_laudos.py` |
+| 27/07 | Bug #13 — UUIDs expostos na UI (laudos + resultados) + `time.sleep` restante | ✅ Corrigido | `pages/laboratorio_laudos.py`, `pages/laboratorio_resultados.py` |
 
 ---
 
@@ -224,10 +227,10 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 - **Problema:** A query `select(OsItem)` retorna todos os itens de todas as OS. Sem paginação, sem filtro. Vai quebrar com volume real.
 - **Solução sugerida:** Adicionar filtro (ex: apenas itens de OS com status `EM_ANALISE` e amostras `RECEBIDA`) e paginação.
 
-#### Bug #9 — `laboratorio_laudos.py` mostra aviso mas não bloqueia botão de liberação
+#### Bug #9 — `laboratorio_laudos.py` mostra aviso mas não bloqueia botão de liberação ✅ CORRIGIDO
 - **Arquivo:** `pages/laboratorio_laudos.py`
 - **Problema:** O aviso "Nem todos os resultados foram digitados e REVISADOS" é exibido na tela, mas o botão "Salvar e LIBERAR Laudo" continua visível e funcional. O service bloqueia corretamente (lança `ValueError`), então o laudo não é liberado. Mas o UX é enganoso — o usuário clica, vê erro, e não entende por que o botão estava disponível.
-- **Solução sugerida:** Desabilitar o botão de liberação (`disabled=True`) quando houver resultados não revisados.
+- **Correção aplicada:** Adicionado `disabled=not todos_revisados` ao botão. Agora o botão fica cinza e não-clicável enquanto houver resultados pendentes de revisão ou sem resultados.
 
 #### Bug #10 — `faturamento_guias.py` usa valor fixo `50.00` como padrão
 - **Arquivo:** `pages/faturamento_guias.py`
@@ -246,10 +249,9 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 
 ### 4.3 Menores
 
-#### Bug #13 — UUIDs expostos na UI
-- **Arquivo:** `pages/laboratorio_laudos.py` — função `_listar_os_itens()`
-- **Problema:** O selectbox mostra `f"OS {item.ordem_servico.id}"` — expondo UUIDs brutos (ex: `a1b2c3d4-...`) em vez do `codigo_os` legível.
-- **Solução sugerida:** Usar `item.ordem_servico.codigo_os` no label.
+#### Bug #13 — UUIDs expostos na UI ✅ CORRIGIDO
+- **Arquivos:** `pages/laboratorio_laudos.py` (linha 45), `pages/laboratorio_resultados.py` (linha 47)
+- **Correção aplicada:** Substituído `item.ordem_servico.id` por `item.ordem_servico.codigo_os` nos selectboxes. Agora o usuário vê `"OS-2026-a3f2c1 — Hemograma"` em vez de `"OS a1b2c3d4-... — Proc Hemograma"`. Também removidos `time.sleep(0.5)` restantes no `laboratorio_resultados.py` (Bug #16).
 
 #### Bug #14 — Formatação de moeda inconsistente (US vs BR)
 - **Arquivos:** `pages/bi_financeiro.py`, `pages/bi_logistica.py`, `pages/home.py`
@@ -261,12 +263,10 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 - **Problema:** O `st.number_input("Qtd de itens")` reconstrói todas as linhas de itens ao ser alterado. Dados já preenchidos nas linhas existentes são perdidos silenciosamente.
 - **Solução sugerida:** Usar botão "Adicionar item" individual em vez de definir quantidade fixa, ou salvar estado em `st.session_state`.
 
-#### Bug #16 — `time.sleep()` artificiais no código
+#### Bug #16 — `time.sleep()` artificiais no código ✅ CORRIGIDO
 - **Arquivos:**
-  - `pages/laboratorio_laudos.py` — `time.sleep(2.5)` após criar rascunho
-  - `pages/laboratorio_resultados.py` — `time.sleep(0.5)` após salvar
-- **Problema:** Workarounds para problemas de timing do Streamlit. Não são necessários e degradam a experiência.
-- **Solução sugerida:** Usar `st.toast()` ou `st.rerun()` diretamente, sem sleep.
+  - `pages/laboratorio_laudos.py` — `time.sleep(2.5)` após criar rascunho e `time.sleep(0.5)` após liberar
+- **Correção aplicada:** Removidos ambos os `time.sleep()`. O Streamlit >=1.36 mantém `st.toast()` no canto inferior durante `st.rerun()`. Padrão já usado com sucesso em `faturamento_glosas.py`, `financeiro_contas.py` e `compras_pedidos.py` sem sleep.
 
 ---
 

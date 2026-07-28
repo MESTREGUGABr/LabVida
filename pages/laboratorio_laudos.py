@@ -1,5 +1,3 @@
-import time
-
 import streamlit as st
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -44,7 +42,7 @@ def main() -> None:
 
         service = LaboratorialService(session)
         opcoes_itens = {
-            f"OS {item.ordem_servico.id} - Proc {item.procedimento.nome}": item
+            f"{item.ordem_servico.codigo_os} — {item.procedimento.nome}": item
             for item in itens
             if item.ordem_servico
             and (
@@ -106,7 +104,6 @@ def main() -> None:
                     try:
                         service.criar_laudo(LaudoCreate(os_item_id=item_selecionado.id))
                         st.toast("Laudo criado como Rascunho.", icon="\u2705")
-                        time.sleep(2.5)
                         st.rerun()
                     except ValueError as e:
                         st.error(str(e))
@@ -151,7 +148,7 @@ def main() -> None:
             with col2:
                 assinatura = st.text_input("Assinatura Digital (Hash/Chave)")
 
-            if st.button("Salvar e LIBERAR Laudo", type="primary", width="stretch"):
+            if st.button("Salvar e LIBERAR Laudo", type="primary", width="stretch", disabled=not todos_revisados):
                 try:
                     service.atualizar_laudo(
                         laudo.id,
@@ -163,7 +160,6 @@ def main() -> None:
                         usuario_id=ctx["usuario_id"],
                     )
                     st.toast("Laudo LIBERADO com sucesso!", icon="\u2705")
-                    time.sleep(0.5)
                     st.rerun()
                 except ValueError as e:
                     st.error(str(e))
