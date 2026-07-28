@@ -60,7 +60,7 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 | 1 | Não permitir cadastro duplicado de paciente (CPF único) | ✅ | `src/cadastro/service.py` + model `cpf_hash` com unique index | `CpfPacienteDuplicado` no service. SHA-256 hash para busca. |
 | 2 | Dados sensíveis do paciente criptografados (LGPD) | ✅ | Model `Paciente` — property setter de `cpf` aplica Fernet + SHA-256 | Transparente para o service, implementado em nível de model. |
 | 3 | Convênios ativos para uso em OS | ✅ | `src/atendimento/ordem_servico/service.py:abrir_os()` | Valida `convenio.status == StatusConvenio.ATIVO`. |
-| 4 | Procedimentos com código TUSS/TISS válido | ⚠️ | `src/cadastro/procedimento/service.py` | Apenas verifica **unicidade** do código. **Não valida formato** (ex: 8 dígitos numéricos, checksum TUSS real). |
+| 4 | Procedimentos com código TUSS/TISS válido | ✅ | `src/cadastro/procedimento/dtos.py:_codigo_tuss()` | Valida exatamente 8 dígitos numéricos. |
 
 ### 2.2 Atendimento e Coleta
 
@@ -93,7 +93,7 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 
 | # | Regra | Status | Onde validar | Detalhes |
 |---|-------|--------|-------------|----------|
-| 17 | Não permitir envio de guia sem código TUSS/TISS válido | ⚠️ | `src/faturamento/lote_faturamento/service.py` | Guia vinculada a `laudo.os_item.procedimento.codigo_tuss`. Mas **não há validação explícita** do código TUSS no momento de `adicionar_guia_item`. |
+| 17 | Não permitir envio de guia sem código TUSS/TISS válido | ✅ | FK `guia_item.procedimento_id` → validado na criação | Procedimento é validado com 8 dígitos na criação (#4); FK garante integridade. |
 | 18 | Não permitir faturamento de OS sem laudo liberado | ✅ | `adicionar_guia_item()` | Valida `laudo.status == LIBERADO` antes de criar `GuiaItem`. |
 | 19 | Guias devem passar por pré-auditoria antes do fechamento do lote | ❌ | — | **Não implementado.** `fechar_lote()` fecha imediatamente. Não há etapa intermediária de pré-auditoria. |
 | 20 | Itens com inconsistência devem ser bloqueados até correção | ❌ | — | **Não implementado.** Não há mecanismo de sinalização ou bloqueio de itens inconsistentes no lote. |
@@ -174,6 +174,7 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | 27/07 | 🔴 `desvincular_usuario_do_perfil` concedia acesso total (shell tratava `perfil_id=None` como bootstrap) | ✅ Corrigido | `src/ui.py`, `tests/rbac/`, `tests/test_app.py` |
 | 27/07 | Regras #9 + #13 — `registrar_resultado` agora bloqueia se amostra não recebida | ✅ Corrigido | `src/laboratorial/service.py`, `tests/laboratorial/` |
 | 28/07 | Regra #30 — RBAC no cancelamento: só gestores com `atendimento:cancelar_os` podem cancelar OS/itens | ✅ Corrigido | `src/seeder/rbac.py`, `src/atendimento/ordem_servico/service.py`, `tests/atendimento/` |
+| 28/07 | Regras #4 + #17 — Validação de formato TUSS (8 dígitos exatos) | ✅ Corrigido | `src/cadastro/procedimento/dtos.py`, `tests/cadastro/test_cadastros_extra.py` |
 
 ---
 

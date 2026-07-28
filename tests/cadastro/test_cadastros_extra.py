@@ -2,6 +2,7 @@ from collections.abc import Iterator
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -38,6 +39,16 @@ def test_procedimento_rejeita_tuss_duplicado(session: Session) -> None:
 
     with pytest.raises(CodigoTussDuplicado):
         criar_procedimento(session, ProcedimentoCreate(codigo_tuss="40302016", nome="Outro"))
+
+
+def test_procedimento_rejeita_tuss_com_formato_invalido(session: Session) -> None:
+    with pytest.raises(ValidationError):
+        criar_procedimento(session, ProcedimentoCreate(codigo_tuss="1234", nome="Invalido"))
+
+
+def test_procedimento_aceita_tuss_com_8_digitos(session: Session) -> None:
+    proc = criar_procedimento(session, ProcedimentoCreate(codigo_tuss="40302016", nome="Hemograma"))
+    assert proc.codigo_tuss == "40302016"
 
 
 def test_medico_rejeita_crm_uf_duplicado(session: Session) -> None:

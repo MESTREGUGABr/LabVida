@@ -15,8 +15,8 @@ class ProcedimentoCreate(BaseModel):
     @classmethod
     def _codigo_tuss(cls, codigo_tuss: str) -> str:
         codigo = re.sub(r"\D", "", codigo_tuss)
-        if not (4 <= len(codigo) <= 10):
-            raise ValueError("Código TUSS inválido")
+        if len(codigo) != 8:
+            raise ValueError("Código TUSS deve ter 8 dígitos")
         return codigo
 
     @field_validator("nome")
