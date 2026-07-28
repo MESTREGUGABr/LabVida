@@ -4,9 +4,9 @@ from dataclasses import dataclass, field
 from faker import Faker
 from sqlalchemy import select
 
-from src.cadastro.dtos import ConvenioCreate
+from src.cadastro.convenio.dtos import ConvenioCreate
 from src.cadastro.models import Convenio
-from src.cadastro.service import criar_convenio
+from src.cadastro.convenio.service import criar_convenio
 from src.db import session_scope
 
 

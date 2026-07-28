@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from src.cadastro.validators import normalizar_cnpj_convenio, normalizar_nome_convenio, normalizar_telefone_convenio
+
 
 class StatusConvenio(StrEnum):
     ATIVO = "ATIVO"
@@ -11,15 +13,30 @@ class StatusConvenio(StrEnum):
 
 class ConvenioCreate(BaseModel):
     nome: str
+    cnpj: str | None = None
+    telefone: str | None = None
+    email: str | None = None
     registro_ans: str | None = None
 
     @field_validator("nome")
     @classmethod
     def _nome(cls, nome: str) -> str:
-        nome_normalizado = " ".join(nome.strip().split())
-        if not (2 <= len(nome_normalizado) <= 120):
-            raise ValueError("Nome do Convênio inválido")
-        return nome_normalizado
+        return normalizar_nome_convenio(nome)
+
+    @field_validator("cnpj")
+    @classmethod
+    def _cnpj(cls, cnpj: str | None) -> str | None:
+        return normalizar_cnpj_convenio(cnpj) if cnpj else None
+
+    @field_validator("telefone")
+    @classmethod
+    def _telefone(cls, telefone: str | None) -> str | None:
+        return normalizar_telefone_convenio(telefone) if telefone else None
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, email: str | None) -> str | None:
+        return email.strip().lower() if email else None
 
     @field_validator("registro_ans")
     @classmethod
@@ -35,5 +52,37 @@ class ConvenioRead(BaseModel):
 
     id: UUID
     nome: str
+    cnpj: str | None = None
+    telefone: str | None = None
+    email: str | None = None
     registro_ans: str | None
     status: StatusConvenio
+    ativo: bool
+
+
+class ConvenioUpdate(BaseModel):
+    nome: str | None = None
+    cnpj: str | None = None
+    telefone: str | None = None
+    email: str | None = None
+    ativo: bool | None = None
+
+    @field_validator("nome")
+    @classmethod
+    def _nome(cls, nome: str | None) -> str | None:
+        return normalizar_nome_convenio(nome) if nome is not None else None
+
+    @field_validator("cnpj")
+    @classmethod
+    def _cnpj(cls, cnpj: str | None) -> str | None:
+        return normalizar_cnpj_convenio(cnpj) if cnpj else None
+
+    @field_validator("telefone")
+    @classmethod
+    def _telefone(cls, telefone: str | None) -> str | None:
+        return normalizar_telefone_convenio(telefone) if telefone else None
+
+    @field_validator("email")
+    @classmethod
+    def _email(cls, email: str | None) -> str | None:
+        return email.strip().lower() if email else None

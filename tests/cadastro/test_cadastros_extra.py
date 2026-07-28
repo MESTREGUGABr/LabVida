@@ -6,7 +6,8 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from src.cadastro.convenio.dtos import ConvenioCreate, StatusConvenio
-from src.cadastro.convenio.service import alternar_status, criar_convenio
+from src.cadastro.convenio.service import alternar_status, criar_convenio, listar_convenios, obter_convenio_por_id
+from src.cadastro.errors import NomeConvenioDuplicado
 from src.cadastro.medico.dtos import MedicoCreate
 from src.cadastro.medico.errors import CrmDuplicado
 from src.cadastro.medico.service import criar_medico
@@ -72,3 +73,54 @@ def test_setor_vinculado_a_unidade(session: Session) -> None:
 
     setores = listar_setores_ativos(session, unidade.id)
     assert [s.nome for s in setores] == ["Hematologia"]
+
+
+def test_convenio_criar_apenas_com_nome(session: Session) -> None:
+    convenio = criar_convenio(session, ConvenioCreate(nome="Amil"))
+
+    assert convenio.id
+    assert convenio.nome == "Amil"
+    assert convenio.status == StatusConvenio.ATIVO
+    assert convenio.cnpj is None
+    assert convenio.telefone is None
+    assert convenio.email is None
+
+
+def test_convenio_rejeita_nome_duplicado_case_diferente(session: Session) -> None:
+    criar_convenio(session, ConvenioCreate(nome="Bradesco Saúde"))
+
+    with pytest.raises(NomeConvenioDuplicado, match="Convênio já cadastrado com este nome"):
+        criar_convenio(session, ConvenioCreate(nome="  BRADESCO   SAÚDE  "))
+
+
+def test_convenio_criar_com_todos_os_campos(session: Session) -> None:
+    convenio = criar_convenio(
+        session,
+        ConvenioCreate(
+            nome="Unimed Recife",
+            cnpj="12.345.678/0001-95",
+            telefone="(87) 99999-1234",
+            email="financeiro@unimed.test",
+            registro_ans="123456",
+        ),
+    )
+
+    assert convenio.nome == "Unimed Recife"
+    assert convenio.cnpj == "12345678000195"
+    assert convenio.telefone == "87999991234"
+    assert convenio.email == "financeiro@unimed.test"
+    assert convenio.registro_ans == "123456"
+
+
+def test_convenio_read_campos_novos_com_valor_default(session: Session) -> None:
+    criar_convenio(session, ConvenioCreate(nome="SulAmérica"))
+
+    convenios = listar_convenios(session)
+    assert len(convenios) == 1
+
+    sulamerica = obter_convenio_por_id(session, convenios[0].id)
+    assert sulamerica.nome == "SulAmérica"
+    assert sulamerica.cnpj is None
+    assert sulamerica.telefone is None
+    assert sulamerica.email is None
+    assert sulamerica.ativo is True

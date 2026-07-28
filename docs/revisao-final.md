@@ -160,6 +160,16 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 
 ---
 
+## Correções aplicadas
+
+| Data | Bug/Issue | Status | Arquivo |
+|------|-----------|--------|---------|
+| 27/07 | Bug #4 / I1 — `alembic/env.py` sem imports de `rbac`, `auditoria`, `bi` | ✅ Corrigido | `alembic/env.py` |
+| 27/07 | Bug #2 — `ConvenioService` duplicado e versão em produção incompleta | ✅ Corrigido | `src/cadastro/convenio/service.py`, `dtos.py`, imports |
+| 27/07 | UX `cadastro_convenios.py` — erro não tratado + campos novos do DTO | ✅ Corrigido | `pages/cadastro_convenios.py` |
+
+---
+
 ## 4. Bugs de Código/Lógica
 
 ### 4.1 Críticos
@@ -170,12 +180,12 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 - **Regra violada:** Regra 13 (Laboratorial) — "Resultados só podem ser inseridos ou importados após recebimento logístico da amostra".
 - **Solução sugerida:** No service, antes de criar o `Resultado`, navegar `os_item → ordem_servico → amostras` e verificar se ao menos uma amostra do item está `RECEBIDA`. Levantar erro se não estiver.
 
-#### Bug #2 — `ConvenioService` duplicado e versão em produção é incompleta
+#### Bug #2 — `ConvenioService` duplicado e versão em produção é incompleta ✅ CORRIGIDO
 - **Arquivos:**
-  - `src/cadastro/service.py` (versão completa — com validação de unicidade de nome e CNPJ)
-  - `src/cadastro/convenio/service.py` (versão simplificada — sem validação de unicidade)
-- **Problema:** A página `cadastro_convenios.py` importa da versão simplificada (`from src.cadastro.convenio.service import *`), que não tem verificações de nome duplicado nem CNPJ duplicado. Já os testes (`tests/cadastro/test_convenio_service.py`) testam a versão completa. Resultado: **em produção, é possível cadastrar convênios com nome duplicado.**
-- **Solução sugerida:** Unificar as duas implementações. Manter apenas a versão completa em `src/cadastro/convenio/service.py` e remover os métodos de convênio de `src/cadastro/service.py`. Atualizar imports.
+  - `src/cadastro/convenio/service.py` — versão unificada com validações
+  - `src/cadastro/convenio/dtos.py` — DTO enriquecido com `cnpj`, `telefone`, `email`
+  - `src/cadastro/service.py` — métodos de Convênio removidos (mantém só Paciente)
+- **Correção aplicada:** Unificada a implementação em `src/cadastro/convenio/service.py` com validação de nome duplicado (casefold), CNPJ duplicado (se informado), `obter_convenio_por_id`, `inativar_convenio` e `atualizar_convenio`. DTO atualizado com suporte a `cnpj`, `telefone`, `email`. Consumidores atualizados. 51/51 testes passando.
 
 #### Bug #3 — `AutorizacaoConvenio` nunca utilizada
 - **Arquivos:**
@@ -185,15 +195,10 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 - **Regra violada:** Regra 6 (Atendimento) — "OS de convênio só pode ser aberta com autorização válida".
 - **Solução sugerida:** Integrar `AutorizacaoConvenio` no fluxo de `abrir_os()`: se a OS tem convênio, verificar se existe autorização com status `VALIDA` e data de validade não vencida.
 
-#### Bug #4 — `alembic/env.py` não importa modelos de RBAC, Auditoria e BI
+#### Bug #4 — `alembic/env.py` não importa modelos de RBAC, Auditoria e BI ✅ CORRIGIDO
 - **Arquivo:** `alembic/env.py`
 - **Problema:** Os modelos `src/rbac/models.py`, `src/auditoria/models.py` e `src/bi/models.py` **não são importados** no `env.py`. Isso significa que `alembic revision --autogenerate` nunca detectará mudanças nessas tabelas (`perfis`, `permissoes`, `perfil_permissao`, `auditoria_log`, `bi_dim_*`, `bi_fato_*`). Qualquer alteração futura nessas tabelas será ignorada ou precisará de migration manual.
-- **Solução sugerida:** Adicionar os imports no `alembic/env.py`:
-  ```python
-  import src.rbac.models        # noqa
-  import src.auditoria.models   # noqa
-  import src.bi.models          # noqa
-  ```
+- **Correção aplicada:** Adicionados os 3 imports no `alembic/env.py`. Agora `alembic revision --autogenerate` detecta mudanças em todas as tabelas do sistema.
 
 ### 4.2 Médios
 
@@ -380,7 +385,7 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 
 | # | Issue | Detalhe | Severidade |
 |---|-------|---------|------------|
-| I1 | `alembic/env.py` não importa `rbac`, `auditoria`, `bi` models | Autogenerate cego para tabelas de RBAC, auditoria e BI (mesmo que Bug #4) | Alta |
+| I1 | `alembic/env.py` não importa `rbac`, `auditoria`, `bi` models | Autogenerate cego para tabelas de RBAC, auditoria e BI (mesmo que Bug #4) | ✅ Corrigido |
 | I2 | `ConvenioService` duplicado em dois arquivos | Duas implementações concorrentes. A usada em produção (`convenio/service.py`) é a incompleta. | Alta |
 | I3 | `session.commit()` descentralizado no módulo laboratorial | `LaboratorialService` comita internamente, impedindo composição transacional (mesmo que Bug #5) | Média |
 | I4 | Chave LGPD hardcoded em `tests/conftest.py` | Chave Fernet de teste exposta no código. OK para testes, mas há risco de confusão se alguém usá-la em produção. | Baixa |
