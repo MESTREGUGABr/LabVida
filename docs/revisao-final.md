@@ -67,7 +67,7 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 | # | Regra | Status | Onde validar | Detalhes |
 |---|-------|--------|-------------|----------|
 | 5 | Toda OS deve possuir identificador único | ✅ | `src/atendimento/ordem_servico/service.py:abrir_os()` | `codigo_os` formato `OS-{ano}-{6 hex}` com unique constraint no banco. |
-| 6 | OS de convênio só pode ser aberta com autorização válida | ❌ | — | Model `AutorizacaoConvenio` existe e a tabela é criada, mas **nenhum service ou página** a utiliza. `abrir_os()` não verifica autorização. |
+| 6 | OS de convênio só pode ser aberta com autorização válida | ✅ | `abrir_os()` cria `AutorizacaoConvenio` PENDENTE; `registrar_coleta()` bloqueia sem `VALIDA` | Autorização criada junto com a OS. Coleta só prossegue após validação. |
 | 7 | Coleta só pode ser registrada por usuário autorizado | ⚠️ | `src/atendimento/amostra/service.py` + shell da página | Service verifica `coletor.ativo` mas **não verifica permissão RBAC** (`atendimento:coletar`). A verificação acontece apenas no `shell()` da página. |
 | 8 | Toda amostra coletada deve receber etiqueta (código de barras/QR) | ⚠️ | `src/atendimento/amostra/service.py:registrar_coleta()` | `codigo_barras` é gerado (`AM{12 hex}`). **Não há visualização ou impressão da etiqueta na UI.** |
 
@@ -174,7 +174,8 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | 27/07 | 🔴 `desvincular_usuario_do_perfil` concedia acesso total (shell tratava `perfil_id=None` como bootstrap) | ✅ Corrigido | `src/ui.py`, `tests/rbac/`, `tests/test_app.py` |
 | 27/07 | Regras #9 + #13 — `registrar_resultado` agora bloqueia se amostra não recebida | ✅ Corrigido | `src/laboratorial/service.py`, `tests/laboratorial/` |
 | 28/07 | Regra #30 — RBAC no cancelamento: só gestores com `atendimento:cancelar_os` podem cancelar OS/itens | ✅ Corrigido | `src/seeder/rbac.py`, `src/atendimento/ordem_servico/service.py`, `tests/atendimento/` |
-| 28/07 | Regras #4 + #17 — Validação de formato TUSS (8 dígitos exatos) | ✅ Corrigido | `src/cadastro/procedimento/dtos.py`, `tests/cadastro/test_cadastros_extra.py` |
+| 28/07 | Regra #6 — Autorização de convênio: cria PENDENTE no `abrir_os` e bloqueia `registrar_coleta` sem VALIDA | ✅ Corrigido | `src/atendimento/ordem_servico/service.py`, `amostra/service.py`, `tests/atendimento/` |
+| 28/07 | UX cancelamento — botões ocultos para usuários sem `atendimento:cancelar_os` | ✅ Corrigido | `pages/atendimento_os.py` |
 
 ---
 
@@ -447,10 +448,11 @@ O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são
 
 1. ~~Unificar ConvenioService~~ ✅ Corrigido
 2. ~~Resultados sem amostra recebida~~ ✅ Corrigido (regras #9 + #13)
-3. ~~Resultados sem amostra recebida~~ ✅ Corrigido (regras #9 + #13)
-4. ~~Apenas gestores cancelam OS~~ ✅ Corrigido (regra #30)
-5. **Validar formato TUSS** (Regra #4) — código sem validação de formato
-6. **Implementar autorização de convênio** (Regra #6) — tabela existe mas não é usada
+3. ~~Apenas gestores cancelam OS~~ ✅ Corrigido (regra #30)
+4. ~~Validar formato TUSS~~ ✅ Corrigido (regras #4 + #17)
+5. ~~Autorização de convênio~~ ✅ Corrigido (regra #6)
+7. **RBAC nos services** — coleta (#7), financeiro (#21), compras (#25)
+8. **Pré-auditoria de guias TISS** (F1/F2) — funcionalidade crítica do módulo de faturamento
 
 ---
 

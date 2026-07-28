@@ -31,6 +31,10 @@ def registrar_coleta(session: Session, dto: ColetaCreate) -> AmostraRead:
     if ordem.status in _STATUS_OS_BLOQUEIA_COLETA:
         raise ColetaNaoPermitida("Ordem de Serviço não permite novas coletas")
 
+    from src.atendimento.autorizacao.service import possui_autorizacao_valida
+    if ordem.convenio_id is not None and not possui_autorizacao_valida(session, ordem.id):
+        raise ColetaNaoPermitida("OS de convênio sem autorização válida")
+
     coletor = usuario_repository.obter_por_id(session, dto.coletor_usuario_id)
     if coletor is None or not coletor.ativo:
         raise ColetorInvalido("Coletor inválido ou inativo")

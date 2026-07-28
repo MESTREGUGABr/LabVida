@@ -351,3 +351,31 @@ def test_usuario_sem_permissao_nao_pode_cancelar(session: Session) -> None:
     session.query(PerfilPermissao).filter_by(perfil_id=perfil.id).delete()
     session.delete(perfil)
     session.flush()
+
+
+def test_abrir_os_com_convenio_cria_autorizacao_pendente(session: Session) -> None:
+    from sqlalchemy import select
+    from src.atendimento.autorizacao.dtos import StatusAutorizacao
+    from src.atendimento.autorizacao.models import AutorizacaoConvenio
+    from src.atendimento.ordem_servico.dtos import OrdemServicoCreate, OsItemInput
+
+    base = montar_base(session)
+    ordem = abrir_os(
+        session,
+        OrdemServicoCreate(
+            paciente_id=base.paciente_id,
+            unidade_id=base.unidade_id,
+            convenio_id=base.convenio_id,
+            itens=[OsItemInput(procedimento_id=base.procedimento_id, valor_negociado=Decimal("50"))],
+        ),
+        base.usuario_id,
+    )
+
+    autorizacao = session.scalar(
+        select(AutorizacaoConvenio).where(
+            AutorizacaoConvenio.ordem_servico_id == ordem.id
+        )
+    )
+    assert autorizacao is not None
+    assert autorizacao.status == StatusAutorizacao.PENDENTE
+    assert autorizacao.numero_guia == f"PEND-{ordem.codigo_os}"

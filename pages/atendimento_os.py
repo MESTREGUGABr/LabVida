@@ -34,6 +34,7 @@ from src.cadastro.procedimento.service import listar_procedimentos_ativos
 from src.cadastro.service import listar_pacientes_ativos
 from src.cadastro.unidade.service import listar_unidades_ativas
 from src.db import session_scope
+from src.rbac.repository import usuario_tem_permissao
 from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import (
     renderizar_cabecalho,
@@ -314,6 +315,10 @@ def _render_listar() -> None:
 
 
 def _render_cancelamento(ordem_id, ordem, itens, procedimentos) -> None:
+    with session_scope() as session:
+        if not usuario_tem_permissao(session, usuario_id_logado(), "atendimento:cancelar_os"):
+            return
+
     st.subheader("Cancelamento")
 
     with st.form(f"form_cancelar_os_{ordem_id}"):

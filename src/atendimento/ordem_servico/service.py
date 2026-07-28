@@ -29,6 +29,8 @@ from src.atendimento.ordem_servico.errors import (
     ValorItemNaoDefinido,
 )
 from src.atendimento.ordem_servico.models import OrdemServico, OsItem, OsStatusHistorico
+from src.atendimento.autorizacao.dtos import StatusAutorizacao
+from src.atendimento.autorizacao.models import AutorizacaoConvenio
 from src.cadastro.convenio import repository as convenio_repository
 from src.cadastro.convenio.dtos import StatusConvenio
 from src.cadastro import repository as paciente_repository
@@ -75,6 +77,14 @@ def abrir_os(session: Session, dto: OrdemServicoCreate, usuario_id: UUID | None 
     )
     repository.salvar(session, ordem)
     session.flush()
+
+    if convenio is not None:
+        autorizacao = AutorizacaoConvenio(
+            ordem_servico_id=ordem.id,
+            numero_guia=f"PEND-{ordem.codigo_os}",
+            status=StatusAutorizacao.PENDENTE,
+        )
+        session.add(autorizacao)
 
     for entrada in dto.itens:
         procedimento = procedimento_repository.obter_por_id(session, entrada.procedimento_id)
