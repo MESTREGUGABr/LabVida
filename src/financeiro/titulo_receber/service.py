@@ -1,5 +1,5 @@
+from decimal import Decimal
 from uuid import UUID
-from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 
@@ -52,14 +52,18 @@ def baixar_titulo(
                 from src.financeiro.titulo_receber.errors import FinanceiroError
                 raise FinanceiroError("Usuário sem permissão para baixar título")
 
-    divergencia = titulo.valor - valor_pago
+    # `valor` é Numeric (Decimal vindo do banco) e `valor_pago` chega da tela
+    # como float: subtrair um do outro direto estoura TypeError.
+    valor_titulo = Decimal(str(titulo.valor))
+    valor_recebido = Decimal(str(valor_pago))
+    divergencia = valor_titulo - valor_recebido
 
     titulo.status = StatusTitulo.PAGO
 
     movimento = MovimentoCaixa(
         titulo_receber_id=titulo.id,
         tipo=TipoMovimento.ENTRADA,
-        valor=valor_pago,
+        valor=valor_recebido,
         descricao=observacao or f"Recebimento do título {titulo.id}",
     )
     session.add(movimento)
@@ -67,9 +71,9 @@ def baixar_titulo(
     if divergencia > 0:
         conciliacao = ConciliacaoPagamento(
             titulo_receber_id=titulo.id,
-            valor_recebido=valor_pago,
+            valor_recebido=valor_recebido,
             divergencia=divergencia,
-            observacao=f"Divergência de R$ {divergencia:.2f} — valor esperado: R$ {titulo.valor:.2f}",
+            observacao=f"Divergência de R$ {divergencia:.2f} — valor esperado: R$ {valor_titulo:.2f}",
         )
         session.add(conciliacao)
 

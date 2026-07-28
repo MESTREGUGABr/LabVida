@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -33,6 +34,16 @@ from src.laboratorial.models import Laudo, StatusLaudo
 
 def _agora() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _acumular(total_atual, valor_faturado) -> Decimal:
+    """Soma no total do lote preservando Decimal.
+
+    `valor_total` é Numeric: sai do banco como Decimal, mas nasce como int no
+    default do modelo, e o valor faturado chega do DTO como float. Somar os dois
+    direto estoura TypeError assim que o lote passa por um refresh.
+    """
+    return Decimal(str(total_atual or 0)) + Decimal(str(valor_faturado))
 
 
 def criar_lote(session: Session, dto: LoteFaturamentoCreate) -> LoteFaturamentoRead:
@@ -86,7 +97,7 @@ def adicionar_guia_item(session: Session, lote_id: UUID, dto: GuiaItemCreate) ->
     )
     repository.salvar_guia_item(session, item)
 
-    lote.valor_total += dto.valor_faturado
+    lote.valor_total = _acumular(lote.valor_total, dto.valor_faturado)
 
     session.commit()
     session.refresh(lote)
@@ -210,7 +221,7 @@ def adicionar_itens_ao_lote(session: Session, lote_id: UUID, itens: list[GuiaIte
             valor_faturado=dto.valor_faturado,
         )
         repository.salvar_guia_item(session, item)
-        lote.valor_total += dto.valor_faturado
+        lote.valor_total = _acumular(lote.valor_total, dto.valor_faturado)
 
     session.commit()
     session.refresh(lote)

@@ -1,9 +1,11 @@
 """Seed dos cadastros-base (unidades, convênios, procedimentos, médicos).
 
 Idempotente por tabela: só insere quando a tabela está vazia, para não colidir
-com FKs de OS/itens já existentes. Habilita abrir uma OS ponta a ponta na demo.
+com FKs de OS/itens já existentes. É a fundação de todo o resto do seeder — sem
+procedimento com valor vigente por convênio não se abre uma OS.
 """
 
+import random
 from datetime import date
 from decimal import Decimal
 
@@ -19,33 +21,12 @@ from src.cadastro.procedimento import repository as procedimento_repository
 from src.cadastro.procedimento.dtos import ProcedimentoCreate, ProcedimentoValorCreate
 from src.cadastro.procedimento.service import criar_procedimento, definir_valor
 from src.cadastro.unidade import repository as unidade_repository
-from src.cadastro.unidade.dtos import SetorCreate, TipoUnidade, UnidadeCreate
+from src.cadastro.unidade.dtos import SetorCreate, UnidadeCreate
 from src.cadastro.unidade.service import criar_setor, criar_unidade
 from src.db import session_scope
-
-
-_UNIDADES = [
-    ("Laboratório Central Garanhuns", TipoUnidade.CENTRAL, ["Bioquímica", "Hematologia", "Recepção"]),
-    ("Unidade de Coleta Centro", TipoUnidade.COLETA, ["Coleta"]),
-    ("Unidade de Coleta Heliópolis", TipoUnidade.COLETA, ["Coleta"]),
-    ("Unidade de Coleta São José", TipoUnidade.COLETA, ["Coleta"]),
-    ("Unidade de Coleta Boa Vista", TipoUnidade.COLETA, ["Coleta"]),
-]
-
-_CONVENIOS = [("Unimed", "417033"), ("Bradesco Saúde", "005711"), ("Hapvida", "368253")]
-
-_PROCEDIMENTOS = [
-    ("40302016", "Hemograma completo", "Hematologia"),
-    ("40301630", "Glicose", "Bioquímica"),
-    ("40301770", "Colesterol total", "Bioquímica"),
-    ("40311902", "TSH", "Bioquímica"),
-    ("40307450", "Urina tipo I (EAS)", "Bioquímica"),
-]
-
-_MEDICOS = [
-    ("Dra. Helena Vasconcelos", "12345", "PE", True),
-    ("Dr. Rafael Lins", "54321", "PE", False),
-]
+from src.seeder.catalogo import CONVENIOS, MEDICOS, PROCEDIMENTOS, UNIDADES
+from src.seeder.config import qtd
+from src.seeder.documentos import gerar_cnpj, gerar_telefone
 
 
 def executar_seeder_cadastros() -> dict[str, int]:
@@ -68,7 +49,7 @@ def _seed_unidades(session: Session) -> tuple[int, int]:
         return 0, 0
     unidades = 0
     setores = 0
-    for nome, tipo, nomes_setores in _UNIDADES:
+    for nome, tipo, nomes_setores in UNIDADES:
         unidade = criar_unidade(session, UnidadeCreate(nome=nome, tipo=tipo))
         unidades += 1
         for nome_setor in nomes_setores:
@@ -81,7 +62,22 @@ def _seed_convenios(session: Session) -> list:
     existentes = convenio_repository.listar_ativos(session)
     if existentes:
         return [c.id for c in existentes]
-    return [criar_convenio(session, ConvenioCreate(nome=nome, registro_ans=ans)).id for nome, ans in _CONVENIOS]
+
+    cnpjs_usados: set[str] = set()
+    ids = []
+    for nome, registro_ans in CONVENIOS[: qtd(len(CONVENIOS))]:
+        convenio = criar_convenio(
+            session,
+            ConvenioCreate(
+                nome=nome,
+                registro_ans=registro_ans,
+                cnpj=gerar_cnpj(cnpjs_usados),
+                telefone=gerar_telefone(),
+                email=f"faturamento@{nome.split()[0].lower()}.com.br",
+            ),
+        )
+        ids.append(convenio.id)
+    return ids
 
 
 def _seed_procedimentos(session: Session) -> list:
@@ -90,15 +86,24 @@ def _seed_procedimentos(session: Session) -> list:
         return [p.id for p in existentes]
     return [
         criar_procedimento(
-            session, ProcedimentoCreate(codigo_tuss=tuss, nome=nome, setor=setor)
+            session,
+            ProcedimentoCreate(codigo_tuss=p.codigo_tuss, nome=p.nome, setor=p.setor),
         ).id
-        for tuss, nome, setor in _PROCEDIMENTOS
+        for p in PROCEDIMENTOS[: qtd(len(PROCEDIMENTOS))]
     ]
 
 
 def _seed_valores(session: Session, procedimentos_ids: list, convenios_ids: list) -> int:
+    """Tabela de preços negociada: cada convênio paga um percentual do valor base."""
+    valores_base = {p.codigo_tuss: p.valor_base for p in PROCEDIMENTOS}
+    fatores = {cid: Decimal(str(round(random.uniform(0.82, 1.18), 2))) for cid in convenios_ids}
+    inicio_vigencia = date(date.today().year, 1, 1)
+
     total = 0
     for procedimento_id in procedimentos_ids:
+        procedimento = procedimento_repository.obter_por_id(session, procedimento_id)
+        valor_base = valores_base.get(procedimento.codigo_tuss, Decimal("35.00")) if procedimento else Decimal("35.00")
+
         for convenio_id in convenios_ids:
             if procedimento_repository.obter_valor_vigente(
                 session, procedimento_id, convenio_id, date.today()
@@ -109,8 +114,8 @@ def _seed_valores(session: Session, procedimentos_ids: list, convenios_ids: list
                 ProcedimentoValorCreate(
                     procedimento_id=procedimento_id,
                     convenio_id=convenio_id,
-                    valor=Decimal("35.00"),
-                    vigencia_inicio=date(date.today().year, 1, 1),
+                    valor=(valor_base * fatores[convenio_id]).quantize(Decimal("0.01")),
+                    vigencia_inicio=inicio_vigencia,
                 ),
             )
             total += 1
@@ -120,12 +125,13 @@ def _seed_valores(session: Session, procedimentos_ids: list, convenios_ids: list
 def _seed_medicos(session: Session) -> int:
     if medico_repository.listar_ativos(session):
         return 0
-    for nome, crm, uf, responsavel in _MEDICOS:
+    medicos = MEDICOS[: max(2, qtd(len(MEDICOS)))]
+    for nome, crm, uf, responsavel in medicos:
         criar_medico(
             session,
             MedicoCreate(nome=nome, crm=crm, uf_crm=uf, responsavel_tecnico=responsavel),
         )
-    return len(_MEDICOS)
+    return len(medicos)
 
 
 def main() -> None:

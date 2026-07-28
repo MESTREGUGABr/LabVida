@@ -6,13 +6,17 @@ Princípios de segurança aplicados:
 - Read/Write separados: cadastros têm permissões de leitura e escrita distintas
 - Acesso plano (ADR 0002): usuário sem perfil vê menu completo
 
-Popula 11 perfis e 34 permissões com vínculos N:N.
-Idempotente por contagem: só insere se a tabela permissoes estiver vazia.
+Popula 11 perfis e 34 permissões com vínculos N:N, mais a equipe operacional
+(um usuário por função, com o perfil correspondente).
+Idempotente: perfis só entram se a tabela permissoes estiver vazia; usuários
+são conferidos por e-mail.
 """
 
 from src.db import session_scope
 from src.rbac import repository
 from src.rbac.models import Perfil, PerfilPermissao, Permissao
+from src.seeder.catalogo import USUARIOS
+from src.usuario import repository as usuario_repository
 
 _PERMISSOES = [
     # --- Cadastro: leitura (read-only) ---
@@ -142,29 +146,67 @@ _PERFIS = {
 }
 
 
-def main() -> None:
+def executar_seeder_rbac() -> dict[str, int]:
+    contagem = {"perfis": 0, "permissoes": 0, "usuarios": 0}
+
     with session_scope() as session:
-        if repository.listar_permissoes(session):
-            return
+        contagem["perfis"], contagem["permissoes"] = _seed_perfis(session)
+        contagem["usuarios"] = _seed_usuarios(session)
 
-        permissoes_map: dict[str, Permissao] = {}
-        for codigo, descricao in _PERMISSOES:
-            permissao = Permissao(codigo=codigo, descricao=descricao)
-            repository.salvar_permissao(session, permissao)
-            permissoes_map[codigo] = permissao
+    return contagem
 
-        for nome_perfil, codigos_permissoes in _PERFIS.items():
-            perfil = Perfil(nome=nome_perfil, descricao=f"Perfil {nome_perfil}")
-            repository.salvar_perfil(session, perfil)
-            session.flush()
 
-            for codigo in codigos_permissoes:
-                permissao = permissoes_map[codigo]
-                vinculo = PerfilPermissao(perfil_id=perfil.id, permissao_id=permissao.id)
-                repository.vincular_permissao(session, vinculo)
+def _seed_perfis(session) -> tuple[int, int]:
+    if repository.listar_permissoes(session):
+        return 0, 0
 
-        session.commit()
-        print(f"Seeder RBAC: {len(_PERFIS)} perfis e {len(_PERMISSOES)} permissões criados")
+    permissoes_map: dict[str, Permissao] = {}
+    for codigo, descricao in _PERMISSOES:
+        permissao = Permissao(codigo=codigo, descricao=descricao)
+        repository.salvar_permissao(session, permissao)
+        permissoes_map[codigo] = permissao
+
+    for nome_perfil, codigos_permissoes in _PERFIS.items():
+        perfil = Perfil(nome=nome_perfil, descricao=f"Perfil {nome_perfil}")
+        repository.salvar_perfil(session, perfil)
+        session.flush()
+
+        for codigo in codigos_permissoes:
+            permissao = permissoes_map[codigo]
+            vinculo = PerfilPermissao(perfil_id=perfil.id, permissao_id=permissao.id)
+            repository.vincular_permissao(session, vinculo)
+
+    session.commit()
+    return len(_PERFIS), len(_PERMISSOES)
+
+
+def _seed_usuarios(session) -> int:
+    """Cria a equipe operacional, cada um com o perfil mínimo da sua função.
+
+    O resto do seeder depende disso: coleta, compras e baixa de título passam
+    pelo gate de RBAC e só funcionam com um usuário que tenha a permissão.
+    """
+    from src.usuario.models import Usuario
+
+    criados = 0
+    for email, nome, nome_perfil in USUARIOS:
+        if usuario_repository.obter_por_email(session, email) is not None:
+            continue
+        perfil = repository.obter_perfil_por_nome(session, nome_perfil)
+        session.add(
+            Usuario(email=email, nome=nome, ativo=True, perfil_id=perfil.id if perfil else None)
+        )
+        criados += 1
+
+    session.commit()
+    return criados
+
+
+def main() -> None:
+    contagem = executar_seeder_rbac()
+    print("Seed RBAC finalizado")
+    for chave, valor in contagem.items():
+        print(f"{chave}: {valor}")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from decimal import Decimal
 
 import pytest
 from sqlalchemy.orm import Session
@@ -74,6 +75,54 @@ def test_fluxo_caixa_vazio(session: Session) -> None:
     assert resultado["total_entradas"] == 0
     assert resultado["total_saidas"] == 0
     assert resultado["saldo"] == 0
+
+
+def test_baixar_titulo_receber_recarregado_do_banco(session: Session) -> None:
+    """Regressão: a tela baixa títulos lidos do banco, não recém-criados.
+
+    Nesse caminho `valor` volta como Decimal enquanto o valor pago chega como
+    float — subtrair um do outro estourava TypeError e derrubava toda baixa.
+    """
+    from src.financeiro.conciliacao_pagamento.service import listar_por_titulo
+    from src.financeiro.titulo_receber.models import TituloReceber
+
+    base = montar_base(session)
+    titulo = TituloReceber(
+        lote_faturamento_id=base.lote_id,
+        valor=Decimal("30.87"),
+        vencimento=date.today() + timedelta(days=30),
+        status="PENDENTE",
+    )
+    session.add(titulo)
+    session.commit()
+    session.expire_all()
+
+    resultado = baixar_receber(session, titulo.id, 25.50)
+
+    assert resultado.status == StatusTitulo.PAGO
+    conciliacoes = listar_por_titulo(session, titulo.id)
+    assert len(conciliacoes) == 1
+    assert Decimal(str(conciliacoes[0].divergencia)) == Decimal("5.37")
+
+
+def test_baixar_titulo_receber_integral_nao_gera_conciliacao(session: Session) -> None:
+    from src.financeiro.conciliacao_pagamento.service import listar_por_titulo
+    from src.financeiro.titulo_receber.models import TituloReceber
+
+    base = montar_base(session)
+    titulo = TituloReceber(
+        lote_faturamento_id=base.lote_id,
+        valor=Decimal("30.87"),
+        vencimento=date.today() + timedelta(days=30),
+        status="PENDENTE",
+    )
+    session.add(titulo)
+    session.commit()
+    session.expire_all()
+
+    baixar_receber(session, titulo.id, 30.87)
+
+    assert listar_por_titulo(session, titulo.id) == []
 
 
 def test_baixar_titulo_receber_registra_auditoria(session: Session) -> None:

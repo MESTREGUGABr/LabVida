@@ -10,7 +10,7 @@ help:
 	@echo   make test      Sobe banco de teste, roda testes e remove dados de teste
 	@echo   make migrate   Aplica migrations no banco principal
 	@echo   make revision  Cria migration via autogenerate: make revision msg="mensagem"
-	@echo   make seeder    Limpa o banco e cria Pacientes de exemplo
+	@echo   make seeder    Popula a base de demonstracao (todos os modulos + BI)
 	@echo   make clean     Para app e banco removendo volumes
 
 up:

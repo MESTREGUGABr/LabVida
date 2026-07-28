@@ -24,6 +24,7 @@
 
 ## 📑 Sumário
 
+0. [⚡ Início Rápido (Docker)](#-início-rápido-docker)
 1. [Nome do Projeto](#1-nome-do-projeto)
 2. [Integrantes da Equipe](#2-integrantes-da-equipe)
 3. [Descrição do Sistema](#3-descrição-do-sistema)
@@ -42,6 +43,32 @@
 13. [Observações Importantes para Execução do Projeto](#13-observações-importantes-para-execução-do-projeto)
 14. [Entregas Acadêmicas](#entregas-acadêmicas)
 15. [Licença](#licença)
+
+---
+
+## ⚡ Início Rápido (Docker)
+
+Caminho mais curto para ter o sistema completo rodando (app + PostgreSQL + migrações + dados de exemplo). **A ordem importa:** o `.env` precisa existir e estar preenchido *antes* do `docker compose up`.
+
+```bash
+# 1. Criar o .env a partir do modelo  (Windows:  copy .env.exemplo .env)
+cp .env.exemplo .env
+
+# 2. Preencher AUTH0_DOMAIN, AUTH0_CLIENT_ID e AUTH0_CLIENT_SECRET no .env
+#    Sem isso o compose aborta com:
+#    "required variable AUTH0_DOMAIN is missing a value"
+
+# 3. Subir tudo
+docker compose up --build -d
+```
+
+Acesse **http://localhost:8501**.
+
+> **Não é preciso criar `venv`, instalar dependências nem rodar `make migrate` para usar o sistema via Docker.** O próprio container executa `alembic upgrade head` (migrações) e `python -m src.seeder` (dados de exemplo) no boot — o banco já sobe estruturado e populado.
+
+Acompanhar o boot: `docker compose logs -f app` · Encerrar: `docker compose down`
+
+As seções [7](#7-como-instalar-as-dependências) (venv) e [9](#9-como-importar-os-scripts-sql--migrations-alembic) (migrações manuais) são necessárias apenas para execução **sem Docker** ou para rodar a suíte de testes na máquina local.
 
 ---
 
@@ -151,7 +178,11 @@ LabVida/
 │   ├── financeiro/                → Títulos a Receber/Pagar, Caixa e Conciliação
 │   ├── compras/                   → Fornecedores, Pedidos de Compra e Estoque
 │   ├── usuario/                   → Identidade do Auth0
-│   └── seeder/                    → Dados de exemplo (Faker)
+│   ├── bi/                        → Esquema estrela e ETL de carga dos fatos
+│   └── seeder/                    → Base de demonstração (~3 meses de operação)
+│       ├── catalogo.py            → Procedimentos, convênios, insumos e equipe
+│       ├── config.py              → Volume (escala), janela temporal e RNG
+│       └── <modulo>.py            → Um seeder por módulo, idempotente
 ├── alembic.ini                    → Configuração do Alembic
 ├── alembic/                       → Migrações do banco de dados
 ├── docker-compose.yml             → Serviços Docker (App Streamlit + PostgreSQL 16)
@@ -201,6 +232,12 @@ Python 3.12+
 
 A versão de desenvolvimento é gerenciada nativamente e fixada no arquivo [`mise.toml`](mise.toml). Caso utilize a ferramenta [mise](https://mise.jdx.dev/), execute `mise install` na raiz do projeto.
 
+> ⚠️ **Python 3.12 é o mínimo real, não uma recomendação.** O `requirements.txt` fixa `numpy==2.5.1`, que não publica distribuição para versões anteriores. Em Python 3.11 ou inferior o `pip install -r requirements.txt` falha com:
+> ```
+> ERROR: Could not find a version that satisfies the requirement numpy==2.5.1
+> ```
+> Isso vale apenas para a execução local — a imagem Docker já usa `python:3.12-slim`.
+
 ---
 
 ## 6. Versão do PostgreSQL Utilizada
@@ -215,11 +252,21 @@ No ambiente Docker Compose, o serviço `postgres` utiliza a imagem oficial `post
 
 ## 7. Como Instalar as Dependências
 
-**7.1. Criar ambiente virtual Python**
+> Necessário apenas para execução **sem Docker** ou para rodar `pytest` localmente. Pelo [Início Rápido](#-início-rápido-docker), as dependências já são instaladas dentro da imagem.
 
-```bash
-python3 -m venv .venv
-```
+**7.1. Criar ambiente virtual Python (com 3.12+)**
+
+* **Linux / macOS:**
+  ```bash
+  python3 --version          # precisa ser 3.12 ou superior
+  python3 -m venv .venv
+  ```
+* **Windows (PowerShell / CMD):** o comando `python3` **não existe no Windows** — o alias apenas abre a Microsoft Store (`Python não foi encontrado; executar sem argumentos para instalar do Microsoft Store...`). Use o *Python Launcher* (`py`) apontando explicitamente a versão:
+  ```powershell
+  py -0p                     # lista as versões instaladas e seus caminhos
+  py -3.12 -m venv .venv     # ou py -3.13, se for a versão instalada
+  ```
+  > Evite `python -m venv .venv` sem indicar a versão: o `python` do PATH pode ser uma versão antiga (ex.: 3.11) e o ambiente criado quebra na instalação (ver [seção 5](#5-versão-do-python-utilizada)).
 
 **7.2. Ativar o ambiente virtual**
 
@@ -239,6 +286,7 @@ python3 -m venv .venv
 **7.3. Instalar dependências congeladas**
 
 ```bash
+python --version             # confirme que o venv ativo é 3.12+
 pip install -r requirements.txt
 ```
 
@@ -262,6 +310,8 @@ ou via Makefile:
 make up
 ```
 
+> O `.env` precisa estar preenchido antes deste comando — ver [seção 10](#10-como-configurar-o-arquivo-env).
+
 ### Opção B — PostgreSQL local (Sem Docker)
 
 Caso prefira utilizar uma instância local do PostgreSQL, crie o banco de dados e o usuário no seu gerenciador SQL:
@@ -271,6 +321,16 @@ CREATE DATABASE labvida;
 CREATE USER labvida WITH PASSWORD 'labvida';
 GRANT ALL PRIVILEGES ON DATABASE labvida TO labvida;
 ```
+
+E ajuste o `DATABASE_URL` do `.env` para apontar ao host local:
+
+```dotenv
+DATABASE_URL=postgresql+psycopg://labvida:labvida@localhost:5432/labvida
+```
+
+> O valor padrão do `.env.exemplo` usa `@postgres:5432` — `postgres` é o nome do serviço **na rede interna do Docker** e não resolve fora dela. Rodar `alembic`/`streamlit` na máquina host com esse valor falha com `failed to resolve host 'postgres'`.
+>
+> O contêiner do Compose publica a porta `5432`, então `localhost:5432` também funciona para acessar da máquina host o banco que está rodando no Docker.
 
 ---
 
@@ -286,22 +346,60 @@ O LabVida **não utiliza dumps estáticos (`.sql`) manuais** — a estrutura rel
 
 ### 9.1. Aplicar as Migrações de Estrutura
 
-* **Via Make / Docker:**
+> **Ao subir por Docker, as migrações já são aplicadas automaticamente** no boot do container (item 3 da caixa acima). Os comandos abaixo servem para reaplicá-las manualmente ou para uso sem Docker. Confira o resultado com `docker compose logs app | grep "Running upgrade"`.
+
+* **Via Docker:**
   ```bash
-  make migrate
+  docker compose run --rm app alembic upgrade head
   ```
+  Com GNU Make instalado, o atalho equivalente é `make migrate`.
 * **Localmente (sem Docker):**
   ```bash
   alembic upgrade head
   ```
+  > Exige o venv da [seção 7](#7-como-instalar-as-dependências) **ativado** e `DATABASE_URL` apontando para `localhost` (ver [seção 8, Opção B](#opção-b--postgresql-local-sem-docker)).
 
 ### 9.2. Popular o Banco com Dados de Exemplo (Seed)
 
-Para popular a base de dados com registros reais de teste (pacientes, médicos, convênios, ordens de serviço, amostras e laudos):
+> Também executado automaticamente no boot do container Docker (leva ~35s na primeira vez; nas seguintes é ignorado, pois cada módulo é idempotente).
+
+O seeder não gera registros soltos: ele **simula ~3 meses de operação do laboratório**, atravessando o fluxo ponta a ponta pelos mesmos services da aplicação. Ou seja, as regras de negócio são validadas de verdade — OS de convênio só coleta com autorização, resultado só entra com amostra recebida no central, laudo só é liberado por responsável técnico com resultados revisados, lote só fecha se passar na pré-auditoria TISS.
+
+* **Via Docker:**
+  ```bash
+  docker compose run --rm app python -m src.seeder
+  ```
+* **Localmente (sem Docker):**
+  ```bash
+  python -m src.seeder
+  ```
+
+**O que é gerado (volume padrão):**
+
+| Módulo | Conteúdo |
+|---|---|
+| **RBAC** | 11 perfis, 33 permissões e 16 usuários — um por função (recepção, coleta, bancada, RT, faturista, financeiro, compras, almoxarifado) |
+| **Cadastro** | 5 unidades e 15 setores, 8 convênios, 30 procedimentos com analitos e faixas de referência, 240 preços negociados, 12 médicos (5 responsáveis técnicos), 220 pacientes |
+| **Atendimento** | ~400 OS distribuídas em dias de movimento por unidade, com ~1.600 exames, em **todos os estágios**: aberta, coletada, em trânsito, em análise, concluída e cancelada |
+| **Logística** | ~100 malotes (despachados e recebidos), com amostras rejeitadas por avaria e cadeia de custódia completa |
+| **Laboratorial** | 6 equipamentos, 34 valores de referência, ~1.300 resultados (dentro e fora da faixa) e ~950 laudos entre rascunho e liberado |
+| **Faturamento** | ~70 lotes (abertos e fechados), guias TISS e ~80 glosas parciais e integrais |
+| **Financeiro** | Títulos a receber vindos do fechamento de lote, despesas fixas mensais, baixas com movimento de caixa e conciliações de pagamento divergente |
+| **Compras** | 8 fornecedores, 24 insumos com preço de tabela, ~18 pedidos em todos os status e estoque com entradas e saídas |
+| **BI** | Carga do esquema estrela (dimensões + fatos de atendimento, faturamento, financeiro e logística) |
+
+**Ajustar o volume:** todo o volume é escalável, útil para gerar uma base menor (demonstração rápida) ou maior (teste de carga):
 
 ```bash
-python -m src.seeder
+python -m src.seeder --escala 0.2   # ~1/5 do volume
+SEED_ESCALA=3 python -m src.seeder  # 3x o volume
 ```
+
+| Variável | Padrão | Efeito |
+|---|:---:|---|
+| `SEED_ESCALA` | `1.0` | Multiplicador de volume de todos os módulos |
+| `SEED_JANELA_DIAS` | `90` | Período de operação simulado (afeta a série temporal do BI) |
+| `SEED_SEMENTE` | `20261` | Semente do gerador aleatório |
 
 ---
 
@@ -338,6 +436,14 @@ PORT=8501
 LGPD_ENCRYPTION_KEY=Q22r1OivohTtSBRaMi-hjLxXxrQ3SwEdOumlaNDfvw8=
 ```
 
+> ⚠️ **`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` e `LGPD_ENCRYPTION_KEY` são obrigatórios e precisam estar preenchidos antes de `docker compose up`** — o Compose interrompe a subida logo no início se algum estiver vazio:
+> ```
+> error while interpolating services.app.environment.AUTH0_DOMAIN:
+> required variable AUTH0_DOMAIN is missing a value
+> ```
+>
+> Sobre o `DATABASE_URL`: use `@postgres:5432` para executar **via Docker** (nome do serviço na rede do Compose) e `@localhost:5432` para executar **na máquina host** (ver [seção 8, Opção B](#opção-b--postgresql-local-sem-docker)).
+
 ---
 
 ## 11. Comando para Executar o Streamlit
@@ -351,6 +457,8 @@ docker compose up -d
 Acesse no navegador: `http://localhost:8501`
 
 ### Opção B — Desenvolvimento Local
+
+Com o venv da [seção 7](#7-como-instalar-as-dependências) ativado, um PostgreSQL acessível e `DATABASE_URL` apontando para `localhost`:
 
 ```bash
 streamlit run app.py
@@ -374,32 +482,44 @@ O LabVida utiliza autenticação via **Auth0 + Login Social do Google (OAuth 2.0
 
 * **Ambiente com Auth0 Configurado:** Qualquer conta Google autorizada no tenant Auth0.
 * **Ambiente de Desenvolvimento Local / Testes:** Caso a aplicação seja executada sem credenciais Auth0 ativas no `.env`, o sistema permite navegação no modo de desenvolvimento para testes completos de todos os módulos.
-* **Dados de Teste:** O seeder automatizado (`python -m src.seeder`) popula cadastros completos de pacientes, convênios e exames para avaliação funcional.
+* **Dados de Teste:** O seeder automatizado (`python -m src.seeder`) popula ~3 meses de operação completa — ver [seção 9.2](#92-popular-o-banco-com-dados-de-exemplo-seed).
 
 ---
 
 ## 13. Observações Importantes para Execução do Projeto
 
-* **Suporte ao Makefile:** O `Makefile` é compatível com Linux, macOS e Windows (via GNU Make). No Windows, pode ser instalado com:
-  ```cmd
-  winget install GnuWin32.Make
-  ```
-* **Comandos Úteis do Makefile:**
-  ```bash
-  make help        # Exibe lista de comandos
-  make up          # Sobe os containers Docker
-  make down        # Encerra os containers Docker
-  make build       # Reconstrói a imagem Docker
-  make logs        # Visualiza os logs dos containers
-  make migrate     # Aplica as migrações do banco de dados
-  make test        # Executa a suíte de testes unitários com pytest
-  ```
+* **Suporte ao Makefile:** O `Makefile` é apenas um conjunto de atalhos — **nenhum comando do projeto depende dele**. Windows não traz GNU Make por padrão (`O termo 'make' não é reconhecido...`); instale-o com `winget install GnuWin32.Make` ou use diretamente o comando `docker compose` equivalente:
+
+  | Atalho Make | Comando equivalente |
+  |---|---|
+  | `make up` | `docker compose up -d` |
+  | `make down` | `docker compose down` |
+  | `make build` | `docker compose build` |
+  | `make logs` | `docker compose logs -f app` |
+  | `make migrate` | `docker compose run --rm app alembic upgrade head` |
+  | `make seeder` | `docker compose run --rm app python -m src.seeder` |
+  | `make test` | `docker compose --profile test run --rm app_test` |
+  | `make clean` | `docker compose down -v` |
+
 * **Suíte de Testes Automatizados:**
   ```bash
   make test
-  # Ou localmente:
+  # Ou via Docker, sem Make:
+  docker compose --profile test run --rm app_test
+  # Ou localmente (venv 3.12+ ativado, banco acessível em localhost):
   pytest tests/ -v
   ```
+
+### 13.1. Problemas Comuns
+
+| Erro | Causa | Solução |
+|---|---|---|
+| `Python não foi encontrado; executar sem argumentos para instalar do Microsoft Store` | `python3` não existe no Windows — é um alias da Store | Use `py -3.12 -m venv .venv` ([seção 7.1](#7-como-instalar-as-dependências)) |
+| `ERROR: Could not find a version that satisfies the requirement numpy==2.5.1` | O venv foi criado com Python 3.11 ou inferior | Recrie o venv com Python 3.12+ ([seção 5](#5-versão-do-python-utilizada)) |
+| `required variable AUTH0_DOMAIN is missing a value` | `.env` ausente ou com variáveis Auth0 vazias | Preencha o `.env` antes de subir ([seção 10](#10-como-configurar-o-arquivo-env)) |
+| `O termo 'make' não é reconhecido...` | GNU Make não instalado (padrão no Windows) | Use o comando `docker compose` equivalente da tabela acima |
+| `failed to resolve host 'postgres'` | `DATABASE_URL` com host da rede interna do Docker sendo usado na máquina host | Use `@localhost:5432` para rodar fora do Docker ([seção 8, Opção B](#opção-b--postgresql-local-sem-docker)) |
+| `docker compose up` conclui mas a porta 8501 não responde | Migrações/seed ainda executando no boot | Acompanhe com `docker compose logs -f app` |
 
 ---
 

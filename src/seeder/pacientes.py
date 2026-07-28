@@ -1,19 +1,24 @@
+"""Seed de Pacientes.
+
+Cada CPF é gerado com dígito verificador válido e criptografado na origem pelo
+service (LGPD), então este seeder também exercita o caminho de cifra do CPF.
+"""
+
 import argparse
 import random
 import sys
 from dataclasses import dataclass, field
-from datetime import date
 
-from faker import Faker
 from sqlalchemy import select
 
 from src.cadastro.dtos import PacienteCreate, SexoPaciente
 from src.cadastro.models import Paciente
 from src.cadastro.service import criar_paciente
 from src.db import session_scope
+from src.seeder.config import fake, qtd
+from src.seeder.documentos import gerar_cpf, gerar_telefone
 
-
-fake = Faker("pt_BR")
+PACIENTES_PADRAO = 220
 
 
 @dataclass
@@ -29,30 +34,19 @@ def executar_seeder_pacientes(quantidade: int) -> SeederResult:
         pacientes_existentes = list(session.scalars(select(Paciente)))
         cpfs_usados = {p.cpf for p in pacientes_existentes}
 
-    a_criar = max(0, quantidade - len(cpfs_usados))
-    for indice in range(1, a_criar + 1):
-        try:
-            dto = _gerar_paciente(cpfs_usados)
-            with session_scope() as session:
-                criar_paciente(session, dto)
-            resultado.pacientes_criados += 1
-        except Exception as error:
-            resultado.erros.append(f"Paciente {indice}: {error}")
+        a_criar = max(0, quantidade - len(pacientes_existentes))
+        for indice in range(1, a_criar + 1):
+            try:
+                criar_paciente(session, _gerar_paciente(cpfs_usados))
+                resultado.pacientes_criados += 1
+            except Exception as error:
+                resultado.erros.append(f"Paciente {indice}: {error}")
 
     return resultado
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Popula Pacientes de exemplo no LabVida")
-    parser.add_argument(
-        "--pacientes",
-        type=int,
-        default=20,
-        help="Quantidade de Pacientes gerados",
-    )
-    args = parser.parse_args()
-
-    resultado = executar_seeder_pacientes(args.pacientes)
+def main(quantidade: int | None = None) -> None:
+    resultado = executar_seeder_pacientes(quantidade if quantidade is not None else qtd(PACIENTES_PADRAO))
     _reportar_resultado(resultado)
 
     if resultado.erros:
@@ -60,44 +54,13 @@ def main() -> None:
 
 
 def _gerar_paciente(cpfs_usados: set[str]) -> PacienteCreate:
-    cpf = _gerar_cpf_unico(cpfs_usados)
-    sexo = random.choice(list(SexoPaciente))
-    nome = fake.name()
-
     return PacienteCreate(
-        cpf=cpf,
-        nome=nome,
-        data_nascimento=fake.date_of_birth(minimum_age=18, maximum_age=90),
-        telefone=_gerar_telefone(),
-        sexo=sexo,
+        cpf=gerar_cpf(cpfs_usados),
+        nome=fake.name(),
+        data_nascimento=fake.date_of_birth(minimum_age=1, maximum_age=95),
+        telefone=gerar_telefone(),
+        sexo=random.choice(list(SexoPaciente)),
     )
-
-
-def _gerar_cpf_unico(cpfs_usados: set[str]) -> str:
-    while True:
-        cpf = _gerar_cpf()
-        if cpf not in cpfs_usados:
-            cpfs_usados.add(cpf)
-            return cpf
-
-
-def _gerar_cpf() -> str:
-    base = [random.randint(0, 9) for _ in range(9)]
-    primeiro = _calcular_digito_cpf(base, range(10, 1, -1))
-    segundo = _calcular_digito_cpf([*base, primeiro], range(11, 1, -1))
-    return "".join(str(digito) for digito in [*base, primeiro, segundo])
-
-
-def _calcular_digito_cpf(digitos: list[int], pesos: range) -> int:
-    soma = sum(digito * peso for digito, peso in zip(digitos, pesos))
-    resto = soma % 11
-    return 0 if resto < 2 else 11 - resto
-
-
-def _gerar_telefone() -> str:
-    ddd = random.randint(11, 99)
-    numero = random.randint(900000000, 999999999)
-    return f"{ddd}{numero}"
 
 
 def _reportar_resultado(resultado: SeederResult) -> None:
@@ -115,3 +78,14 @@ def reportar_resultado_pacientes(resultado: SeederResult) -> None:
     print(f"Erros em Pacientes: {len(resultado.erros)}")
     for erro in resultado.erros:
         print(f"- {erro}")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Popula Pacientes de exemplo no LabVida")
+    parser.add_argument(
+        "--pacientes",
+        type=int,
+        default=qtd(PACIENTES_PADRAO),
+        help="Quantidade de Pacientes gerados",
+    )
+    main(parser.parse_args().pacientes)

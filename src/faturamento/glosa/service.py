@@ -1,3 +1,4 @@
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import select
@@ -21,9 +22,14 @@ def registrar_glosa(
     if guia_item is None:
         raise GuiaItemNaoEncontrado("Guia Item não encontrado")
 
-    if dto.valor_glosado <= 0:
+    # O DTO traz float e a coluna é Numeric: comparar direto reprova a glosa
+    # integral, porque float(30.87) é maior que Decimal("30.87").
+    valor_glosado = Decimal(str(dto.valor_glosado))
+    valor_faturado = Decimal(str(guia_item.valor_faturado))
+
+    if valor_glosado <= 0:
         raise ValueError("Valor da glosa deve ser maior que zero")
-    if dto.valor_glosado > guia_item.valor_faturado:
+    if valor_glosado > valor_faturado:
         raise ValorGlosaExcedeFaturado("Valor da glosa excede o valor faturado do item")
 
     unidade_id = _unidade_do_guia_item(session, guia_item.laudo_id)
@@ -33,12 +39,12 @@ def registrar_glosa(
     glosa = Glosa(
         guia_item_id=dto.guia_item_id,
         motivo=dto.motivo,
-        valor_glosado=dto.valor_glosado,
+        valor_glosado=valor_glosado,
         unidade_origem_id=unidade_id,
     )
     repository.salvar_glosa(session, glosa)
 
-    if dto.valor_glosado >= guia_item.valor_faturado:
+    if valor_glosado >= valor_faturado:
         guia_item.status = StatusGuiaItem.GLOSADO
 
     if usuario_id is not None:
