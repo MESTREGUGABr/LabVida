@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from src.auditoria import registrar_auditoria
 from src.atendimento.ordem_servico import repository
@@ -150,6 +151,20 @@ def listar_historico(session: Session, ordem_servico_id: UUID) -> list[OsStatusH
     ]
 
 
+def _validar_permissao_cancelar(session: Session, usuario_id: UUID) -> None:
+    """Bloqueia cancelamento quando RBAC está ativo e usuário não tem permissão."""
+    from src.rbac.models import Perfil
+    from src.rbac.repository import usuario_tem_permissao
+
+    if session.scalar(select(Perfil.id).limit(1)) is None:
+        return
+
+    if not usuario_tem_permissao(session, usuario_id, "atendimento:cancelar_os"):
+        raise UsuarioNaoAutorizadoParaCancelamento(
+            "Usuário sem permissão para cancelar itens"
+        )
+
+
 def cancelar_item_os(session: Session, os_item_id: UUID, usuario_id: UUID) -> OsItemRead:
     """Cancela um item ativo e recalcula o status agregado da sua OS.
 
@@ -159,6 +174,8 @@ def cancelar_item_os(session: Session, os_item_id: UUID, usuario_id: UUID) -> Os
     usuario = usuario_repository.obter_por_id(session, usuario_id)
     if usuario is None or not usuario.ativo:
         raise UsuarioNaoAutorizadoParaCancelamento("Usuário inválido ou inativo")
+
+    _validar_permissao_cancelar(session, usuario_id)
 
     item = repository.obter_item_por_id(session, os_item_id)
     if item is None:
@@ -195,6 +212,8 @@ def cancelar_os(session: Session, ordem_servico_id: UUID, usuario_id: UUID) -> O
     usuario = usuario_repository.obter_por_id(session, usuario_id)
     if usuario is None or not usuario.ativo:
         raise UsuarioNaoAutorizadoParaCancelamento("Usuário inválido ou inativo")
+
+    _validar_permissao_cancelar(session, usuario_id)
 
     ordem = repository.obter_por_id(session, ordem_servico_id)
     if ordem is None:

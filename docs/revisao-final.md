@@ -121,7 +121,7 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 | # | Regra | Status | Onde validar | Detalhes |
 |---|-------|--------|-------------|----------|
 | 29 | Permissões devem variar conforme o perfil do usuário | ✅ | `src/rbac/` + `src/ui.py:shell()` | RBAC completo: `Perfil → Permissao` via `PerfilPermissao`. Gate `shell(permissao=...)` em cada página. |
-| 30 | Apenas gestores podem cancelar operações críticas | ⚠️ | `cancelar_item_os()` + `cancelar_os()` | Verifica `usuario.ativo` mas **não verifica perfil de gestor**. Qualquer usuário autenticado pode cancelar. |
+| 30 | Apenas gestores podem cancelar operações críticas | ✅ | `src/atendimento/ordem_servico/service.py:_validar_permissao_cancelar()` | Verifica permissão `atendimento:cancelar_os` (só admin). Bootstrap ignora se RBAC não semeado. |
 | 31 | Logs devem registrar alterações sensíveis | ⚠️ | Vários services | Cobertura parcial de `auditoria_log`: OS, coleta, laudo, faturamento, financeiro têm auditoria. **Cadastros (paciente, médico, convênio, procedimento), malote, recebimento, compras e RBAC não têm.** |
 | 32 | Dados pessoais e clínicos devem seguir LGPD | ✅ | `src/lgpd/` + model `Paciente` | CPF: Fernet (encrypted) + SHA-256 (hash). BI: paciente anonimizado. Rotação de chave implementada. |
 | 33 | Auditorias clínicas e financeiras append-only | ✅ | `auditoria_log` + `resultado_auditoria` | Ambas são tabelas insert-only (sem UPDATE/DELETE no código). |
@@ -173,6 +173,7 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | 27/07 | Bug #6 — RBAC `remover_permissao_do_perfil` e `desvincular_usuario_do_perfil` | ✅ Corrigido | `src/rbac/`, `pages/admin_usuarios.py`, `tests/rbac/` |
 | 27/07 | 🔴 `desvincular_usuario_do_perfil` concedia acesso total (shell tratava `perfil_id=None` como bootstrap) | ✅ Corrigido | `src/ui.py`, `tests/rbac/`, `tests/test_app.py` |
 | 27/07 | Regras #9 + #13 — `registrar_resultado` agora bloqueia se amostra não recebida | ✅ Corrigido | `src/laboratorial/service.py`, `tests/laboratorial/` |
+| 28/07 | Regra #30 — RBAC no cancelamento: só gestores com `atendimento:cancelar_os` podem cancelar OS/itens | ✅ Corrigido | `src/seeder/rbac.py`, `src/atendimento/ordem_servico/service.py`, `tests/atendimento/` |
 
 ---
 
@@ -445,10 +446,10 @@ O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são
 
 1. ~~Unificar ConvenioService~~ ✅ Corrigido
 2. ~~Resultados sem amostra recebida~~ ✅ Corrigido (regras #9 + #13)
-3. **Implementar autorização de convênio** (Regra #6) — tabela existe mas não é usada
-4. ~~Corrigir `alembic/env.py`~~ ✅ Corrigido
-5. **Pré-auditoria de guias TISS** (F1/F2) — funcionalidade crítica do módulo de faturamento
-6. **Auditoria para CRUD de cadastros** (F22-F25) — 46% das operações sem trilha de auditoria
+3. ~~Resultados sem amostra recebida~~ ✅ Corrigido (regras #9 + #13)
+4. ~~Apenas gestores cancelam OS~~ ✅ Corrigido (regra #30)
+5. **Validar formato TUSS** (Regra #4) — código sem validação de formato
+6. **Implementar autorização de convênio** (Regra #6) — tabela existe mas não é usada
 
 ---
 

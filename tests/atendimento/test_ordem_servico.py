@@ -1,3 +1,4 @@
+from datetime import date, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -293,3 +294,60 @@ def test_usuario_inativo_nao_pode_cancelar_item(session: Session) -> None:
 
     with pytest.raises(UsuarioNaoAutorizadoParaCancelamento):
         cancelar_item_os(session, itens[0].id, base.usuario_id)
+
+
+def test_usuario_sem_permissao_nao_pode_cancelar(session: Session) -> None:
+    from src.atendimento.ordem_servico.dtos import OrdemServicoCreate, OsItemInput
+    from src.cadastro.procedimento.dtos import ProcedimentoCreate, ProcedimentoValorCreate
+    from src.cadastro.procedimento.service import criar_procedimento, definir_valor
+    from src.rbac.models import Perfil, PerfilPermissao
+    from src.usuario.service import sincronizar_usuario
+
+    _base = montar_base(session)
+    procedimento_extra = criar_procedimento(
+        session, ProcedimentoCreate(codigo_tuss="40302032", nome="Colesterol")
+    )
+    definir_valor(
+        session,
+        ProcedimentoValorCreate(
+            procedimento_id=procedimento_extra.id,
+            convenio_id=_base.convenio_id,
+            valor=Decimal("35"),
+            vigencia_inicio=date.today() - timedelta(days=1),
+        ),
+    )
+
+    perfil = Perfil(nome="cancelar_test", descricao="Perfil sem cancelamento")
+    session.add(perfil)
+    session.flush()
+
+    usuario_sem_permissao = sincronizar_usuario(
+        session, "semcancelar@labvida.test", "Sem Cancelar"
+    )
+    usuario_sem_permissao.perfil_id = perfil.id
+    session.flush()
+
+    ordem = abrir_os(
+        session,
+        OrdemServicoCreate(
+            paciente_id=_base.paciente_id,
+            unidade_id=_base.unidade_id,
+            itens=[
+                OsItemInput(
+                    procedimento_id=procedimento_extra.id, valor_negociado=Decimal("35")
+                ),
+            ],
+        ),
+        usuario_sem_permissao.id,
+    )
+    itens = listar_itens(session, ordem.id)
+
+    with pytest.raises(UsuarioNaoAutorizadoParaCancelamento):
+        cancelar_item_os(session, itens[0].id, usuario_sem_permissao.id)
+
+    with pytest.raises(UsuarioNaoAutorizadoParaCancelamento):
+        cancelar_os(session, ordem.id, usuario_sem_permissao.id)
+
+    session.query(PerfilPermissao).filter_by(perfil_id=perfil.id).delete()
+    session.delete(perfil)
+    session.flush()
