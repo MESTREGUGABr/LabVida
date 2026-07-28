@@ -13,9 +13,16 @@ import streamlit as st
 
 from src.db import session_scope
 from src.rbac.gate import verificar_permissao
+from src.rbac.models import Perfil
 from src.rbac.service import listar_permissoes_do_usuario
 from src.ui_css import injetar_css_global, injetar_toggle_dark_mode
 from src.ui_icons import ICONES_MAPA, ICONE_HOME, ICONE_SAIR, ICONE_TEMA
+
+
+def _existem_perfis(session) -> bool:
+    from sqlalchemy import select
+
+    return session.scalar(select(Perfil.id).limit(1)) is not None
 
 _MENU = [
     (
@@ -138,7 +145,8 @@ def shell(page_title: str, *, layout: str = "centered", permissao: str | None = 
             from src.usuario.models import Usuario
 
             usuario = session.get(Usuario, usuario_id)
-            acesso_plano = usuario is None or usuario.perfil_id is None
+            bootstrap = not _existem_perfis(session)
+            acesso_plano = usuario is None or (usuario.perfil_id is None and bootstrap)
             if not acesso_plano and not verificar_permissao(session, usuario_id, permissao):
                 st.error("Acesso negado. Voce nao possui permissao para acessar esta pagina.")
                 st.stop()
@@ -152,8 +160,7 @@ def renderizar_menu(usuario_id: UUID) -> None:
     """Renderiza o menu lateral com secoes filtradas por permissao do usuario."""
     with session_scope() as session:
         permissoes = {p.codigo for p in listar_permissoes_do_usuario(session, usuario_id)}
-
-    acesso_plano = len(permissoes) == 0
+        acesso_plano = len(permissoes) == 0 and not _existem_perfis(session)
     user = st.session_state.get("user", {})
 
     op_secoes = []

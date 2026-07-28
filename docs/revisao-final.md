@@ -170,6 +170,8 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | 27/07 | Bug #3 — Botão Liberar Laudo desabilitar com resultados não revisados | ✅ Corrigido | `pages/laboratorio_laudos.py` |
 | 27/07 | Bug #16 — `time.sleep()` artificiais nos laudos | ✅ Corrigido | `pages/laboratorio_laudos.py` |
 | 27/07 | Bug #13 — UUIDs expostos na UI (laudos + resultados) + `time.sleep` restante | ✅ Corrigido | `pages/laboratorio_laudos.py`, `pages/laboratorio_resultados.py` |
+| 27/07 | Bug #6 — RBAC `remover_permissao_do_perfil` e `desvincular_usuario_do_perfil` | ✅ Corrigido | `src/rbac/`, `pages/admin_usuarios.py`, `tests/rbac/` |
+| 27/07 | 🔴 `desvincular_usuario_do_perfil` concedia acesso total (shell tratava `perfil_id=None` como bootstrap) | ✅ Corrigido | `src/ui.py`, `tests/rbac/`, `tests/test_app.py` |
 
 ---
 
