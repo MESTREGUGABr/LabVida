@@ -215,13 +215,32 @@ def _render_perfis() -> None:
     permissoes_por_id = {p.id: p for p in todas_permissoes}
 
     for perfil in perfis:
-        with session_scope() as session:
-            perms = rbac_service.listar_permissoes_do_perfil(session, perfil.id)
+        toggle_key = f"expand_perfil_{perfil.id}"
+        if toggle_key not in st.session_state:
+            st.session_state[toggle_key] = False
 
-        n_permissoes = len(perms)
-        badge_count = f"{n_permissoes} permiss{'ao' if n_permissoes == 1 else 'oes'}"
+        aberto = st.session_state[toggle_key]
+        prefixo = "\u2013" if aberto else "+"
 
-        with st.expander(f"{perfil.nome} — {perfil.descricao or 'Sem descricao'}"):
+        col_toggle, col_label = st.columns([0.5, 9.5])
+        with col_toggle:
+            if st.button(
+                prefixo,
+                key=f"btn_perfil_{perfil.id}",
+                use_container_width=True,
+            ):
+                st.session_state[toggle_key] = not aberto
+                st.rerun()
+        with col_label:
+            st.markdown(f"**{perfil.nome}** \u2014 *{perfil.descricao or 'Sem descricao'}*")
+
+        if aberto:
+            with session_scope() as session:
+                perms = rbac_service.listar_permissoes_do_perfil(session, perfil.id)
+
+            n_permissoes = len(perms)
+            badge_count = f"{n_permissoes} permiss{'ao' if n_permissoes == 1 else 'oes'}"
+
             st.markdown(
                 f"""<span style="display:inline-block;padding:3px 10px;border-radius:10px;
                 font-size:11px;font-weight:600;background:{PRIMARY_50};color:{PRIMARY_600};">
@@ -243,13 +262,43 @@ def _render_perfis() -> None:
                             unsafe_allow_html=True,
                         )
                     with col_acao:
-                        if st.button("✕", key=f"rem_perm_{perfil.id}_{p.id}", help="Remover permissão"):
+                        if st.button("\u2715", key=f"rem_perm_{perfil.id}_{p.id}", help="Remover permissão"):
                             with session_scope() as sess:
                                 rbac_service.remover_permissao_do_perfil(sess, perfil.id, p.id)
-                            st.toast(f"Permissão removida!", icon="🗑")
+                            st.toast("Permissão removida!", icon="\U0001f5d1")
                             st.rerun()
             else:
                 st.caption("Nenhuma permissao atribuida.")
+
+            perms_ids = {p.id for p in perms}
+            disponiveis = [p for p in todas_permissoes if p.id not in perms_ids]
+            if disponiveis:
+                st.markdown("<br>", unsafe_allow_html=True)
+                col_perm_sel, col_perm_btn = st.columns([7, 2])
+                with col_perm_sel:
+                    opcoes_permissoes = {
+                        f"{p.codigo} \u2014 {p.descricao or ''}": p.id for p in disponiveis
+                    }
+                    selecionada = st.selectbox(
+                        "Adicionar permissao",
+                        options=list(opcoes_permissoes.keys()),
+                        key=f"add_perm_{perfil.id}",
+                        label_visibility="collapsed",
+                        placeholder="Selecionar permissao...",
+                    )
+                with col_perm_btn:
+                    if st.button(
+                        "Adicionar",
+                        key=f"btn_add_perm_{perfil.id}",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        with session_scope() as sess:
+                            rbac_service.atribuir_permissao_ao_perfil(
+                                sess, perfil.id, opcoes_permissoes[selecionada]
+                            )
+                        st.toast("Permissao adicionada!", icon="\u2705")
+                        st.rerun()
 
 
 if __name__ == "__main__":
