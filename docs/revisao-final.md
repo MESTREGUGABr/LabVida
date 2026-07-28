@@ -105,7 +105,7 @@ Base: `docs/Templates/Template - LabVida.md` — Seção 6 (37 regras).
 | 21 | Somente o setor financeiro pode confirmar baixa de pagamento | ✅ | `src/financeiro/titulo_receber/service.py` + `titulo_pagar/service.py:baixar_titulo()` | Verifica `usuario_tem_permissao("financeiro:baixar_titulo")`. Bootstrap-friendly. |
 | 22 | Lotes fechados no Faturamento devem gerar títulos automaticamente | ✅ | `fechar_lote()` | Cria `TituloReceber` com `valor_total` do lote e vencimento em 30 dias. |
 | 23 | Pagamentos recebidos devem alimentar o fluxo de caixa | ✅ | `baixar_titulo()` (receber) | Cria `MovimentoCaixa` (tipo `ENTRADA`) com o valor pago. |
-| 24 | Divergências entre valor faturado e recebido devem gerar alerta | ⚠️ | `baixar_titulo()` | `ConciliacaoPagamento` é criada com a divergência. Mas é **apenas um registro passivo** — não há notificação ou alerta ativo. |
+| 24 | Divergências entre valor faturado e recebido devem gerar alerta | ✅ | `pages/financeiro_contas.py:148` | `st.warning()` no momento da baixa + aba Conciliações com métricas e tabela de divergências. |
 
 ### 2.7 Compras
 
@@ -182,6 +182,7 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | 28/07 | Regra #10: Auditoria corporativa em despacho e recebimento | `logistica/malote/service.py`, `recebimento/service.py` |
 | 28/07 | Regra #31: Auditoria em CRUDs de cadastro (5 entidades, 12 operações) | 5 services + 5 páginas |
 | 28/07 | Regras #4+#17: Validação TUSS 8 dígitos exatos | `procedimento/dtos.py`, tests |
+| 28/07 | Regra #24: Alerta de divergência no momento da baixa (`st.warning`) | `pages/financeiro_contas.py` |
 
 **165/165 testes passando.**
 
@@ -405,8 +406,8 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | Indicador | Valor |
 |-----------|-------|
 | Regras de negócio totais (Template) | 37 |
-| Regras **totalmente cobertas** ✅ | 31 (84%) |
-| Regras **parcialmente cobertas** ⚠️ | 4 (11%) |
+| Regras **totalmente cobertas** ✅ | 34 (92%) |
+| Regras **parcialmente cobertas** ⚠️ | 1 (3%) |
 | Regras **não cobertas** ❌ | 2 (5%) |
 | Bugs críticos | 4 (todos resolvidos) |
 | Bugs médios | 8 (2 resolvidos, 6 pendentes) |
@@ -414,7 +415,7 @@ Base: `docs/specs/0001-cancelamento-coerente-da-os.md` e ADRs 0005/0006.
 | Histórias de cancelamento da OS | 12/12 (100%) |
 | **Total de testes passando** | **165/165** |
 
-### Nota geral: 9.0/10 (após 2 sessões — 18 correções aplicadas)
+### Nota geral: 9.2/10 (após 2 sessões — 19 correções aplicadas)
 
 O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são:
 
@@ -430,8 +431,7 @@ O projeto está **sólido para um protótipo acadêmico**. Os pontos fortes são
 |---|------------|---------|
 | #19 | Pré-auditoria de guias TISS antes do fechamento do lote | 60-90 min |
 | #20 | Bloqueio de itens inconsistentes no faturamento | 30 min |
-| #24 | Alertas de divergência financeira (notificação ativa) | 15 min |
-| #36 | ETL com scheduler (não manual) | 15 min |
+| #36 | ETL acessível via botão nos dashboards de BI | 15 min |
 
 ---
 

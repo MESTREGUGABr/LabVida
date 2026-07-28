@@ -145,6 +145,7 @@ def _render_receber() -> None:
                                     )
                                 divergencia = resultado.valor - valor_pago
                                 if divergencia > 0:
+                                    st.warning(f"Divergência de R$ {divergencia:.2f} registrada — verifique a aba Conciliações.")
                                     st.toast(f"Recebido R$ {valor_pago:.2f}. Divergência: R$ {divergencia:.2f}")
                                 else:
                                     st.toast(f"Título de R$ {t.valor:.2f} baixado com sucesso!")
