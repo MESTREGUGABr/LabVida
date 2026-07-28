@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 
 from src.atendimento.amostra.dtos import ColetaCreate, TipoMaterial
 from src.atendimento.amostra.service import registrar_coleta
+from src.atendimento.autorizacao.dtos import AutorizacaoCreate, StatusAutorizacao
+from src.atendimento.autorizacao.service import registrar_autorizacao
 from src.atendimento.ordem_servico import repository as os_repository
 from src.atendimento.ordem_servico.dtos import OrdemServicoCreate, OsItemInput
 from src.atendimento.ordem_servico.service import abrir_os
@@ -30,7 +32,20 @@ from src.logistica.malote.service import (
 )
 from src.logistica.recebimento.dtos import ProtocoloRecebimentoCreate
 from src.logistica.recebimento.service import receber_malote
+from src.rbac.repository import obter_perfil_por_nome
 from src.usuario.models import Usuario
+
+
+def _garantir_autorizacao(session: Session, ordem) -> None:
+    if ordem.convenio_id:
+        registrar_autorizacao(
+            session,
+            AutorizacaoCreate(
+                ordem_servico_id=ordem.id,
+                numero_guia=f"GUIA-{ordem.id.hex[:8].upper()}",
+                status=StatusAutorizacao.VALIDA,
+            ),
+        )
 
 
 def executar_seeder_atendimento() -> dict[str, int]:
@@ -46,10 +61,19 @@ def executar_seeder_atendimento() -> dict[str, int]:
         procedimentos = listar_procedimentos(session)
         unidades = listar_unidades_ativas(session)
 
+        perfil_admin = obter_perfil_por_nome(session, "admin")
         usuario = session.query(Usuario).first()
         if not usuario:
-            usuario = Usuario(email="seeder@labvida.com.br", nome="Seeder do Sistema", ativo=True)
+            usuario = Usuario(
+                email="seeder@labvida.com.br",
+                nome="Seeder do Sistema",
+                ativo=True,
+                perfil_id=perfil_admin.id if perfil_admin else None,
+            )
             session.add(usuario)
+            session.flush()
+        elif perfil_admin and usuario.perfil_id is None:
+            usuario.perfil_id = perfil_admin.id
             session.flush()
 
         if not (pacientes and procedimentos and unidades):
@@ -76,6 +100,7 @@ def executar_seeder_atendimento() -> dict[str, int]:
             ),
             usuario.id,
         )
+        _garantir_autorizacao(session, ordem1)
         amostra1 = registrar_coleta(
             session,
             ColetaCreate(
@@ -100,6 +125,7 @@ def executar_seeder_atendimento() -> dict[str, int]:
                 ),
                 usuario.id,
             )
+            _garantir_autorizacao(session, ordem2)
             amostra2 = registrar_coleta(
                 session,
                 ColetaCreate(
@@ -136,6 +162,7 @@ def executar_seeder_atendimento() -> dict[str, int]:
                 ),
                 usuario.id,
             )
+            _garantir_autorizacao(session, ordem3)
             amostra3 = registrar_coleta(
                 session,
                 ColetaCreate(
@@ -182,6 +209,7 @@ def executar_seeder_atendimento() -> dict[str, int]:
                 ),
                 usuario.id,
             )
+            _garantir_autorizacao(session, ordem4)
             amostra4 = registrar_coleta(
                 session,
                 ColetaCreate(
