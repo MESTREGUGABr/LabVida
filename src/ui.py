@@ -19,6 +19,11 @@ from src.ui_css import injetar_css_global, injetar_toggle_dark_mode
 from src.ui_icons import ICONES_MAPA, ICONE_HOME, ICONE_SAIR, ICONE_TEMA
 
 
+def formatar_brl(valor: float) -> str:
+    """Formata valor como moeda brasileira: R$ 1.234,56."""
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 def _existem_perfis(session) -> bool:
     from sqlalchemy import select
 
@@ -158,9 +163,10 @@ def shell(page_title: str, *, layout: str = "centered", permissao: str | None = 
 
 def renderizar_menu(usuario_id: UUID) -> None:
     """Renderiza o menu lateral com secoes filtradas por permissao do usuario."""
-    with session_scope() as session:
-        permissoes = {p.codigo for p in listar_permissoes_do_usuario(session, usuario_id)}
-        acesso_plano = len(permissoes) == 0 and not _existem_perfis(session)
+    with st.spinner("Carregando..."):
+        with session_scope() as session:
+            permissoes = {p.codigo for p in listar_permissoes_do_usuario(session, usuario_id)}
+            acesso_plano = len(permissoes) == 0 and not _existem_perfis(session)
     user = st.session_state.get("user", {})
 
     op_secoes = []

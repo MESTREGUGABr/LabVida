@@ -139,7 +139,7 @@ class LaboratorialService:
             valor_novo=dto.valor
         )
         self.repository.save_auditoria(auditoria)
-        self.repository.session.commit()
+        self.repository.session.flush()
         self.repository.session.refresh(resultado)
         return resultado
 
@@ -172,7 +172,7 @@ class LaboratorialService:
             )
             self.repository.save_auditoria(auditoria)
 
-        self.repository.session.commit()
+        self.repository.session.flush()
         self.repository.session.refresh(resultado)
         return resultado
 

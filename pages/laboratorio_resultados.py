@@ -103,6 +103,7 @@ def main() -> None:
                                         usuario_id=usuario_id,
                                     ),
                                 )
+                                session.commit()
                                 st.toast("Resultado atualizado!", icon="\u2705")
                                 st.rerun()
                             except ValueError as e:
@@ -154,6 +155,7 @@ def main() -> None:
                                 usuario_id=usuario_id,
                             )
                         )
+                        session.commit()
                         st.toast("Resultado inserido com sucesso!", icon="\u2705")
                         st.rerun()
                     except ValueError as e:
