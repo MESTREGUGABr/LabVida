@@ -79,6 +79,25 @@ RBAC = (
 
 AUDITORIA = ("auditoria_log",)
 
+# Esquema estrela. Truncado so pelos testes de BI — o ETL reconstroi tudo.
+BI = (
+    "bi_etl_execucao",
+    "bi_fato_glosa",
+    "bi_fato_logistica",
+    "bi_fato_financeiro",
+    "bi_fato_faturamento",
+    "bi_fato_atendimento",
+    "bi_fato_ordem_servico",
+    "bi_dim_motivo_glosa",
+    "bi_dim_faixa_etaria",
+    "bi_dim_paciente_anon",
+    "bi_dim_procedimento",
+    "bi_dim_convenio",
+    "bi_dim_setor",
+    "bi_dim_unidade",
+    "bi_dim_tempo",
+)
+
 # Escopo do fluxo completo: da OS ao recebimento do titulo.
 CICLO_COMPLETO = NUCLEO + LABORATORIAL + FATURAMENTO + FINANCEIRO + COMPRAS
 

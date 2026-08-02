@@ -299,9 +299,23 @@ O seeder continua sendo o teste de integração de fato — ele atravessa ~400 O
 
 ## 10. As duas ondas
 
-### Onda 1 — BI independente (**F2** do roadmap, começa junto com F1)
+### Onda 1 — BI independente (**F2** do roadmap) — ✅ **implementada em 02/08/2026**
 
 Não depende de competência, item faturável, remessa nem baixa parcial.
+
+**Resultado medido na base de demonstração (~400 OS):**
+
+| Verificação | Antes | Depois |
+|---|---|---|
+| Duração do ETL | ~35 s | **1,3 s** (fim do N+1) |
+| Série temporal de logística | 1 barra em "hoje" | 4 meses distribuídos |
+| Reconciliação faturamento OLTP↔OLAP | não existia | `20774,18` = `20774,18` |
+| Receita "recebida" | somava título em aberto | previsto `39.125,26` × realizado `10.298,00` |
+| `DimProcedimento.setor` | sempre NULL | 0 procedimentos sem setor |
+| `tempo_transito_horas` | nunca populado | 316 amostras, média 3,20 h |
+| Testes de BI | 2 (só dimensões) | **41** |
+
+Dois bugs apareceram durante a implementação e viraram teste: `GROUP BY coalesce(...)` gerava bind params distintos e o Postgres rejeitava a query (afetava as 4 métricas por convênio), e `date_part('day', date - date)` não existe em Postgres — `date - date` já devolve `integer`.
 
 - Correção dos 8 bugs + os 2 problemas de grão
 - `DimTempo` densa, `DimSetor`, `DimMotivoGlosa`

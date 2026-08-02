@@ -12,15 +12,19 @@ from src.bi.models import (
     FatoAtendimento,
     FatoFaturamento,
     FatoFinanceiro,
+    FatoGlosa,
     FatoLogistica,
+    FatoOrdemServico,
 )
 from src.db import session_scope
 
 _FATOS = {
+    "fato_ordem_servico": FatoOrdemServico,
     "fato_atendimento": FatoAtendimento,
     "fato_faturamento": FatoFaturamento,
     "fato_financeiro": FatoFinanceiro,
     "fato_logistica": FatoLogistica,
+    "fato_glosa": FatoGlosa,
 }
 
 

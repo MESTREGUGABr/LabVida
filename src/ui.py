@@ -95,6 +95,7 @@ _MENU = [
     (
         "BI \u2014 Indicadores",
         [
+            ("Visao Executiva", "pages/bi_visao_executiva.py", "bi:visualizar"),
             ("Produtividade", "pages/bi_produtividade.py", "bi:visualizar"),
             ("Financeiro", "pages/bi_financeiro.py", "bi:visualizar"),
             ("Logistica", "pages/bi_logistica.py", "bi:visualizar"),
