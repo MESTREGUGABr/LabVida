@@ -61,7 +61,7 @@ Head atual verificado: **`0013_bi_paciente_hash`**, cadeia única e limpa (o `00
 | Migration | Fase | Conteúdo |
 |---|:---:|---|
 | `0014_bi_reconstrucao` | F2 | tabelas `bi_*`: chave natural nos fatos, `bi_fato_ordem_servico`, `bi_fato_glosa`, `bi_dim_setor`, `bi_dim_motivo_glosa`, colunas novas de `bi_dim_tempo`, `bi_etl_execucao` |
-| `0015_precos_e_condicoes_comerciais` | F3 | (era `0014` no anexo) |
+| `0015_precos_comerciais` | F3 | (era `0014` no anexo) |
 | `0016_competencias` | F4 | (era `0015`) |
 | `0017_itens_faturaveis` | F5 | (era `0016`) |
 | `0018_remessa` | F6 | (era `0017`) |

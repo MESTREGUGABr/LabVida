@@ -48,6 +48,11 @@ class OsItem(Base):
     )
     valor_negociado: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Rastro da regra do valor (F3): o que a TABELA dizia na data do fato, de
+    # onde veio o valor cobrado e, quando negociado, por que.
+    valor_tabela: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    origem_valor: Mapped[str] = mapped_column(String(16), nullable=False, default="TABELA")
+    motivo_excecao: Mapped[str | None] = mapped_column(String(255), nullable=True)
     cancelado_por_usuario_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
     )
