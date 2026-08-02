@@ -203,16 +203,22 @@ Impacto real: três das quatro pessoas da equipe desenvolvem no Windows e não c
 
 ---
 
-## 8. Dívida de documentação
+## 8. Dívida de documentação — ✅ quitada em 02/08/2026
 
-Três documentos declaram o projeto pronto e contradizem os achados atuais. Enquanto não forem corrigidos, cada pessoa da equipe lê um estado diferente do projeto.
+Três documentos declaravam o projeto pronto e contradiziam os achados, então cada pessoa da equipe lia um estado diferente. Resolvido:
 
-| Documento | O que corrigir | Quando |
-|---|---|---|
-| [README.md](../README.md) | Tabela "Status de implementação": Faturamento não está "✅ Concluído" (N1, N2, N3 abertos) e BI não está apenas "⏳ Pendente" — está incorreto | Ao fim de F0 |
-| [revisao-final.md](revisao-final.md) | "Nota geral 9.5/10, 1 bug pendente" é de antes dos 18 achados novos. Adicionar cabeçalho apontando para os planos atuais | Ao fim de F0 |
-| [RESENHA-E-PLANO-4-STACKS.md](../RESENHA-E-PLANO-4-STACKS.md) | "🔴 Alta: (vazio — resolvidos nesta leva)" está desatualizado | Ao fim de F0 |
-| [CONTEXT.md](../CONTEXT.md) | Glossário precisa de: **Competência**, **Remessa** (hoje "remessa" é listado como termo a *evitar* para Malote — vai colidir), **Item Faturável**, **Divergência**, **Recurso de Glosa** | Junto com F4 |
-| [doc.md](../doc.md) | Rascunho duplicado do README — avaliar remoção | Ao fim de F0 |
+| Documento | O que foi feito |
+|---|---|
+| **[arquitetura.md](arquitetura.md)** | **Criado.** Passa a ser a referência de estado atual: fluxo, camadas, modelo de dados, módulos, BI, segurança, testes e pendências |
+| [README.md](../README.md) | Tabela de status corrigida (Faturamento e Financeiro "em evolução", BI "reconstruído") + ponteiro para `arquitetura.md` |
+| [CONTEXT.md](../CONTEXT.md) | Glossário atualizado com os termos de BI que passaram a existir |
+| `revisao-final.md` | **Removido.** Auditoria de 28/07 que se declarava "9,5/10, 1 bug pendente" — contradita por 18 achados posteriores. As partes ainda válidas foram absorvidas por `arquitetura.md` |
+| `RESENHA-E-PLANO-4-STACKS.md` | **Removido.** Declarava "backlog alta: vazio". O planejamento vive neste roadmap; o estado, em `arquitetura.md` |
+| `doc.md` | **Removido.** Rascunho duplicado do README |
+| `diff.patch` | **Removido.** Artefato solto na raiz |
 
-> ⚠️ Atenção ao `CONTEXT.md`: o glossário atual define **Malote** e manda *evitar* "remessa" como sinônimo. A F6 introduz `RemessaFaturamento` com significado completamente diferente. Sem atualizar o glossário, a colisão de vocabulário vai confundir a equipe e a banca.
+> Os arquivos removidos continuam no histórico do git — nada foi perdido, só saiu do caminho.
+
+### Ainda pendente
+
+**Colisão de vocabulário na F6:** o `CONTEXT.md` define **Malote** e manda *evitar* "remessa" como sinônimo. A F6 introduz `RemessaFaturamento`, com significado completamente diferente. O glossário precisa ganhar **Competência**, **Remessa de Faturamento**, **Item Faturável**, **Divergência** e **Recurso de Glosa** **junto com as fases que os criam** — não antes, para o glossário não descrever o que não existe.

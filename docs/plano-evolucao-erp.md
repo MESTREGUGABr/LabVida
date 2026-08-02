@@ -2,7 +2,7 @@
 
 > Documento de **planejamento**. Nada aqui foi implementado ainda.
 > Anexo técnico: [plano-faturamento-competencia.md](plano-faturamento-competencia.md).
-> Documento irmão: [revisao-final.md](revisao-final.md).
+> Estado atual do sistema: [arquitetura.md](arquitetura.md).
 >
 > ⚠️ **A §8 (Ordem de execução) foi superada por [roadmap-execucao.md](roadmap-execucao.md)**, que é o documento canônico de fases, migrations e paralelização. Este plano continua válido como **conteúdo técnico** (o *quê* e o *como*).
 > O **Eixo 4 — BI** (§5) foi expandido e corrigido em [plano-bi.md](plano-bi.md): a afirmação de §5.1 de que o bug B1 exige mudança no OLTP está incorreta, e por isso o BI deixou de ser a última fase.
@@ -17,7 +17,7 @@ O LabVida foi apresentado ao professor e voltou com uma lista de apontamentos. E
 
 **Prazo:** sem prazo curto — ordem técnica, fazer certo.
 
-`docs/revisao-final.md` já cataloga 16 bugs, 7 UX sistêmicos e 29 funcionalidades ausentes. Este plano **não duplica** aquilo; a seção 7 aqui lista só o que aquele documento **não** contém.
+Uma auditoria anterior (`docs/revisao-final.md`, removida em 02/08 — está no histórico do git) catalogava 16 bugs, 7 UX sistêmicos e 29 funcionalidades ausentes. A seção 7 aqui lista o que aquele documento **não** continha.
 
 ---
 
@@ -100,7 +100,7 @@ Alvo:
 - **`st.dialog`** para os formulários inline (baixa de título, registrar glosa, editar fornecedor) — modal de verdade, sem `session_state[f"form_{id}"]`.
 - **`st.popover`** para ações rápidas por linha.
 
-Isso apaga a classe inteira de bug U4 do `revisao-final.md` ("apenas um formulário pode estar aberto por vez; colapsam em reruns não relacionados").
+Isso apaga a classe inteira de bug U4 catalogada na auditoria anterior ("apenas um formulário pode estar aberto por vez; colapsam em reruns não relacionados").
 
 ### 2.4 Padrões unificados
 
@@ -294,7 +294,7 @@ O professor pediu "implementar essa brincadeira". Antes de escolher, o diagnóst
 
 ## 7. Achados novos
 
-Bugs e inconsistências que **não** estão em `revisao-final.md` (aquele documento se declara "9.5/10, 1 bug pendente" — está desatualizado).
+Bugs e inconsistências que **não** estavam na auditoria anterior (que se declarava "9.5/10, 1 bug pendente" — desatualizada).
 
 ### 7.1 Críticos
 

@@ -49,7 +49,7 @@ Cada afirmação abaixo foi conferida linha a linha em [src/bi/etl.py](../src/bi
 
 ### 1.2 Dois problemas de grão
 
-**G1 — `tempo_ciclo_os_horas` está no grão errado.** O fato é gravado por `OsItem` ([etl.py:164-166](../src/bi/etl.py#L164-L166)), mas o tempo de ciclo é atributo da **OS** e é repetido idêntico em cada item dela. Qualquer `AVG()` pondera a OS pelo número de exames — uma OS com 8 exames pesa 8× uma OS com 1 exame. O indicador que a `RESENHA` declara pronto está **estatisticamente errado**.
+**G1 — `tempo_ciclo_os_horas` está no grão errado.** O fato é gravado por `OsItem` ([etl.py:164-166](../src/bi/etl.py#L164-L166)), mas o tempo de ciclo é atributo da **OS** e é repetido idêntico em cada item dela. Qualquer `AVG()` pondera a OS pelo número de exames — uma OS com 8 exames pesa 8× uma OS com 1 exame. O indicador dado como pronto na documentação anterior está **estatisticamente errado**.
 
 **G2 — Nenhum fato tem chave natural.** Não existe `os_item_id`, `amostra_id`, `guia_item_id` nem `titulo_id` em fato nenhum. Consequências: carga incremental impossível, reconciliação OLTP↔OLAP impossível, deduplicação impossível. O ETL só sabe `DELETE FROM` tudo e recarregar ([etl.py:144-148](../src/bi/etl.py#L144-L148)).
 
@@ -68,7 +68,7 @@ Cada afirmação abaixo foi conferida linha a linha em [src/bi/etl.py](../src/bi
 - **11 queries SQL em string inline** dentro das 3 páginas. Nada é testável sem subir o Streamlit.
 - **Zero filtros de data.** Todo agregado é "desde o início dos tempos"; apenas 2 das 11 queries sequer tocam `bi_dim_tempo`. É exatamente o que o professor apontou.
 - **10 gráficos** em `st.bar_chart`/`st.line_chart`: sem tooltip, sem formatação pt-BR, sem escala de cor, sem drill-down. Altair 6.2.2 **já está instalado** e não é usado em lugar nenhum.
-- [bi_logistica.py:52-60](../pages/bi_logistica.py#L52-L60) consulta a tabela operacional `amostras` **direto**, furando o modelo dimensional — viola a regra #35 do próprio `revisao-final.md`.
+- [bi_logistica.py:52-60](../pages/bi_logistica.py#L52-L60) consulta a tabela operacional `amostras` **direto**, furando o modelo dimensional — viola a própria regra de negócio #35 (BI read-only sobre a base operacional).
 - Formatação monetária inconsistente entre páginas (`formatar_brl` só em `bi_financeiro`).
 - O usuário **não tem como saber quando o ETL rodou pela última vez**. O número na tela pode ser de ontem ou de três semanas atrás.
 
@@ -127,7 +127,7 @@ OLTP
 | **`bi_dim_setor`** | — | **nova** — setor × unidade. Habilita produtividade e TAT por setor |
 | **`bi_dim_motivo_glosa`** | — | **nova** — `Glosa.motivo` normalizado (hoje texto livre; vira código TISS na F8) |
 
-A anonimização do paciente (`id_origem` = SHA-256, só `faixa_etaria` e `sexo` expostos) é mantida integralmente — é requisito LGPD e regra #37 do `revisao-final.md`.
+A anonimização do paciente (`id_origem` = SHA-256, só `faixa_etaria` e `sexo` expostos) é mantida integralmente — é requisito LGPD e regra de negócio #37.
 
 ### 3.2 Fatos
 
@@ -214,7 +214,7 @@ Ganhos: cada indicador ganha teste próprio; o filtro de período é aplicado **
 | Indicador | Fonte | Onda | Origem do pedido |
 |---|---|---|---|
 | Exames por unidade / mês / convênio / faixa etária | `fato_atendimento` | 1 | já existe, ganha período |
-| **Ticket médio por exame e por convênio** | `fato_faturamento` | 1 | F14 do `revisao-final` |
+| **Ticket médio por exame e por convênio** | `fato_faturamento` | 1 | funcionalidade ausente catalogada |
 | **TAT — tempo médio coleta→laudo**, por setor/procedimento/unidade | `fato_ordem_servico` | 1 | F15 — corrigido no grão (G1) |
 | **Tempo médio de trânsito de malote** | `fato_logistica` | 1 | coluna morta destravada |
 | Curva ABC de procedimentos por receita | `fato_faturamento` | 1 | novo |
@@ -257,7 +257,7 @@ def waterfall_dre(df, *, categoria, valor) -> alt.Chart
 
 Tema único em `src/bi/tema_altair.py`: paleta consistente entre as 4 páginas, `tooltip` com rótulos em pt-BR, eixo monetário com separador brasileiro (`R$ 1.234,56`), tipografia alinhada ao `ui_css.py` existente.
 
-**Drill-down:** `alt.selection_point()` + `st.altair_chart(..., on_select="rerun")` — clicar num convênio no gráfico filtra os demais gráficos da página. É o F27 do `revisao-final`, pendente desde sempre.
+**Drill-down:** `alt.selection_point()` + `st.altair_chart(..., on_select="rerun")` — clicar num convênio no gráfico filtra os demais gráficos da página. É o drill-down catalogado como ausente desde a primeira auditoria.
 
 **Zero dependência nova:** `altair==6.2.2` já está em [requirements.txt](../requirements.txt).
 

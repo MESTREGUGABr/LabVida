@@ -84,6 +84,38 @@ _Evitar_: erro de pagamento, desconto.
 Camada analitica que consolida dados operacionais em indicadores, dashboards e relatorios gerenciais.
 _Evitar_: relatorio, dashboard.
 
+**Dimensao**:
+Tabela do BI que descreve o contexto de um fato — quem, o que, onde e quando. E por ela que se filtra e agrupa (tempo, unidade, convenio, procedimento, setor, faixa etaria, motivo de glosa).
+_Evitar_: tabela auxiliar, lookup.
+
+**Fato**:
+Tabela do BI que guarda as medidas de um evento do negocio, sempre num unico grao e sempre com a chave natural da linha de origem.
+_Evitar_: tabela de dados, agregado.
+
+**Grao**:
+O que exatamente uma linha de fato representa (uma Ordem de Servico, um item, uma amostra, uma glosa). Medida so convive com o fato que compartilha seu grao.
+_Evitar_: nivel, granularidade generica.
+
+**Chave Natural**:
+Identificador da linha de origem no operacional guardado no fato. E o que torna a carga do BI reexecutavel e permite reconciliar BI com a base operacional.
+_Evitar_: id, chave primaria.
+
+**Medida Aditiva**:
+Valor que pode ser somado em qualquer combinacao de dimensoes (valor faturado, quantidade de exames). Indicador de razao — ticket medio, taxa de glosa — e sempre calculado a partir delas, nunca armazenado.
+_Evitar_: metrica, indicador armazenado.
+
+**Regime de Caixa**:
+Reconhecimento do valor na data em que o dinheiro entrou ou saiu de fato, apurado a partir dos movimentos de caixa.
+_Evitar_: realizado, pago.
+
+**Regime de Competencia**:
+Reconhecimento do valor na data do fato gerador, independentemente de quando o dinheiro circula. No faturamento e a data em que o laudo foi liberado.
+_Evitar_: previsto, provisionado.
+
+**Tempo de Atendimento (TAT)**:
+Intervalo entre a coleta da Amostra e a liberacao do ultimo Laudo da Ordem de Servico. Medido no grao da OS, nunca no grao do item.
+_Evitar_: tempo de ciclo, lead time.
+
 **Resultado**:
 Valor bruto ou interpretacao tecnica inicial importada de um equipamento laboratorial referente a um parametro de exame.
 _Evitar_: laudo, exame.

@@ -140,16 +140,21 @@ O sistema é organizado em módulos especializados que refletem os setores reais
 
 ### Status de implementação
 
-| Módulo | Status |
-|---|:---:|
-| Cadastro | ✅ Concluído |
-| Atendimento e Coleta | ✅ Concluído |
-| Logística de Amostras | ✅ Concluído |
-| Laboratorial | ✅ Concluído |
-| Faturamento | ✅ Concluído |
-| Financeiro | ✅ Concluído |
-| Compras | ✅ Concluído |
-| BI | ⏳ Pendente |
+> Estado detalhado, com fluxo, modelo de dados e pendências por módulo:
+> **[docs/arquitetura.md](docs/arquitetura.md)**. Próximos passos: [docs/roadmap-execucao.md](docs/roadmap-execucao.md).
+
+| Módulo | Status | Observação |
+|---|:---:|---|
+| Cadastro | ✅ Operacional | Falta tabela de preço particular e vigência de fim (fase F3) |
+| Atendimento e Coleta | ✅ Operacional | Fluxo completo, cancelamento coerente 100% testado |
+| Logística de Amostras | ✅ Operacional | Cadeia de custódia completa |
+| Laboratorial | ✅ Operacional | Falta catálogo de analitos ligando resultado a faixa de referência (F3) |
+| Faturamento | 🔶 Em evolução | Lote/guia/glosa funcionam; competência, guia por paciente e divergências são as fases F4–F9 |
+| Financeiro | 🔶 Em evolução | Títulos e caixa funcionam; baixa parcial é a fase F10 |
+| Compras | ✅ Operacional | Segregação de funções aplicada |
+| BI | ✅ Reconstruído | Star schema com grão e chave natural, ETL idempotente, 4 dashboards em Altair com filtro de período |
+
+**223 testes passando.** A suíte roda em Windows e Linux.
 
 ### Estrutura do repositório
 
@@ -549,9 +554,12 @@ Traduz a arquitetura organizacional em um modelo de dados relacional (PostgreSQL
 
 | Diagrama | Descrição |
 |---|---|
-| [MER Conceitual](docs/diagramas/MER-conceitual.mmd) | Entidades e relacionamentos (alto nível) |
-| [MER Lógico](docs/diagramas/MER-logico.mmd) | Tabelas, atributos, PKs, FKs e cardinalidades |
-| [BI — Esquema Estrela](docs/diagramas/BI-esquema-estrela.mmd) | Modelo dimensional (fatos e dimensões) |
+| [MER Conceitual](docs/Entrega%202/diagramas/MER-conceitual.mmd) | Entidades e relacionamentos (alto nível) |
+| [MER Lógico](docs/Entrega%202/diagramas/MER-logico.mmd) | Tabelas, atributos, PKs, FKs e cardinalidades |
+| [BI — Esquema Estrela](docs/Entrega%202/diagramas/BI-esquema-estrela.mmd) | Modelo dimensional **como entregue na Entrega 02** |
+
+> O esquema estrela foi reconstruído depois da Entrega 02. O modelo **em vigor** está em
+> [docs/diagramas/bi-esquema-estrela.mmd](docs/diagramas/bi-esquema-estrela.mmd).
 
 </details>
 

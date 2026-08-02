@@ -60,7 +60,7 @@ a camada analítica de BI descritos na Entrega 01 e detalhados tecnicamente no
 O modelo conceitual apresenta as entidades principais e seus relacionamentos em alto nível, sem detalhar
 atributos. Ele evidencia o fluxo central da operação — do cadastro do paciente até o registro financeiro.
 
-> Diagrama: [`diagramas/MER-conceitual.mmd`](../diagramas/MER-conceitual.mmd)
+> Diagrama: [`diagramas/MER-conceitual.mmd`](diagramas/MER-conceitual.mmd)
 
 **Entidades centrais e seu papel:**
 
@@ -74,7 +74,7 @@ atributos. Ele evidencia o fluxo central da operação — do cadastro do pacien
 
 ## 5. Modelo lógico — dicionário de dados por módulo
 
-Diagrama completo (atributos, PKs, FKs, cardinalidades): [`diagramas/MER-logico.mmd`](../diagramas/MER-logico.mmd)
+Diagrama completo (atributos, PKs, FKs, cardinalidades): [`diagramas/MER-logico.mmd`](diagramas/MER-logico.mmd)
 
 > Convenções: **PK** = chave primária · **FK** = chave estrangeira · **UK** = chave única (UNIQUE).
 > Todas as entidades operacionais possuem timestamp de criação (omitido nas tabelas por concisão quando
