@@ -58,7 +58,7 @@ A página em `pages/` **orquestra**: chama service, trata erro, renderiza. Não 
 ### 2.2 Camadas
 
 ```
-pages/*.py                  Streamlit — 27 telas
+pages/*.py                  Streamlit — 27 telas, montadas por st.navigation
    │  (só chama service; a partir da F2, BI não tem SQL em página)
    ▼
 src/<dominio>/service.py    Regra de negócio · RBAC · auditoria · transação
@@ -74,7 +74,19 @@ PostgreSQL
 
 `session_scope()` ([src/db.py](../src/db.py)) entrega a sessão, faz **rollback em exceção** e fecha. O `commit` é responsabilidade do service — não há auto-commit. O engine usa `pool_pre_ping` e `pool_recycle=1800` para não quebrar na primeira query após conexão ociosa.
 
-### 2.4 Transversais
+### 2.4 Camada de UI (fase F1)
+
+| Peça | Papel |
+|---|---|
+| `app.py` | **Entrypoint e roteador.** Decide entre login e aplicação, e monta `st.navigation` a partir das permissões. Única chamada de `set_page_config` |
+| [ui.py](../src/ui.py) `paginas_permitidas()` | Regra de visibilidade do menu — função pura, testável |
+| [ui_components/data_grid.py](../src/ui_components/data_grid.py) | `renderizar_grid()` — **fronteira única** com o AgGrid. Formatação pt-BR, ordenação, filtro, paginação e seleção num só lugar |
+| [ui_components/erros.py](../src/ui_components/erros.py) | `tratar_erros()` — converte falha em mensagem legível, classificando pela origem da exceção |
+| [ui_components/](../src/ui_components/) | Cabeçalho, seção, KPI, badge de status, estado vazio |
+
+**Regra:** a página orquestra (chama service → renderiza componente). Não monta SQL, não monta HTML e não fala com o AgGrid diretamente.
+
+### 2.5 Transversais
 
 | Módulo | Papel |
 |---|---|
@@ -289,7 +301,11 @@ CPF criptografado com Fernet e indexado por SHA-256 (`cpf_hash`) — o setter do
 
 ## 8. Testes
 
-**223 testes passando**, 1 skip. Rodam em Windows e Linux.
+**274 testes passando, zero skips.** Rodam em Windows e Linux.
+
+> `make test` roda com `--build`. Sem isso o compose reusa a imagem antiga e uma
+> dependência nova em `requirements.txt` não entra — já aconteceu com o
+> `streamlit-aggrid`, e os testes que dependiam dele foram pulados em silêncio.
 
 | Área | Cobertura |
 |---|---|
@@ -299,7 +315,7 @@ CPF criptografado com Fernet e indexado por SHA-256 (`cpf_hash`) — o setter do
 | `tests/cadastro/` (5) | CRUD, unicidade, validadores de CPF/CNPJ/TUSS |
 | `tests/rbac/` (3) | Gate, granularidade, perfil padrão, idempotência do seed |
 | `tests/financeiro/` (3) · `tests/compras/` (2) · `tests/laboratorial/` (2) · `tests/logistica/` (2) · `tests/lgpd/` (2) · `tests/auditoria/` (1) | Regras de cada domínio |
-| Raiz | Sessão e rollback, compatibilidade do AgGrid, config, renderização de páginas |
+| Raiz | Sessão e rollback, compatibilidade do AgGrid, componente de grid, navegação por permissão, config, **smoke das 28 telas** |
 
 `tests/_tabelas.py` centraliza os conjuntos de tabelas truncadas entre testes, por domínio.
 
@@ -355,7 +371,7 @@ Base de demonstração: ~400 OS, ~1600 itens, ~960 laudos, ~76 lotes, glosas, ca
 |:---:|---|:---:|
 | **F0** | Fundação — rollback, glosa cumulativa, particular na glosa, seed RBAC, suíte no Windows | ✅ |
 | **F2** | BI onda 1 | ✅ |
-| F1 | Streamlit moderno — `st.navigation`, AgGrid, `fragment`/`dialog` | ⬜ |
+| **F1** | Streamlit moderno — grid, navegação nativa, dialogs | 🔶 parcial |
 | F3 | Preço particular, vigência, catálogo de exames e analitos, regra do valor | ⬜ |
 | F4–F11 | Competência → item faturável → remessa → guia por paciente → glosa → divergências → baixa parcial → caixa | ⬜ |
 | F12 | BI onda 2 | ⬜ |
