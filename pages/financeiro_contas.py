@@ -3,19 +3,24 @@ import streamlit as st
 from src.cadastro.convenio.service import listar_convenios
 from src.db import session_scope
 from src.faturamento.lote_faturamento.service import listar_lotes
-from src.financeiro.titulo_receber.errors import FinanceiroError
 from src.financeiro.titulo_receber.service import (
     baixar_titulo as baixar_receber,
     listar_todos as receber_todos,
 )
-from src.financeiro.titulo_pagar.errors import TituloPagarJaBaixado, TituloPagarNaoEncontrado
 from src.financeiro.titulo_pagar.service import (
     baixar_titulo as baixar_pagar,
     listar_todos as pagar_todos,
 )
 from src.financeiro.conciliacao_pagamento.service import listar_todas as conciliacoes_todas
-from src.ui import renderizar_menu, shell, usuario_id_logado
-from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao, renderizar_status_badge
+from src.ui import formatar_brl, renderizar_menu, shell, usuario_id_logado
+from src.ui_components import (
+    ColunaGrid,
+    renderizar_cabecalho,
+    renderizar_empty_state,
+    renderizar_grid,
+    renderizar_secao,
+    tratar_erros,
+)
 from src.ui_icons import ICONE_FINANCEIRO
 
 
@@ -106,57 +111,37 @@ def _render_receber() -> None:
     pendentes = [t for t in titulos if t.status == "PENDENTE"]
     st.caption(f"{len(pendentes)} pendentes de {len(titulos)} total")
 
-    for t in titulos:
-        status_tipo = "success" if t.status == "PAGO" else "warning" if t.status == "PENDENTE" else "error"
-        ref = _conv_label(convs, lotes, t.lote_faturamento_id)
+    linhas = [
+        {
+            "id": str(t.id),
+            "valor": t.valor,
+            "vencimento": t.vencimento,
+            "status": t.status,
+            "referencia": _conv_label(convs, lotes, t.lote_faturamento_id),
+        }
+        for t in titulos
+    ]
 
-        with st.container(border=True):
-            c1, c2 = st.columns([4, 1])
-            with c1:
-                st.metric(f"R$ {t.valor:.2f}", f"Vencimento: {t.vencimento.strftime('%d/%m/%Y')}")
-                st.caption(f"Status: {t.status} | {ref}")
-            with c2:
-                st.write("")
-                renderizar_status_badge(t.status, status_tipo)
-                if t.status == "PENDENTE":
-                    if st.button("Baixar", key=f"receber_{t.id}"):
-                        st.session_state[f"form_receber_{t.id}"] = True
+    grid = renderizar_grid(
+        linhas,
+        colunas=_COLUNAS_RECEBER,
+        chave="grid_receber",
+        selecao="linha",
+        altura=380,
+    )
 
-            if st.session_state.get(f"form_receber_{t.id}", False):
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    valor_pago = st.number_input(
-                        "Valor recebido (R$)",
-                        min_value=0.01,
-                        value=float(t.valor),
-                        step=1.0,
-                        key=f"valor_rec_{t.id}",
-                    )
-                with col_b:
-                    obs = st.text_input("Observação", key=f"obs_rec_{t.id}")
-                    c_confirm, c_cancel = st.columns(2)
-                    with c_confirm:
-                        if st.button("Confirmar", type="primary", key=f"conf_rec_{t.id}"):
-                            try:
-                                with session_scope() as session:
-                                    resultado = baixar_receber(
-                                        session, t.id, valor_pago, obs or None,
-                                        usuario_id=usuario_id_logado(),
-                                    )
-                                divergencia = resultado.valor - valor_pago
-                                if divergencia > 0:
-                                    st.warning(f"Divergência de R$ {divergencia:.2f} registrada — verifique a aba Conciliações.")
-                                    st.toast(f"Recebido R$ {valor_pago:.2f}. Divergência: R$ {divergencia:.2f}")
-                                else:
-                                    st.toast(f"Título de R$ {t.valor:.2f} baixado com sucesso!")
-                                st.session_state.pop(f"form_receber_{t.id}", None)
-                                st.rerun()
-                            except FinanceiroError as e:
-                                st.error(str(e))
-                    with c_cancel:
-                        if st.button("Cancelar", key=f"cancel_rec_{t.id}"):
-                            st.session_state.pop(f"form_receber_{t.id}", None)
-                            st.rerun()
+    titulo = grid.selecionado
+    if titulo is None:
+        st.caption("Selecione um titulo na tabela para dar baixa.")
+        return
+
+    st.divider()
+    if titulo["status"] != "PENDENTE":
+        st.caption(f"Titulo {titulo['status'].lower()} — nenhuma acao disponivel.")
+        return
+
+    if st.button("Dar baixa no titulo selecionado", type="primary"):
+        _dialogo_baixa_receber(titulo)
 
 
 def _render_pagar() -> None:
@@ -177,37 +162,40 @@ def _render_pagar() -> None:
     pendentes = [t for t in titulos if t.status == "PENDENTE"]
     st.caption(f"{len(pendentes)} pendentes de {len(titulos)} total")
 
-    for t in titulos:
-        emoji = "🟢" if t.status == "PAGO" else "🟡"
-        ref = f"Pedido: {str(t.pedido_compra_id)[:12]}..." if t.pedido_compra_id else "Lançamento manual"
+    linhas = [
+        {
+            "id": str(t.id),
+            "valor": t.valor,
+            "vencimento": t.vencimento,
+            "status": t.status,
+            "referencia": (
+                f"Pedido {str(t.pedido_compra_id)[:8]}" if t.pedido_compra_id
+                else "Lancamento manual"
+            ),
+        }
+        for t in titulos
+    ]
 
-        with st.container(border=True):
-            c1, c2 = st.columns([4, 1])
-            with c1:
-                st.write(f"{emoji} **R$ {t.valor:.2f}** — Vencimento: {t.vencimento.strftime('%d/%m/%Y')}")
-                st.caption(f"Status: {t.status} | {ref}")
-            with c2:
-                if t.status == "PENDENTE":
-                    if st.button("Baixar", key=f"pagar_{t.id}"):
-                        st.session_state[f"form_pagar_{t.id}"] = True
+    grid = renderizar_grid(
+        linhas,
+        colunas=_COLUNAS_PAGAR,
+        chave="grid_pagar",
+        selecao="linha",
+        altura=380,
+    )
 
-            if st.session_state.get(f"form_pagar_{t.id}", False):
-                obs = st.text_input("Observação", key=f"obs_pag_{t.id}")
-                c_confirm, c_cancel = st.columns(2)
-                with c_confirm:
-                    if st.button("Confirmar Pagamento", type="primary", key=f"conf_pag_{t.id}"):
-                        try:
-                            with session_scope() as session:
-                                baixar_pagar(session, t.id, obs or None, usuario_id=usuario_id_logado())
-                            st.toast(f"Título de R$ {t.valor:.2f} pago com sucesso!")
-                            st.session_state.pop(f"form_pagar_{t.id}", None)
-                            st.rerun()
-                        except (TituloPagarNaoEncontrado, TituloPagarJaBaixado, FinanceiroError) as e:
-                            st.error(str(e))
-                with c_cancel:
-                    if st.button("Cancelar", key=f"cancel_pag_{t.id}"):
-                        st.session_state.pop(f"form_pagar_{t.id}", None)
-                        st.rerun()
+    titulo = grid.selecionado
+    if titulo is None:
+        st.caption("Selecione um titulo na tabela para dar baixa.")
+        return
+
+    st.divider()
+    if titulo["status"] != "PENDENTE":
+        st.caption(f"Titulo {titulo['status'].lower()} — nenhuma acao disponivel.")
+        return
+
+    if st.button("Confirmar pagamento do titulo selecionado", type="primary"):
+        _dialogo_baixa_pagar(titulo)
 
 
 def _conv_label(convs, lotes, lote_id):
@@ -222,3 +210,75 @@ def _conv_label(convs, lotes, lote_id):
 
 if __name__ == "__main__":
     main()
+
+
+_COLUNAS_RECEBER = [
+    ColunaGrid("valor", "Valor", tipo="moeda", largura=140),
+    ColunaGrid("vencimento", "Vencimento", tipo="data", largura=140),
+    ColunaGrid("status", "Status", largura=120),
+    ColunaGrid("referencia", "Convenio / lote"),
+    ColunaGrid("id", "id", oculta=True),
+]
+
+_COLUNAS_PAGAR = [
+    ColunaGrid("valor", "Valor", tipo="moeda", largura=140),
+    ColunaGrid("vencimento", "Vencimento", tipo="data", largura=140),
+    ColunaGrid("status", "Status", largura=120),
+    ColunaGrid("referencia", "Origem"),
+    ColunaGrid("id", "id", oculta=True),
+]
+
+
+@st.dialog("Baixar titulo a receber")
+def _dialogo_baixa_receber(titulo: dict) -> None:
+    """Baixa com dialogo no lugar do formulario inline por linha (bug U4)."""
+    valor_total = float(titulo["valor"])
+    st.write(f"Titulo de **{formatar_brl(valor_total)}**")
+    st.caption(f"{titulo['referencia']} · vence em {titulo['vencimento'].strftime('%d/%m/%Y')}")
+
+    valor_pago = st.number_input(
+        "Valor recebido (R$)", min_value=0.01, value=valor_total, step=1.0
+    )
+    observacao = st.text_input("Observacao")
+
+    if valor_pago < valor_total:
+        st.warning(
+            f"Recebimento menor que o titulo em {formatar_brl(valor_total - valor_pago)}. "
+            "A divergenca fica registrada na aba Conciliacoes."
+        )
+
+    coluna_ok, coluna_cancelar = st.columns(2)
+    with coluna_ok:
+        if st.button("Confirmar baixa", type="primary", width="stretch"):
+            with tratar_erros("baixar o titulo") as resultado, session_scope() as session:
+                baixar_receber(
+                    session, titulo["id"], valor_pago, observacao or None,
+                    usuario_id=usuario_id_logado(),
+                )
+            if resultado:
+                st.toast(f"Titulo baixado: {formatar_brl(valor_pago)}.")
+                st.rerun()
+    with coluna_cancelar:
+        if st.button("Cancelar", width="stretch"):
+            st.rerun()
+
+
+@st.dialog("Confirmar pagamento")
+def _dialogo_baixa_pagar(titulo: dict) -> None:
+    st.write(f"Titulo de **{formatar_brl(float(titulo['valor']))}**")
+    st.caption(f"{titulo['referencia']} · vence em {titulo['vencimento'].strftime('%d/%m/%Y')}")
+    observacao = st.text_input("Observacao")
+
+    coluna_ok, coluna_cancelar = st.columns(2)
+    with coluna_ok:
+        if st.button("Confirmar pagamento", type="primary", width="stretch"):
+            with tratar_erros("pagar o titulo") as resultado, session_scope() as session:
+                baixar_pagar(
+                    session, titulo["id"], observacao or None, usuario_id=usuario_id_logado()
+                )
+            if resultado:
+                st.toast("Titulo pago.")
+                st.rerun()
+    with coluna_cancelar:
+        if st.button("Cancelar", width="stretch"):
+            st.rerun()

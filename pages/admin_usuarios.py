@@ -2,18 +2,17 @@ import streamlit as st
 from src.db import session_scope
 from src.rbac import service as rbac_service
 from src.rbac.dtos import PerfilCreate
-from src.rbac.errors import PerfilNaoEncontrado
 from src.usuario import repository as usuario_repository
-from src.usuario.errors import UsuarioNaoEncontrado
 from src.ui import renderizar_menu, shell
 from src.ui_components import (
+    ColunaGrid,
     renderizar_cabecalho,
-    renderizar_empty_state,
+    renderizar_grid,
     renderizar_secao,
-    renderizar_status_badge,
+    tratar_erros,
 )
-from src.ui_icons import ICONE_LIBERAR, ICONE_BUSCA, ICONE_ADICIONAR
-from src.ui_theme import NEUTRAL_50, NEUTRAL_100, NEUTRAL_200, NEUTRAL_300, NEUTRAL_600, NEUTRAL_800, WHITE, PRIMARY_50, PRIMARY_600
+from src.ui_icons import ICONE_LIBERAR
+from src.ui_theme import NEUTRAL_50, NEUTRAL_200, NEUTRAL_600, PRIMARY_50, PRIMARY_600
 
 
 def main() -> None:
@@ -37,123 +36,105 @@ def main() -> None:
 
 # ── TAB USUARIOS ──────────────────────────────────────────
 
+_COLUNAS_USUARIO = [
+    ColunaGrid("nome", "Usuario"),
+    ColunaGrid("email", "E-mail"),
+    ColunaGrid("perfil", "Perfil atual", largura=200),
+    ColunaGrid("id", "id", oculta=True),
+]
+
+_MANTER = "— Manter atual —"
+_REMOVER = "Remover perfil"
+
+
+@st.dialog("Alterar perfil do usuario")
+def _dialogo_perfil(usuario: dict, perfis_opcoes: dict) -> None:
+    st.write(f"**{usuario['nome']}**")
+    st.caption(f"{usuario['email']} · perfil atual: {usuario['perfil']}")
+
+    escolha = st.selectbox(
+        "Novo perfil",
+        options=[_MANTER, _REMOVER] + list(perfis_opcoes.keys()),
+    )
+
+    coluna_ok, coluna_cancelar = st.columns(2)
+    with coluna_ok:
+        if st.button("Salvar", type="primary", width="stretch", disabled=escolha == _MANTER):
+            with tratar_erros("alterar o perfil") as resultado, session_scope() as session:
+                if escolha == _REMOVER:
+                    rbac_service.desvincular_usuario_do_perfil(session, usuario["id"])
+                else:
+                    rbac_service.vincular_usuario_ao_perfil(
+                        session, usuario["id"], perfis_opcoes[escolha]
+                    )
+            if resultado:
+                st.toast("Perfil atualizado.")
+                st.rerun()
+    with coluna_cancelar:
+        if st.button("Cancelar", width="stretch"):
+            st.rerun()
+
+
 def _render_usuarios() -> None:
+    """Listagem de usuarios.
+
+    Ate a fase F1 esta tela desenhava a tabela com `st.markdown` de `<div>`
+    flex e depois sobrepunha `st.columns` por cima para encaixar os widgets —
+    duas grades independentes que so PARECIAM alinhadas. Agora e o componente
+    unico de grid, com a acao num dialogo.
+    """
     renderizar_secao(
         titulo="Vincular Usuario a Perfil",
         descricao="Atribua perfis de acesso aos usuarios cadastrados",
     )
 
-    with session_scope() as session:
+    with tratar_erros("carregar usuarios e perfis") as resultado, session_scope() as session:
         usuarios = usuario_repository.listar(session)
         perfis = rbac_service.listar_perfis(session)
+    if not resultado:
+        return
 
     if not usuarios:
         st.info("Nenhum usuario encontrado. Faca login para sincronizar.")
         return
-
     if not perfis:
         st.info("Nenhum perfil cadastrado. Execute o seeder RBAC primeiro.")
         return
 
     perfis_opcoes = {f"{p.nome} — {p.descricao or 'Sem descricao'}": p.id for p in perfis}
-    perfis_por_id = {p.id: p for p in perfis}
+    nomes_por_id = {p.id: p.nome for p in perfis}
 
-    # ── busca ──
-    busca = st.text_input(
-        "", placeholder="Buscar por nome ou e-mail...",
-        key="busca_usuarios", label_visibility="collapsed",
+    linhas = [
+        {
+            "id": str(u.id),
+            "nome": u.nome or "—",
+            "email": u.email or "—",
+            "perfil": nomes_por_id.get(u.perfil_id, "Nenhum"),
+        }
+        for u in usuarios
+    ]
+
+    sem_perfil = sum(1 for linha in linhas if linha["perfil"] == "Nenhum")
+    coluna_total, coluna_sem = st.columns(2)
+    coluna_total.metric("Usuarios", len(linhas))
+    coluna_sem.metric("Sem perfil", sem_perfil)
+
+    grid = renderizar_grid(
+        linhas,
+        colunas=_COLUNAS_USUARIO,
+        chave="grid_usuarios",
+        selecao="linha",
+        altura=380,
     )
-    st.markdown("<br>", unsafe_allow_html=True)
 
-    usuarios_filtrados = usuarios
-    if busca:
-        termo = busca.lower()
-        usuarios_filtrados = [
-            u for u in usuarios
-            if termo in (u.nome or "").lower() or termo in (u.email or "").lower()
-        ]
-
-    if not usuarios_filtrados:
-        st.caption("Nenhum usuario encontrado para esta busca.")
+    usuario = grid.selecionado
+    if usuario is None:
+        st.caption("Selecione um usuario na tabela para alterar o perfil de acesso.")
         return
 
-    # ── cabecalho da tabela ──
-    st.markdown(
-        f"""<div style="display:flex;align-items:center;padding:8px 14px;
-        background:{NEUTRAL_50};border:1px solid {NEUTRAL_200};border-radius:8px 8px 0 0;
-        font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;
-        color:{NEUTRAL_600};">
-        <span style="flex:3;">Usuario</span>
-        <span style="flex:3;">E-mail</span>
-        <span style="flex:2;">Perfil Atual</span>
-        <span style="flex:4;">Alterar Perfil</span>
-        </div>""",
-        unsafe_allow_html=True,
-    )
-
-    # ── linhas ──
-    for i, usuario in enumerate(usuarios_filtrados):
-        bg = WHITE if i % 2 == 0 else NEUTRAL_50
-        perfil_atual_nome = "Nenhum"
-        perfil_atual_id = None
-        if usuario.perfil_id and usuario.perfil_id in perfis_por_id:
-            perfil_atual_nome = perfis_por_id[usuario.perfil_id].nome
-            perfil_atual_id = usuario.perfil_id
-
-        st.markdown(
-            f"""<div style="display:flex;align-items:center;padding:10px 14px;
-            background:{bg};border:1px solid {NEUTRAL_200};border-top:none;
-            font-size:13px;color:{NEUTRAL_800};">
-            <div style="flex:3;">
-                <span style="font-weight:600;">{usuario.nome or "—"}</span>
-            </div>
-            <div style="flex:3;color:{NEUTRAL_600};font-size:12px;">
-                {usuario.email or "—"}
-            </div>
-            <div style="flex:2;">
-            </div>
-            <div style="flex:4;">
-            </div>
-            </div>""",
-            unsafe_allow_html=True,
-        )
-
-        col_nome, col_email, col_perfil, col_acao = st.columns([3, 3, 2, 4])
-
-        with col_perfil:
-            if perfil_atual_nome == "Nenhum":
-                renderizar_status_badge("Nenhum", "neutral")
-            else:
-                renderizar_status_badge(perfil_atual_nome, "info")
-
-        with col_acao:
-            sub_col1, sub_col2 = st.columns([3, 1])
-            with sub_col1:
-                novo_label = st.selectbox(
-                    "Perfil",
-                    options=["— Manter atual —", "🗑 Remover perfil"] + list(perfis_opcoes.keys()),
-                    key=f"sel_perfil_{usuario.id}",
-                    label_visibility="collapsed",
-                    placeholder="Alterar perfil...",
-                )
-            with sub_col2:
-                if novo_label != "— Manter atual —" and st.button(
-                    "Salvar", key=f"btn_salvar_{usuario.id}", type="primary", use_container_width=True,
-                ):
-                    try:
-                        with session_scope() as sess:
-                            if novo_label == "🗑 Remover perfil":
-                                rbac_service.desvincular_usuario_do_perfil(sess, usuario.id)
-                            else:
-                                rbac_service.vincular_usuario_ao_perfil(
-                                    sess, usuario.id, perfis_opcoes[novo_label]
-                                )
-                        st.toast("Perfil atualizado!", icon="\u2705")
-                        st.rerun()
-                    except (UsuarioNaoEncontrado, PerfilNaoEncontrado) as e:
-                        st.error(str(e))
-
-        st.markdown("<hr style='margin:0;border-color:#E0E4E8;border-width:0.5px;'>", unsafe_allow_html=True)
+    st.divider()
+    if st.button(f"Alterar perfil de {usuario['nome']}", type="primary"):
+        _dialogo_perfil(usuario, perfis_opcoes)
 
 
 # ── TAB PERFIS ─────────────────────────────────────────────

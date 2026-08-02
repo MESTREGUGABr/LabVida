@@ -371,7 +371,7 @@ Base de demonstração: ~400 OS, ~1600 itens, ~960 laudos, ~76 lotes, glosas, ca
 |:---:|---|:---:|
 | **F0** | Fundação — rollback, glosa cumulativa, particular na glosa, seed RBAC, suíte no Windows | ✅ |
 | **F2** | BI onda 1 | ✅ |
-| **F1** | Streamlit moderno — grid, navegação nativa, dialogs | 🔶 parcial |
+| **F1** | Streamlit moderno — grid, navegação nativa, dialogs | ✅ |
 | F3 | Preço particular, vigência, catálogo de exames e analitos, regra do valor | ⬜ |
 | F4–F11 | Competência → item faturável → remessa → guia por paciente → glosa → divergências → baixa parcial → caixa | ⬜ |
 | F12 | BI onda 2 | ⬜ |

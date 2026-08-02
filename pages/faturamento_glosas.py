@@ -2,14 +2,20 @@ import streamlit as st
 
 from src.db import session_scope
 from src.faturamento.glosa.dtos import GlosaCreate
-from src.faturamento.glosa.errors import GlosaError
 from src.faturamento.glosa.service import (
     listar_glosas_com_contexto,
     listar_guias_itens_faturados,
     registrar_glosa,
 )
 from src.ui import renderizar_menu, shell, usuario_id_logado
-from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
+from src.ui_components import (
+    ColunaGrid,
+    renderizar_cabecalho,
+    renderizar_empty_state,
+    renderizar_grid,
+    renderizar_secao,
+    tratar_erros,
+)
 from src.ui_icons import ICONE_ALERTA
 
 _MOTIVOS_PADRAO = [
@@ -57,61 +63,7 @@ def _render_registrar_glosa() -> None:
 
     st.caption(f"{len(itens)} itens faturados encontrados")
 
-    for item in itens:
-        guia_item_id = item["guia_item_id"]
-
-        with st.container(border=True):
-            col_info, col_btn = st.columns([4, 1])
-            with col_info:
-                st.write(f"**Lote:** {item['codigo_lote']} | **Convênio:** {item['convenio_nome']}")
-                st.write(f"**Procedimento:** {item['procedimento_nome']} | **Valor faturado:** R$ {item['valor_faturado']:.2f}")
-                st.caption(f"Unidade: {item['unidade_nome']}")
-            with col_btn:
-                expandir = st.button("Registrar Glosa", key=f"btn_glosa_{guia_item_id}")
-
-            if expandir or st.session_state.get(f"show_form_{guia_item_id}", False):
-                st.session_state[f"show_form_{guia_item_id}"] = True
-
-                motivo_opcoes = _MOTIVOS_PADRAO
-                motivo = st.selectbox("Motivo", options=motivo_opcoes, key=f"motivo_{guia_item_id}")
-
-                if motivo == "Outro":
-                    motivo = st.text_input("Descreva o motivo", key=f"motivo_outro_{guia_item_id}")
-
-                col1, col2 = st.columns(2)
-                with col1:
-                    valor_glosado = st.number_input(
-                        "Valor Glosado (R$)",
-                        min_value=0.01,
-                        max_value=float(item["valor_faturado"]),
-                        value=float(item["valor_faturado"]),
-                        step=1.0,
-                        key=f"valor_glosa_{guia_item_id}",
-                    )
-                with col2:
-                    st.write("")
-                    st.caption(f"Unidade de origem: **{item['unidade_nome']}** (detectada automaticamente)")
-
-                if st.button("Confirmar Glosa", type="primary", key=f"confirmar_{guia_item_id}"):
-                    try:
-                        dto = GlosaCreate(
-                            guia_item_id=guia_item_id,
-                            motivo=motivo.strip(),
-                            valor_glosado=valor_glosado,
-                        )
-                        with session_scope() as session:
-                            registrar_glosa(session, dto, usuario_id=usuario_id_logado())
-                        st.toast("Glosa registrada com sucesso!")
-                        st.session_state[f"show_form_{guia_item_id}"] = False
-                        st.rerun()
-                    except ValueError as e:
-                        st.error(str(e))
-                    except GlosaError as e:
-                        st.error(str(e))
-
-                if st.button("Cancelar", key=f"cancelar_{guia_item_id}"):
-                    st.session_state[f"show_form_{guia_item_id}"] = False
-                    st.rerun()
+    _selecionar_item_para_glosar(itens)
 
 
 def _render_listar_glosas() -> None:
@@ -153,3 +105,88 @@ def _render_listar_glosas() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+_COLUNAS_ITEM = [
+    ColunaGrid("codigo_lote", "Lote", largura=130),
+    ColunaGrid("convenio_nome", "Convenio"),
+    ColunaGrid("procedimento_nome", "Procedimento"),
+    ColunaGrid("unidade_nome", "Unidade"),
+    ColunaGrid("valor_faturado", "Faturado", tipo="moeda", largura=130),
+    ColunaGrid("guia_item_id", "guia_item_id", oculta=True),
+]
+
+
+@st.dialog("Registrar glosa")
+def _dialogo_glosa(item: dict) -> None:
+    st.write(f"**{item['procedimento_nome']}**")
+    st.caption(
+        f"Lote {item['codigo_lote']} · {item['convenio_nome']} · "
+        f"unidade {item['unidade_nome']}"
+    )
+
+    motivo = st.selectbox("Motivo", options=_MOTIVOS_PADRAO)
+    if motivo == "Outro":
+        motivo = st.text_input("Descreva o motivo")
+
+    faturado = float(item["valor_faturado"])
+    valor_glosado = st.number_input(
+        "Valor glosado (R$)",
+        min_value=0.01,
+        max_value=faturado,
+        value=faturado,
+        step=1.0,
+    )
+    st.caption(
+        "O servico valida o ACUMULADO do item: glosas parciais somadas nao podem "
+        "passar do valor faturado."
+    )
+
+    coluna_ok, coluna_cancelar = st.columns(2)
+    with coluna_ok:
+        if st.button("Confirmar glosa", type="primary", width="stretch"):
+            with tratar_erros("registrar a glosa") as resultado, session_scope() as session:
+                registrar_glosa(
+                    session,
+                    GlosaCreate(
+                        guia_item_id=item["guia_item_id"],
+                        motivo=(motivo or "").strip(),
+                        valor_glosado=valor_glosado,
+                    ),
+                    usuario_id=usuario_id_logado(),
+                )
+            if resultado:
+                st.toast("Glosa registrada.")
+                st.rerun()
+    with coluna_cancelar:
+        if st.button("Cancelar", width="stretch"):
+            st.rerun()
+
+
+def _selecionar_item_para_glosar(itens: list[dict]) -> None:
+    """Grid + dialogo no lugar do formulario inline por linha.
+
+    O padrao anterior guardava `st.session_state[f"show_form_{id}"]` por item:
+    so um formulario podia ficar aberto por vez e ele colapsava em reruns nao
+    relacionados (bug U4).
+    """
+    grid = renderizar_grid(
+        itens,
+        colunas=_COLUNAS_ITEM,
+        chave="grid_itens_faturados",
+        selecao="linha",
+        altura=380,
+    )
+
+    item = grid.selecionado
+    if item is None:
+        st.caption("Selecione um item faturado na tabela para registrar a glosa.")
+        return
+
+    st.divider()
+    if st.button(f"Registrar glosa em {item['procedimento_nome']}", type="primary"):
+        _dialogo_glosa(item)
+
+
+def _listar_itens_para_glosa(itens: list[dict]) -> None:
+    _selecionar_item_para_glosar(itens)
