@@ -117,26 +117,21 @@ section[data-testid="stSidebar"]::before {{
     z-index: 10;
 }}
 
-[data-testid="stSidebarNav"],
-[data-testid="stSidebarNavContainer"],
-[data-testid="stSidebarNavItems"],
-[data-testid="collapsedControl"],
-[data-testid="stSidebarCollapseButton"] {{
-    display: none !important;
+/* A navegacao nativa (st.navigation) e estilizada, nao escondida.
+   Ate a fase F1 este bloco tinha ~25 linhas de `display: none !important`
+   sobre o nav do Streamlit, porque o menu era HTML inline renderizado por
+   cima. O menu virou nativo, entao o CSS de combate saiu. */
+[data-testid="stSidebarNav"] {{
+    padding-top: 4px;
 }}
 
-section[data-testid="stSidebar"] ul,
-section[data-testid="stSidebar"] nav,
-section[data-testid="stSidebar"] > div:first-child > div:first-child {{
-    display: none !important;
+[data-testid="stSidebarNav"] a {{
+    border-radius: 8px;
+    margin: 1px 6px;
 }}
 
-section[data-testid="stSidebar"] > div > div:first-child:has(ul) {{
-    display: none !important;
-}}
-
-[data-testid="stSidebarCollapseButton"] {{
-    display: none !important;
+[data-testid="stSidebarNav"] a:hover {{
+    background: rgba(255, 255, 255, 0.08);
 }}
 
 section[data-testid="stSidebar"] > div:first-child {{

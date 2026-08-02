@@ -32,11 +32,17 @@ def admin_logado() -> dict:
 
     email = f"smoke_{uuid.uuid4().hex[:8]}@labvida.test"
     with session_scope() as session:
-        usuario = sincronizar_usuario(session, email, "Smoke Admin")
+        # `sincronizar_usuario` devolve DTO: o vinculo de perfil tem que ser
+        # feito na linha ORM, senao o teste roda em modo bootstrap (acesso
+        # plano) e nao exercita o gate de RBAC.
+        from src.usuario.models import Usuario
+
+        lido = sincronizar_usuario(session, email, "Smoke Admin")
+        usuario = session.get(Usuario, lido.id)
         admin = obter_perfil_por_nome(session, "admin")
-        if admin is not None:
-            usuario.perfil_id = admin.id
-            session.commit()
+        assert admin is not None, "seed de RBAC nao criou o perfil admin"
+        usuario.perfil_id = admin.id
+        session.commit()
         return {"id": str(usuario.id), "name": "Smoke Admin", "email": email}
 
 

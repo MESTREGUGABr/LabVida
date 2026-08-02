@@ -1,18 +1,33 @@
+"""Entrypoint do LabVida.
+
+Ate a fase F1 este arquivo era so a tela de login, e a navegacao vinha da
+auto-descoberta da pasta `pages/`, com o nav nativo escondido por CSS e um menu
+em HTML desenhado por cima. Agora ele e o roteador: decide entre login e
+aplicacao, e monta a navegacao nativa a partir das permissoes do usuario.
+"""
+
 import base64
+from uuid import UUID
+
 import streamlit as st
 
 from src.auth import AuthConfig, build_login_url, exchange_code, fetch_user
 from src.config import get_auth_config
 from src.db import session_scope
+from src.ui import construir_navegacao
 from src.usuario.service import sincronizar_usuario
 
 
 def main() -> None:
+    logado = bool(st.session_state.get("user"))
+
+    # Unica chamada de set_page_config da aplicacao: sob `st.navigation` o
+    # Streamlit recusa a segunda. O `shell()` das paginas tolera isso.
     st.set_page_config(
         page_title="LabVida",
         page_icon="\U0001f9ea",
-        layout="centered",
-        initial_sidebar_state="collapsed",
+        layout="wide" if logado else "centered",
+        initial_sidebar_state="expanded" if logado else "collapsed",
     )
 
     config = get_auth_config()
@@ -44,9 +59,17 @@ def main() -> None:
         st.rerun()
 
     if st.session_state.get("user"):
-        st.switch_page("pages/home.py")
+        _rodar_aplicacao()
+        return
 
     _renderizar_login(config)
+
+
+def _rodar_aplicacao() -> None:
+    """Navegacao nativa filtrada por permissao."""
+    usuario_id = UUID(st.session_state["user"]["id"])
+    pagina = st.navigation(construir_navegacao(usuario_id), position="sidebar")
+    pagina.run()
 
 
 def _logo_base64() -> str:

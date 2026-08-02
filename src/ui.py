@@ -10,6 +10,7 @@ from pathlib import Path
 from uuid import UUID
 
 import streamlit as st
+from streamlit.errors import StreamlitAPIException
 
 from src.db import session_scope
 from src.rbac.gate import verificar_permissao
@@ -136,11 +137,17 @@ def usuario_id_logado() -> UUID:
 
 def shell(page_title: str, *, layout: str = "centered", permissao: str | None = None) -> dict:
     """Shell unificado: login gate + page config + CSS global + RBAC opcional."""
-    st.set_page_config(
-        page_title=page_title,
-        page_icon="\U0001f9ea",
-        layout=layout,
-    )
+    # Sob `st.navigation`, o entrypoint (app.py) ja configurou a pagina e o
+    # Streamlit recusa uma segunda chamada. A pagina continua funcionando
+    # isolada (AppTest, execucao direta), onde esta e a primeira chamada.
+    try:
+        st.set_page_config(
+            page_title=page_title,
+            page_icon="\U0001f9ea",
+            layout=layout,
+        )
+    except StreamlitAPIException:
+        pass
 
     user = exigir_login()
     usuario_id = UUID(user["id"])
@@ -162,8 +169,107 @@ def shell(page_title: str, *, layout: str = "centered", permissao: str | None = 
     return {"user": user, "usuario_id": usuario_id}
 
 
+_ICONES_SECAO = {
+    "Cadastro": ":material/folder_shared:",
+    "Atendimento e Coleta": ":material/assignment:",
+    "Logistica de Amostras": ":material/local_shipping:",
+    "Laboratorial": ":material/biotech:",
+    "Faturamento": ":material/receipt_long:",
+    "Financeiro": ":material/payments:",
+    "Compras": ":material/shopping_cart:",
+    "Administracao": ":material/admin_panel_settings:",
+    "BI — Indicadores": ":material/insights:",
+}
+
+
+def permissoes_do_usuario(usuario_id: UUID) -> tuple[set[str], bool]:
+    """Permissoes efetivas e se o sistema esta em modo bootstrap.
+
+    Bootstrap = nenhum perfil cadastrado ainda. Nesse estado o acesso e plano,
+    senao a primeira pessoa a logar num banco novo nao conseguiria configurar
+    nada (ADR 0002).
+    """
+    with session_scope() as session:
+        permissoes = {p.codigo for p in listar_permissoes_do_usuario(session, usuario_id)}
+        bootstrap = not _existem_perfis(session)
+    return permissoes, (not permissoes and bootstrap)
+
+
+def paginas_permitidas(usuario_id: UUID) -> dict[str, list[tuple[str, str]]]:
+    """`(titulo, caminho)` por secao, filtrado por permissao.
+
+    Logica pura, separada da construcao dos `st.Page`: `StreamlitPage` so se
+    inicializa dentro de um script run, entao a regra de visibilidade nao
+    poderia ser testada se nascesse acoplada a ele.
+
+    A visibilidade usa exatamente a permissao que `shell()` exige na pagina —
+    de proposito. Mostrar um item que a propria tela vai barrar com "acesso
+    negado" e pior do que nao mostrar. Liberar leitura para perfis read-only
+    exige afrouxar tambem o gate de cada pagina, e isso e mudanca por tela.
+    """
+    permissoes, acesso_plano = permissoes_do_usuario(usuario_id)
+
+    secoes: dict[str, list[tuple[str, str]]] = {"Inicio": [("Home", "pages/home.py")]}
+
+    for secao, itens in _MENU:
+        visiveis = [
+            (titulo, caminho)
+            for titulo, caminho, permissao in itens
+            if acesso_plano or permissao is None or permissao in permissoes
+        ]
+        if visiveis:
+            secoes[secao] = visiveis
+
+    return secoes
+
+
+def construir_navegacao(usuario_id: UUID) -> dict[str, list]:
+    """Navegacao nativa do Streamlit, pronta para `st.navigation`.
+
+    Substitui as ~140 linhas de HTML inline que desenhavam um menu falso por
+    cima do nav do Streamlit, que ficava escondido por CSS.
+    """
+    return {
+        secao: [
+            st.Page(
+                caminho,
+                title=titulo,
+                icon=":material/home:" if secao == "Inicio" else _ICONES_SECAO.get(secao),
+                default=(caminho == "pages/home.py"),
+            )
+            for titulo, caminho in itens
+        ]
+        for secao, itens in paginas_permitidas(usuario_id).items()
+    }
+
+
+def renderizar_rodape_lateral(usuario_id: UUID) -> None:
+    """Cartao do usuario e logout no rodape da barra lateral."""
+    user = st.session_state.get("user", {})
+    with st.sidebar:
+        st.divider()
+        st.caption(f"**{user.get('name', 'Usuario')}**")
+        st.caption(user.get("email", ""))
+        if st.button("Sair", width="stretch", key="botao_sair"):
+            # Limpar e rerodar devolve ao login: o entrypoint decide a tela pela
+            # presenca de `user` na sessao. `switch_page` para o entrypoint nao
+            # vale sob `st.navigation`.
+            st.session_state.clear()
+            st.rerun()
+
+
 def renderizar_menu(usuario_id: UUID) -> None:
-    """Renderiza o menu lateral com secoes filtradas por permissao do usuario."""
+    """Compatibilidade: a navegacao agora e nativa (`st.navigation` em app.py).
+
+    As 27 telas seguem chamando esta funcao; ela deixou de desenhar o menu e
+    passou a renderizar so o rodape com usuario e logout. Manter a assinatura
+    evitou tocar em 27 arquivos so para remover uma linha.
+    """
+    renderizar_rodape_lateral(usuario_id)
+
+
+def _renderizar_menu_legado(usuario_id: UUID) -> None:
+    """Menu em HTML inline — substituido por `st.navigation` na fase F1."""
     with st.spinner("Carregando..."):
         with session_scope() as session:
             permissoes = {p.codigo for p in listar_permissoes_do_usuario(session, usuario_id)}
