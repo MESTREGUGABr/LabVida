@@ -8,8 +8,9 @@ Princípios de segurança aplicados:
 
 Popula 11 perfis e 34 permissões com vínculos N:N, mais a equipe operacional
 (um usuário por função, com o perfil correspondente).
-Idempotente: perfis só entram se a tabela permissoes estiver vazia; usuários
-são conferidos por e-mail.
+Idempotente **linha a linha**: permissão, perfil e vínculo são conferidos um a um,
+então uma base já semeada recebe o que for adicionado depois; usuários são
+conferidos por e-mail.
 """
 
 from src.db import session_scope
@@ -157,27 +158,54 @@ def executar_seeder_rbac() -> dict[str, int]:
 
 
 def _seed_perfis(session) -> tuple[int, int]:
-    if repository.listar_permissoes(session):
-        return 0, 0
+    """Upsert linha a linha de permissões, perfis e vínculos.
 
+    Antes havia um early-return (`if listar_permissoes(session): return 0, 0`) que
+    congelava toda base já semeada na primeira versão do RBAC: permissão nova
+    nunca chegava, e a tela que dependesse dela ficava inacessível para todo mundo
+    — inclusive admin. Como as fases seguintes acrescentam 8 permissões, isso
+    precisava cair antes.
+
+    Retorna quantos perfis e permissões foram **criados nesta execução** (0 e 0
+    quando a base já está em dia).
+    """
+    permissoes_criadas = 0
     permissoes_map: dict[str, Permissao] = {}
+
     for codigo, descricao in _PERMISSOES:
-        permissao = Permissao(codigo=codigo, descricao=descricao)
-        repository.salvar_permissao(session, permissao)
+        permissao = repository.obter_permissao_por_codigo(session, codigo)
+        if permissao is None:
+            permissao = Permissao(codigo=codigo, descricao=descricao)
+            repository.salvar_permissao(session, permissao)
+            permissoes_criadas += 1
+        elif permissao.descricao != descricao:
+            permissao.descricao = descricao
         permissoes_map[codigo] = permissao
 
-    for nome_perfil, codigos_permissoes in _PERFIS.items():
-        perfil = Perfil(nome=nome_perfil, descricao=f"Perfil {nome_perfil}")
-        repository.salvar_perfil(session, perfil)
-        session.flush()
+    session.flush()
 
+    perfis_criados = 0
+    for nome_perfil, codigos_permissoes in _PERFIS.items():
+        perfil = repository.obter_perfil_por_nome(session, nome_perfil)
+        if perfil is None:
+            perfil = Perfil(nome=nome_perfil, descricao=f"Perfil {nome_perfil}")
+            repository.salvar_perfil(session, perfil)
+            perfis_criados += 1
+            session.flush()
+
+        ja_vinculadas = {
+            p.codigo for p in repository.listar_permissoes_por_perfil(session, perfil.id)
+        }
         for codigo in codigos_permissoes:
-            permissao = permissoes_map[codigo]
-            vinculo = PerfilPermissao(perfil_id=perfil.id, permissao_id=permissao.id)
-            repository.vincular_permissao(session, vinculo)
+            if codigo in ja_vinculadas:
+                continue
+            repository.vincular_permissao(
+                session,
+                PerfilPermissao(perfil_id=perfil.id, permissao_id=permissoes_map[codigo].id),
+            )
 
     session.commit()
-    return len(_PERFIS), len(_PERMISSOES)
+    return perfis_criados, permissoes_criadas
 
 
 def _seed_usuarios(session) -> int:

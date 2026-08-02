@@ -10,7 +10,7 @@ def test_laboratorio_pages_import_only_existing_symbols() -> None:
     service_modules = {}
 
     for page_path in (PROJECT_ROOT / "pages").glob("laboratorio_*.py"):
-        tree = ast.parse(page_path.read_text(), filename=str(page_path))
+        tree = ast.parse(page_path.read_text(encoding="utf-8"), filename=str(page_path))
 
         for node in ast.walk(tree):
             if not isinstance(node, ast.ImportFrom) or not node.module:
@@ -33,7 +33,9 @@ def test_codebase_has_no_undefined_global_names() -> None:
 
     for base_dir in search_dirs:
         for py_path in base_dir.rglob("*.py"):
-            code = py_path.read_text()
+            # encoding explícito: sem ele, `read_text()` usa a locale do SO e a
+            # varredura quebra no Windows (cp1252) em arquivos UTF-8 com acento.
+            code = py_path.read_text(encoding="utf-8")
             st = symtable.symtable(code, str(py_path), "exec")
             top_globals = set(st.get_identifiers())
 

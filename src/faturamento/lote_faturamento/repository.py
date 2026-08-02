@@ -99,7 +99,10 @@ def listar_laudos_liberados_por_convenio(session: Session, convenio_id: UUID | N
             "laudo_id": r.id,
             "os_item_id": r.os_item_id,
             "procedimento_id": r.procedimento_id,
-            "valor_negociado": float(r.valor_negociado) if r.valor_negociado else 50.0,
+            # `os_itens.valor_negociado` é NOT NULL — o antigo fallback `or 50.0`
+            # nunca cobria NULL, só reescrevia silenciosamente item de valor zero
+            # para R$ 50. Valor inválido é responsabilidade da pré-auditoria.
+            "valor_negociado": float(r.valor_negociado),
             "status": r.status.value,
             "liberado_em": r.liberado_em,
         }

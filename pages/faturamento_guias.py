@@ -168,7 +168,11 @@ def _render_lotes_abertos(lotes, todos_convenios) -> None:
                         st.write(f"Item OS `{str(laudo_info['os_item_id'])[:12]}...`")
                     with c3:
                         valor_key = f"vlr_{lote.id}_{laudo_id}"
-                        valor_default = float(laudo_info.get("valor_negociado", 50.0))
+                        # O repositório sempre entrega `valor_negociado` (coluna NOT NULL).
+                        # O clamp existe só para o widget: item de valor zero violaria
+                        # `min_value` e derrubaria a página. A pré-auditoria é quem barra
+                        # valor inválido no fechamento do lote.
+                        valor_default = max(float(laudo_info["valor_negociado"]), 0.01)
                         valor = st.number_input(
                             "R$", min_value=0.01, value=valor_default, step=1.0,
                             key=valor_key, label_visibility="collapsed",
