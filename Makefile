@@ -27,9 +27,13 @@ build:
 logs:
 	docker compose logs -f app
 
+# --build e obrigatorio: sem ele o compose reusa a imagem antiga e uma dependencia
+# nova em requirements.txt nao entra. Ja aconteceu — streamlit-aggrid ficou fora
+# da imagem e os testes que dependiam dele passaram a ser PULADOS em silencio,
+# enquanto o codigo que o usava so nao quebrava porque a base estava vazia.
 test:
 	docker compose --profile test up -d postgres_test
-	@trap 'docker compose --profile test rm -sfv postgres_test' EXIT; docker compose --profile test run --rm app_test
+	@trap 'docker compose --profile test rm -sfv postgres_test' EXIT; docker compose --profile test run --rm --build app_test
 
 clean-test:
 	docker compose --profile test rm -sfv postgres_test app_test

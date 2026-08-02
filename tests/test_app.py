@@ -25,11 +25,22 @@ def usuario_logado(monkeypatch) -> dict:
     with session_scope() as session:
         from src.rbac.repository import obter_perfil_por_nome
 
-        usuario = sincronizar_usuario(session, email, "Operador Teste")
+        # `sincronizar_usuario` devolve um DTO Pydantic: atribuir `perfil_id`
+        # nele nao chega ao banco. Antes disso ficar explicito, este teste so
+        # passava quando a tabela `perfis` estava vazia (modo bootstrap, acesso
+        # plano) — o que o tornava dependente da ordem de execucao da suite e
+        # deixava o gate de RBAC sem cobertura.
+        from src.seeder.rbac import executar_seeder_rbac
+        from src.usuario.models import Usuario
+
+        executar_seeder_rbac()  # idempotente: garante o perfil admin
+
+        lido = sincronizar_usuario(session, email, "Operador Teste")
+        usuario = session.get(Usuario, lido.id)
         admin = obter_perfil_por_nome(session, "admin")
-        if admin is not None and usuario.perfil_id is None:
-            usuario.perfil_id = admin.id
-            session.commit()
+        assert admin is not None, "seed de RBAC nao criou o perfil admin"
+        usuario.perfil_id = admin.id
+        session.commit()
         return {
             "id": str(usuario.id),
             "name": "Operador Teste",

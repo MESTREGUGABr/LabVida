@@ -6,7 +6,12 @@ from src.cadastro.medico.errors import CrmDuplicado
 from src.cadastro.medico.service import criar_medico, listar_medicos_ativos
 from src.db import session_scope
 from src.ui import renderizar_menu, shell, usuario_id_logado
-from src.ui_components import renderizar_cabecalho, renderizar_empty_state
+from src.ui_components import (
+    ColunaGrid,
+    renderizar_cabecalho,
+    renderizar_empty_state,
+    renderizar_grid,
+)
 from src.ui_icons import ICONE_MEDICO
 
 
@@ -45,17 +50,22 @@ def main() -> None:
         medicos = listar_medicos_ativos(session)
 
     if medicos:
-        st.dataframe(
+        renderizar_grid(
             [
                 {
-                    "Nome": m.nome,
-                    "CRM": f"{m.crm}/{m.uf_crm}",
-                    "Responsavel tecnico": "Sim" if m.responsavel_tecnico else "Nao",
+                    "nome": m.nome,
+                    "crm": f"{m.crm}/{m.uf_crm}",
+                    "responsavel_tecnico": m.responsavel_tecnico,
                 }
                 for m in medicos
             ],
-            hide_index=True,
-            width="stretch",
+            colunas=[
+                ColunaGrid("nome", "Nome"),
+                ColunaGrid("crm", "CRM", largura=140),
+                ColunaGrid("responsavel_tecnico", "Responsavel tecnico", tipo="booleano", largura=190),
+            ],
+            chave="grid_medicos",
+            altura=360,
         )
     else:
         renderizar_empty_state(

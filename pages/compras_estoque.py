@@ -9,7 +9,13 @@ from src.compras.insumo.service import (
 )
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
-from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
+from src.ui_components import (
+    ColunaGrid,
+    renderizar_cabecalho,
+    renderizar_empty_state,
+    renderizar_grid,
+    renderizar_secao,
+)
 from src.ui_icons import ICONE_ESTOQUE
 
 
@@ -57,14 +63,23 @@ def _render_insumos() -> None:
             st.info("Nenhum insumo cadastrado.")
             return
 
-        rows = []
-        for i in insumos:
-            rows.append({
-                "Insumo": i.nome,
-                "Finalidade": i.finalidade,
-                "Qtd Estoque": f"{i.quantidade_estoque:.3f}",
-            })
-        st.dataframe(rows, hide_index=True, width="stretch")
+        renderizar_grid(
+            [
+                {
+                    "nome": i.nome,
+                    "finalidade": i.finalidade,
+                    "quantidade_estoque": i.quantidade_estoque,
+                }
+                for i in insumos
+            ],
+            colunas=[
+                ColunaGrid("nome", "Insumo"),
+                ColunaGrid("finalidade", "Finalidade"),
+                ColunaGrid("quantidade_estoque", "Qtd em estoque", tipo="numero", largura=160),
+            ],
+            chave="grid_insumos",
+            altura=360,
+        )
 
 
 def _render_movimentacoes() -> None:
@@ -79,17 +94,27 @@ def _render_movimentacoes() -> None:
         st.info("Nenhuma movimentação de estoque registrada.")
         return
 
-    rows = []
-    for m in movs:
-        tipo = "+ Entrada" if m.tipo == "ENTRADA" else "- Saída"
-        rows.append({
-            "Data": m.ocorrido_em.strftime("%d/%m/%Y %H:%M"),
-            "Insumo": insumo_nomes.get(m.insumo_material_id, "Desconhecido"),
-            "Tipo": tipo,
-            "Qtd": f"{m.quantidade:.3f}",
-            "Observação": m.observacao or "—",
-        })
-    st.dataframe(rows, hide_index=True, width="stretch")
+    renderizar_grid(
+        [
+            {
+                "ocorrido_em": m.ocorrido_em,
+                "insumo": insumo_nomes.get(m.insumo_material_id, "Desconhecido"),
+                "tipo": "Entrada" if m.tipo == "ENTRADA" else "Saida",
+                "quantidade": m.quantidade,
+                "observacao": m.observacao or "—",
+            }
+            for m in movs
+        ],
+        colunas=[
+            ColunaGrid("ocorrido_em", "Data", tipo="data_hora", largura=160),
+            ColunaGrid("insumo", "Insumo"),
+            ColunaGrid("tipo", "Tipo", largura=110),
+            ColunaGrid("quantidade", "Qtd", tipo="numero", largura=110),
+            ColunaGrid("observacao", "Observacao"),
+        ],
+        chave="grid_movimentos_estoque",
+        altura=380,
+    )
 
 
 if __name__ == "__main__":

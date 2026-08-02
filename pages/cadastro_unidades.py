@@ -11,7 +11,11 @@ from src.cadastro.unidade.service import (
 )
 from src.db import session_scope
 from src.ui import renderizar_menu, shell, usuario_id_logado
-from src.ui_components import renderizar_cabecalho
+from src.ui_components import (
+    ColunaGrid,
+    renderizar_cabecalho,
+    renderizar_grid,
+)
 from src.ui_icons import ICONE_UNIDADE
 
 
@@ -53,10 +57,18 @@ def _render_unidades() -> None:
 
     unidades = _unidades()
     if unidades:
-        st.dataframe(
-            [{"Nome": u.nome, "Tipo": _formatar_tipo(u.tipo), "Endereço": u.endereco or "—"} for u in unidades],
-            hide_index=True,
-            width="stretch",
+        renderizar_grid(
+            [
+                {"nome": u.nome, "tipo": _formatar_tipo(u.tipo), "endereco": u.endereco or "—"}
+                for u in unidades
+            ],
+            colunas=[
+                ColunaGrid("nome", "Nome"),
+                ColunaGrid("tipo", "Tipo", largura=140),
+                ColunaGrid("endereco", "Endereco"),
+            ],
+            chave="grid_unidades",
+            altura=320,
         )
     else:
         st.info("Nenhuma unidade cadastrada")
@@ -92,8 +104,12 @@ def _render_setores() -> None:
         setores = listar_setores_ativos(session, unidade_id)
 
     if setores:
-        st.dataframe(
-            [{"Setor": s.nome} for s in setores], hide_index=True, width="stretch"
+        renderizar_grid(
+            [{"nome": s.nome} for s in setores],
+            colunas=[ColunaGrid("nome", "Setor")],
+            chave="grid_setores",
+            altura=260,
+            paginar=False,
         )
     else:
         st.info("Nenhum setor nesta unidade")

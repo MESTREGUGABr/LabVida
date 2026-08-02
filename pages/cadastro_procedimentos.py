@@ -15,7 +15,11 @@ from src.cadastro.procedimento.service import (
 from src.cadastro.convenio.errors import ConvenioNaoEncontrado
 from src.db import session_scope
 from src.ui import renderizar_menu, shell, usuario_id_logado
-from src.ui_components import renderizar_cabecalho
+from src.ui_components import (
+    ColunaGrid,
+    renderizar_cabecalho,
+    renderizar_grid,
+)
 from src.ui_icons import ICONE_PROCEDIMENTO
 
 
@@ -60,10 +64,18 @@ def _render_procedimentos() -> None:
 
     procedimentos = _procedimentos()
     if procedimentos:
-        st.dataframe(
-            [{"TUSS": p.codigo_tuss, "Nome": p.nome, "Setor": p.setor or "—"} for p in procedimentos],
-            hide_index=True,
-            width="stretch",
+        renderizar_grid(
+            [
+                {"codigo_tuss": p.codigo_tuss, "nome": p.nome, "setor": p.setor or "—"}
+                for p in procedimentos
+            ],
+            colunas=[
+                ColunaGrid("codigo_tuss", "TUSS", largura=120),
+                ColunaGrid("nome", "Procedimento"),
+                ColunaGrid("setor", "Setor", largura=170),
+            ],
+            chave="grid_procedimentos",
+            altura=360,
         )
     else:
         st.info("Nenhum procedimento cadastrado")

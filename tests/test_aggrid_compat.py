@@ -16,7 +16,21 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-st_aggrid = pytest.importorskip("st_aggrid", reason="streamlit-aggrid nao instalado")
+try:
+    import st_aggrid  # noqa: F401
+except ModuleNotFoundError as erro:  # pragma: no cover - falha de ambiente
+    # Deliberadamente NAO e `importorskip`. Com skip, a ausencia da dependencia
+    # passava despercebida: a imagem do container ficou sem streamlit-aggrid,
+    # estes testes foram pulados em silencio e o `renderizar_grid()` so nao
+    # quebrava porque a base de teste estava vazia (o grid retorna antes do
+    # import quando nao ha linhas). Dependencia declarada e requisito, nao
+    # opcional — se faltar, a suite tem que ficar vermelha.
+    pytest.fail(
+        "streamlit-aggrid nao esta instalado no ambiente de teste. "
+        "Reconstrua a imagem: `docker compose --profile test build app_test`. "
+        f"({erro})",
+        pytrace=False,
+    )
 
 
 def test_convive_com_streamlit_e_altair_instalados() -> None:
