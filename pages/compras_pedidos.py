@@ -13,7 +13,13 @@ from src.compras.pedido_compra.service import (
 )
 from src.db import session_scope
 from src.ui import renderizar_menu, shell, usuario_id_logado
-from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao, renderizar_status_badge
+from src.ui_components import (
+    ColunaGrid,
+    renderizar_cabecalho,
+    renderizar_grid,
+    renderizar_secao,
+    tratar_erros,
+)
 from src.ui_icons import ICONE_PEDIDO
 
 
@@ -95,61 +101,120 @@ def _render_novo_pedido() -> None:
             st.error(str(e))
 
 
+_COLUNAS_PEDIDO = [
+    ColunaGrid("numero", "Pedido", largura=110),
+    ColunaGrid("fornecedor", "Fornecedor"),
+    ColunaGrid("status", "Status", largura=120),
+    ColunaGrid("qtd_itens", "Itens", tipo="inteiro", largura=90),
+    ColunaGrid("valor_total", "Valor total", tipo="moeda", largura=140),
+    ColunaGrid("criado_em", "Criado em", tipo="data_hora", largura=160),
+    ColunaGrid("id", "id", oculta=True),
+]
+
+_COLUNAS_ITEM = [
+    ColunaGrid("insumo", "Produto"),
+    ColunaGrid("quantidade", "Quantidade", tipo="numero", largura=130),
+    ColunaGrid("valor_unitario", "Valor unitario", tipo="moeda", largura=140),
+    ColunaGrid("subtotal", "Subtotal", tipo="moeda", largura=140),
+]
+
+
+@st.dialog("Confirmar acao no pedido")
+def _dialogo_acao(pedido: dict, acao: str) -> None:
+    rotulos = {
+        "aprovar": ("Aprovar o pedido gera o **titulo a pagar** correspondente.", aprovar_pedido),
+        "cancelar": ("O cancelamento nao pode ser desfeito.", cancelar_pedido),
+        "receber": ("O recebimento dá entrada dos produtos no **estoque**.", receber_pedido),
+    }
+    aviso, operacao = rotulos[acao]
+
+    st.write(f"Pedido **{pedido['numero']}** — {pedido['fornecedor']}")
+    st.caption(aviso)
+
+    coluna_ok, coluna_cancelar = st.columns(2)
+    with coluna_ok:
+        if st.button("Confirmar", type="primary", width="stretch"):
+            with tratar_erros(f"{acao} o pedido") as resultado, session_scope() as session:
+                operacao(session, pedido["id"])
+            if resultado:
+                st.toast(f"Pedido {acao[:-1]}ado.")
+                st.rerun()
+    with coluna_cancelar:
+        if st.button("Voltar", width="stretch"):
+            st.rerun()
+
+
 def _render_acompanhar() -> None:
     renderizar_secao(titulo="Pedidos")
 
-    with session_scope() as session:
+    with tratar_erros("carregar os pedidos") as resultado, session_scope() as session:
         pedidos = listar_pedidos(session)
-        fornecedores = listar_fornecedores(session)
-        forn_nomes = {f.id: f.nome for f in fornecedores}
-
-    if not pedidos:
-        st.info("Nenhum pedido registrado.")
+        nomes_fornecedor = {f.id: f.nome for f in listar_fornecedores(session)}
+        nomes_insumo = {i.id: i.nome for i in listar_insumos(session)}
+        linhas = [
+            {
+                "id": str(p.id),
+                "numero": f"PC-{str(p.id)[:6].upper()}",
+                "fornecedor": nomes_fornecedor.get(p.fornecedor_id, "Desconhecido"),
+                "status": p.status,
+                "qtd_itens": len(p.itens),
+                "valor_total": p.valor_total,
+                "criado_em": p.criado_em,
+            }
+            for p in pedidos
+        ]
+        # Os itens sao lidos aqui, dentro da sessao: acessa-los depois do
+        # `session_scope` fechar levantaria DetachedInstanceError.
+        itens_por_pedido = {
+            str(p.id): [
+                {
+                    "insumo": nomes_insumo.get(item.insumo_material_id, "Insumo removido"),
+                    "quantidade": item.quantidade,
+                    "valor_unitario": item.valor_unitario,
+                    "subtotal": float(item.quantidade) * float(item.valor_unitario),
+                }
+                for item in p.itens
+            ]
+            for p in pedidos
+        }
+    if not resultado:
         return
 
-    for p in pedidos:
-        status_tipo = {"RASCUNHO": "neutral", "APROVADO": "info", "RECEBIDO": "success", "CANCELADO": "error"}
-        tipo = status_tipo.get(p.status, "neutral")
-        total_itens = len(p.itens)
+    grid = renderizar_grid(
+        linhas,
+        colunas=_COLUNAS_PEDIDO,
+        chave="grid_pedidos",
+        selecao="linha",
+        altura=340,
+        mensagem_vazio="Nenhum pedido registrado. Use a aba **Novo Pedido**.",
+    )
 
-        with st.container(border=True):
-            c1, c2 = st.columns([4, 1])
-            with c1:
-                st.write(f"**Pedido** — R$ {p.valor_total:.2f} — {total_itens} itens")
-                st.caption(f"Fornecedor: {forn_nomes.get(p.fornecedor_id, 'Desconhecido')} | Criado: {p.criado_em.strftime('%d/%m/%Y %H:%M')}")
-            with c2:
-                st.write("")
-                renderizar_status_badge(p.status, tipo)
-                if p.status == "RASCUNHO":
-                    col_a, col_b = st.columns(2)
-                    confirmar = st.checkbox("Confirmo a aprovação", key=f"confirm_aprovar_{p.id}")
-                    with col_a:
-                        if st.button("Aprovar", key=f"aprovar_{p.id}", disabled=not confirmar):
-                            try:
-                                with session_scope() as session:
-                                    aprovar_pedido(session, p.id)
-                                st.toast("Pedido aprovado! Título a pagar gerado.")
-                                st.rerun()
-                            except PedidoError as e:
-                                st.error(str(e))
-                    with col_b:
-                        if st.button("Cancelar", key=f"cancelar_{p.id}"):
-                            try:
-                                with session_scope() as session:
-                                    cancelar_pedido(session, p.id)
-                                st.toast("Pedido cancelado.")
-                                st.rerun()
-                            except PedidoError as e:
-                                st.error(str(e))
-                elif p.status == "APROVADO":
-                    if st.button("Receber", key=f"receber_{p.id}"):
-                        try:
-                            with session_scope() as session:
-                                receber_pedido(session, p.id)
-                            st.toast("Pedido recebido! Estoque atualizado.")
-                            st.rerun()
-                        except PedidoError as e:
-                            st.error(str(e))
+    pedido = grid.selecionado
+    if pedido is None:
+        st.caption("Selecione um pedido para ver os produtos e agir sobre ele.")
+        return
+
+    st.divider()
+    renderizar_secao(titulo=f"Produtos do pedido {pedido['numero']}")
+    renderizar_grid(
+        itens_por_pedido.get(pedido["id"], []),
+        colunas=_COLUNAS_ITEM,
+        chave=f"grid_itens_{pedido['id']}",
+        altura=220,
+        paginar=False,
+        mensagem_vazio="Este pedido nao tem produtos lancados.",
+    )
+
+    acoes = {"RASCUNHO": ["aprovar", "cancelar"], "APROVADO": ["receber"]}.get(pedido["status"], [])
+    if not acoes:
+        st.caption(f"Pedido {pedido['status'].lower()} — nenhuma acao disponivel.")
+        return
+
+    colunas = st.columns(len(acoes) + 2)
+    for indice, acao in enumerate(acoes):
+        with colunas[indice]:
+            if st.button(acao.capitalize(), key=f"acao_{acao}", width="stretch"):
+                _dialogo_acao(pedido, acao)
 
 
 if __name__ == "__main__":
