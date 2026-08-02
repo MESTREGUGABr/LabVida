@@ -3,6 +3,9 @@
 > Documento de **planejamento**. Nada aqui foi implementado ainda.
 > Anexo técnico: [plano-faturamento-competencia.md](plano-faturamento-competencia.md).
 > Documento irmão: [revisao-final.md](revisao-final.md).
+>
+> ⚠️ **A §8 (Ordem de execução) foi superada por [roadmap-execucao.md](roadmap-execucao.md)**, que é o documento canônico de fases, migrations e paralelização. Este plano continua válido como **conteúdo técnico** (o *quê* e o *como*).
+> O **Eixo 4 — BI** (§5) foi expandido e corrigido em [plano-bi.md](plano-bi.md): a afirmação de §5.1 de que o bug B1 exige mudança no OLTP está incorreta, e por isso o BI deixou de ser a última fase.
 
 ## Contexto
 
