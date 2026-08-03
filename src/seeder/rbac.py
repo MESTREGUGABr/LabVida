@@ -48,6 +48,7 @@ _PERMISSOES = [
     ("faturamento:visualizar_lotes", "Visualizar lotes e guias TISS"),
     ("faturamento:gerenciar_lotes", "Criar e fechar lotes de faturamento"),
     ("faturamento:registrar_glosa", "Registrar glosa em guia"),
+    ("faturamento:valor_excecao", "Cobrar valor diferente da tabela de precos"),
     # --- Financeiro ---
     ("financeiro:visualizar_titulos", "Visualizar títulos a receber e pagar"),
     ("financeiro:baixar_titulo", "Baixar títulos a receber e a pagar"),
@@ -76,6 +77,7 @@ _ADMIN = [
     "logistica:visualizar_malotes", "logistica:despachar_malote", "logistica:receber_malote",
     "laboratorial:registrar_resultado", "laboratorial:liberar_laudo",
     "faturamento:visualizar_lotes", "faturamento:gerenciar_lotes", "faturamento:registrar_glosa",
+    "faturamento:valor_excecao",
     "financeiro:visualizar_titulos", "financeiro:baixar_titulo", "financeiro:conciliar",
     "compras:visualizar_estoque", "compras:solicitar", "compras:aprovar", "compras:receber",
     "compras:gerenciar_fornecedores",
@@ -115,6 +117,7 @@ _PERFIS = {
     "faturista": [
         "cadastro:pacientes:ler", "cadastro:convenios:ler", "cadastro:procedimentos:ler",
         "faturamento:visualizar_lotes", "faturamento:gerenciar_lotes", "faturamento:registrar_glosa",
+        "faturamento:valor_excecao",
         "financeiro:visualizar_titulos",
     ],
 

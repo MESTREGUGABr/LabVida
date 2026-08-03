@@ -48,3 +48,11 @@ class UnidadeInvalidaParaOS(Exception):
 
 class TransicaoOSInvalida(Exception):
     pass
+
+
+class ValorForaDaTabela(Exception):
+    """Valor digitado difere da tabela de precos e o usuario nao tem excecao."""
+
+
+class MotivoDeExcecaoObrigatorio(Exception):
+    """Valor negociado exige justificativa registrada."""
