@@ -48,6 +48,7 @@ LABORATORIAL = (
 )
 
 FATURAMENTO = (
+    "competencias",
     "glosas",
     "guias_itens",
     "guias_tiss",

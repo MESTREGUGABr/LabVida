@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -88,7 +88,13 @@ def criar_laudo_liberado(session: Session, base: Base) -> Laudo:
     session.add(item)
     session.flush()
 
-    laudo = Laudo(os_item_id=item.id, status=StatusLaudo.LIBERADO)
+    # `liberado_em` e o FATO GERADOR: e dele que sai a competencia (F4).
+    # Laudo LIBERADO sem instante de liberacao nao existe no mundo real.
+    laudo = Laudo(
+        os_item_id=item.id,
+        status=StatusLaudo.LIBERADO,
+        liberado_em=datetime.now(timezone.utc),
+    )
     session.add(laudo)
     session.commit()
     return laudo

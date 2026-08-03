@@ -373,7 +373,8 @@ Base de demonstração: ~400 OS, ~1600 itens, ~960 laudos, ~76 lotes, glosas, ca
 | **F2** | BI onda 1 | ✅ |
 | **F1** | Streamlit moderno — grid, navegação nativa, dialogs | ✅ |
 | **F3** | Preço particular, vigência, catálogo de analitos, regra do valor | ✅ |
-| F4–F11 | Competência → item faturável → remessa → guia por paciente → glosa → divergências → baixa parcial → caixa | ⬜ |
+| **F4** | Competência como eixo de apuração, com fechamento | ✅ |
+| F5–F11 | Item faturável → remessa → guia por paciente → glosa → divergências → baixa parcial → caixa | ⬜ |
 | F12 | BI onda 2 | ⬜ |
 | F13 | OMOP | ⬜ |
 | F14 | Segurança (JWT, `state`, auditoria de PII, salt no CPF) | ⬜ |

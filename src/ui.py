@@ -67,6 +67,7 @@ _MENU = [
     (
         "Faturamento",
         [
+            ("Competencia", "pages/faturamento_competencia.py", "faturamento:gerenciar_lotes"),
             ("Faturamento de Guias TISS", "pages/faturamento_guias.py", "faturamento:gerenciar_lotes"),
             ("Controle de Glosas", "pages/faturamento_glosas.py", "faturamento:registrar_glosa"),
         ],
