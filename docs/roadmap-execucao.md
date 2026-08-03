@@ -33,9 +33,9 @@ Além disso, a conferência do código contra a documentação encontrou **sete 
 | **F0** | ✅ **Fundação — concluída em 02/08/2026.** `db.py` (rollback + `pool_pre_ping` + `pool_recycle`); glosa cumulativa (N3); `LEFT JOIN` do particular (N7); seed RBAC idempotente por linha (N13); fallback `50.0` removido; `tests/_tabelas.py` extraído dos **6** conftests; N19 (suíte no Windows); spike do AgGrid + 3 ADRs. **N11 já estava corrigido** pelo commit `4a07160` — o plano estava desatualizado | — | — | — | evolucao §8 |
 | **F1** | ✅ **Streamlit moderno — concluída em 02/08/2026.** `renderizar_grid()` com AgGrid como fronteira única · `tratar_erros()` · `st.navigation` nativa filtrada por permissão (morreram ~140 linhas de HTML inline e ~25 de CSS de combate) · `st.dialog` no lugar dos toggles de `session_state` em Fornecedores, Compras, Glosas, Contas e Admin · grid em 12 telas · smoke das 28 telas | — | F0 | F2, F3 | evolucao §2 |
 | **F2** | ✅ **BI onda 1 — concluída em 02/08/2026.** 8 bugs + 2 problemas de grão corrigidos; 7 dimensões e 6 fatos com chave natural; ETL idempotente (**35s → 1,3s**); `metricas.py`; Altair; filtro de período; 4 dashboards; 41 testes de BI | `0014` | F0 | F1, F3 | **[plano-bi.md](plano-bi.md) §10** |
-| **F3** | **Preço, catálogo e regra do valor** — preço particular, `vigencia_fim`, EXCLUDE; catálogo de exames; catálogo de analitos; `ValorReferencia` por sexo/idade; regra do valor nos 3 pontos | `0015` | F0 | F1, F2 | evolucao §4 · faturamento §1.9-1.10 |
-| **F4** | **Competência** — tabela, backfill, service, tela de apuração (ainda sem bloqueio) | `0016` | F3 | — | faturamento §1.1 |
-| **F5** | **Item faturável** — tabela, backfill, hook na liberação do laudo, `StatusOsItem.FATURADO` finalmente atribuído | `0017` | F4 | — | faturamento §1.2 |
+| **F3** | 🔶 **Preço, catálogo e regra do valor — parcial (03/08/2026).** ✅ preço particular + vigência + EXCLUDE · regra do valor na abertura da OS · catálogo de analitos + painel + faixa por sexo/idade · exame enriquecido. ⬜ falta: tela de preços com "Particular", seeder com tabela particular. *(descrição original:)* **Preço, catálogo e regra do valor** — preço particular, `vigencia_fim`, EXCLUDE; catálogo de exames; catálogo de analitos; `ValorReferencia` por sexo/idade; regra do valor nos 3 pontos | `0015` | F0 | F1, F2 | evolucao §4 · faturamento §1.9-1.10 |
+| **F4** | **Competência** — tabela, backfill, service, tela de apuração (ainda sem bloqueio) | `0017` | F3 | — | faturamento §1.1 |
+| **F5** | **Item faturável** — tabela, backfill, hook na liberação do laudo, `StatusOsItem.FATURADO` finalmente atribuído | `0018` | F4 | — | faturamento §1.2 |
 | **F6** | **Remessa** — rename lote→remessa, sequence, unique parcial, pacote `remessa` | `0018` | F5 | — | faturamento §1.5 |
 | **F7** | ⭐ **Guia por paciente** — explosão das guias degeneradas, `item_faturavel_id`, reescrita de `faturamento_guias.py` — **a entrega visível para o professor** | `0019` | F6 | — | faturamento §1.3-1.4 |
 | **F8** | **Glosa com ciclo de vida** — status, `recursos_glosa`, reapresentação, abatimento no título | `0020` | F7 | F9 | faturamento §1.6 |
@@ -61,17 +61,18 @@ Head atual verificado: **`0013_bi_paciente_hash`**, cadeia única e limpa (o `00
 | Migration | Fase | Conteúdo |
 |---|:---:|---|
 | `0014_bi_reconstrucao` | F2 | tabelas `bi_*`: chave natural nos fatos, `bi_fato_ordem_servico`, `bi_fato_glosa`, `bi_dim_setor`, `bi_dim_motivo_glosa`, colunas novas de `bi_dim_tempo`, `bi_etl_execucao` |
-| `0015_precos_comerciais` | F3 | (era `0014` no anexo) |
-| `0016_competencias` | F4 | (era `0015`) |
-| `0017_itens_faturaveis` | F5 | (era `0016`) |
-| `0018_remessa` | F6 | (era `0017`) |
-| `0019_guia_por_paciente` | F7 | (era `0018`) |
-| `0020_glosa_ciclo_de_vida` | F8 | (era `0019`) |
-| `0021_divergencias` | F9 | (era `0020`) |
-| `0022_titulo_receber_baixa_parcial` | F10 | (era `0021`) |
-| `0023_caixa_contas_e_pagar` | F11 | (era `0022`) |
+| `0015_precos_comerciais` | F3 | preço particular, `vigencia_fim`, EXCLUDE, condições comerciais, rastro do valor na OS |
+| `0016_catalogo_analitos` | F3 | catálogo de analitos, painel do exame, faixa por sexo/idade, exame enriquecido |
+| `0017_competencias` | F4 | (era `0015`) |
+| `0018_itens_faturaveis` | F5 | (era `0016`) |
+| `0019_remessa` | F6 | (era `0017`) |
+| `0020_guia_por_paciente` | F7 | (era `0018`) |
+| `0021_glosa_ciclo_de_vida` | F8 | (era `0019`) |
+| `0022_divergencias` | F9 | (era `0020`) |
+| `0023_titulo_receber_baixa_parcial` | F10 | (era `0021`) |
+| `0024_caixa_contas_e_pagar` | F11 | (era `0022`) |
 
-> ⚠️ Ao ler o anexo [plano-faturamento-competencia.md](plano-faturamento-competencia.md) §2, **some 1** em todo número de migration. O conteúdo de cada uma está correto; só o número mudou.
+> ⚠️ Ao ler o anexo [plano-faturamento-competencia.md](plano-faturamento-competencia.md) §2, **some 2** em todo número de migration a partir de `competencias` (a F3 consumiu 0015 e 0016). O conteúdo de cada uma está correto; só o número mudou.
 
 **Regra obrigatória a partir daqui:** migrations **escritas à mão** (`alembic revision -m`, **sem** `--autogenerate`). O autogenerate **não detecta rename** — ele emite `drop_table` + `create_table`, o que destruiria os 73 lotes na `0018`. O alvo `make revision` do Makefile usa `--autogenerate` e **não serve** para esta remodelagem. Documentar no Makefile e no README.
 

@@ -2,7 +2,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import Boolean, Date, ForeignKey, Numeric, String, UniqueConstraint
+from sqlalchemy import Boolean, Date, ForeignKey, Numeric, SmallInteger, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,6 +16,15 @@ class Procedimento(Base):
     codigo_tuss: Mapped[str] = mapped_column(String(10), nullable=False, unique=True, index=True)
     nome: Mapped[str] = mapped_column(String(120), nullable=False)
     setor: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    # Catalogo de exames (F3): o que faz um catalogo ser catalogo.
+    mnemonico: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # De qual material o exame e feito. Antes so existia DEPOIS, como string
+    # livre em `Amostra.tipo_material` — nao era derivavel do catalogo, entao a
+    # coleta nao tinha como saber o que coletar.
+    tipo_material: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    metodo: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    prazo_entrega_dias: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    preparo_paciente: Mapped[str | None] = mapped_column(Text, nullable=True)
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
 
