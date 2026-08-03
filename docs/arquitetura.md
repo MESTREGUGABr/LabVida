@@ -160,7 +160,7 @@ Decisões em [ADR 0004](adr/0004-ator-da-conclusao-da-os.md), [0005](adr/0005-se
 | Paciente | [cadastro_pacientes.py](../pages/cadastro_pacientes.py) | CPF único (dígito verificador + hash), criptografado em repouso, busca e paginação server-side, soft-delete |
 | Convênio | [cadastro_convenios.py](../pages/cadastro_convenios.py) | Nome e CNPJ únicos (casefold), status ATIVO/INATIVO |
 | Médico | [cadastro_medicos.py](../pages/cadastro_medicos.py) | CRM+UF único, flag `responsavel_tecnico` |
-| Procedimento | [cadastro_procedimentos.py](../pages/cadastro_procedimentos.py) | `codigo_tuss` com 8 dígitos exatos; valor por convênio com vigência |
+| Procedimento | [cadastro_procedimentos.py](../pages/cadastro_procedimentos.py) | `codigo_tuss` com 8 dígitos exatos; **tabela de preço por convênio e particular, com vigência fechada por EXCLUDE**; material, método, prazo e mnemônico |
 | Unidade / Setor | [cadastro_unidades.py](../pages/cadastro_unidades.py) | Tipo CENTRAL ou COLETA |
 
 ### 4.2 Atendimento e coleta
@@ -372,7 +372,7 @@ Base de demonstração: ~400 OS, ~1600 itens, ~960 laudos, ~76 lotes, glosas, ca
 | **F0** | Fundação — rollback, glosa cumulativa, particular na glosa, seed RBAC, suíte no Windows | ✅ |
 | **F2** | BI onda 1 | ✅ |
 | **F1** | Streamlit moderno — grid, navegação nativa, dialogs | ✅ |
-| F3 | Preço particular, vigência, catálogo de exames e analitos, regra do valor | ⬜ |
+| **F3** | Preço particular, vigência, catálogo de analitos, regra do valor | ✅ |
 | F4–F11 | Competência → item faturável → remessa → guia por paciente → glosa → divergências → baixa parcial → caixa | ⬜ |
 | F12 | BI onda 2 | ⬜ |
 | F13 | OMOP | ⬜ |

@@ -104,17 +104,25 @@ def _seed_valores(session: Session, procedimentos_ids: list, convenios_ids: list
         procedimento = procedimento_repository.obter_por_id(session, procedimento_id)
         valor_base = valores_base.get(procedimento.codigo_tuss, Decimal("35.00")) if procedimento else Decimal("35.00")
 
-        for convenio_id in convenios_ids:
+        # `None` primeiro = TABELA PARTICULAR (balcao). Ate a fase F3 ela nao
+        # existia: o valor do particular era digitado a mao na abertura da OS.
+        # O balcao cobra o valor cheio; convenio negocia percentual sobre ele.
+        for convenio_id in [None] + list(convenios_ids):
             if procedimento_repository.obter_valor_vigente(
                 session, procedimento_id, convenio_id, date.today()
             ):
                 continue
+            valor = (
+                valor_base
+                if convenio_id is None
+                else (valor_base * fatores[convenio_id]).quantize(Decimal("0.01"))
+            )
             definir_valor(
                 session,
                 ProcedimentoValorCreate(
                     procedimento_id=procedimento_id,
                     convenio_id=convenio_id,
-                    valor=(valor_base * fatores[convenio_id]).quantize(Decimal("0.01")),
+                    valor=valor,
                     vigencia_inicio=inicio_vigencia,
                 ),
             )

@@ -11,6 +11,7 @@ from src.cadastro.procedimento.service import (
     criar_procedimento,
     definir_valor,
     listar_procedimentos_ativos,
+    obter_valor_vigente,
 )
 from src.cadastro.convenio.errors import ConvenioNaoEncontrado
 from src.db import session_scope
@@ -19,6 +20,7 @@ from src.ui_components import (
     ColunaGrid,
     renderizar_cabecalho,
     renderizar_grid,
+    renderizar_secao,
 )
 from src.ui_icons import ICONE_PROCEDIMENTO
 
@@ -86,12 +88,15 @@ def _render_valores() -> None:
     with session_scope() as session:
         convenios = listar_convenios_ativos(session)
 
-    if not procedimentos or not convenios:
-        st.info("Cadastre procedimentos e convênios ativos para definir valores")
+    if not procedimentos:
+        st.info("Cadastre procedimentos para definir valores")
         return
 
     procedimentos_opcoes = {f"{p.codigo_tuss} - {p.nome}": p.id for p in procedimentos}
-    convenios_opcoes = {c.nome: c.id for c in convenios}
+    # `None` = tabela PARTICULAR (balcao), que passou a existir na fase F3.
+    convenios_opcoes = {_PARTICULAR: None} | {c.nome: c.id for c in convenios}
+
+    _render_tabela_vigente(procedimentos, convenios)
 
     with st.form("form_valor", clear_on_submit=True):
         procedimento_label = st.selectbox("Procedimento", options=list(procedimentos_opcoes.keys()))
@@ -118,7 +123,46 @@ def _render_valores() -> None:
     except (ProcedimentoNaoEncontrado, ConvenioNaoEncontrado) as error:
         st.error(str(error))
     else:
-        st.success("Valor definido com sucesso")
+        st.success(
+            "Valor definido. A vigência anterior foi encerrada no dia anterior — "
+            "não existem dois preços válidos na mesma data."
+        )
+        st.rerun()
+
+
+_PARTICULAR = "Particular (balcão)"
+
+
+def _render_tabela_vigente(procedimentos: list, convenios: list) -> None:
+    """Grade do que esta valendo hoje — a tela nao listava valor nenhum antes."""
+    nomes_convenio = {c.id: c.nome for c in convenios}
+    hoje = date.today()
+
+    linhas = []
+    with session_scope() as session:
+        for procedimento in procedimentos:
+            for convenio_id in [None] + [c.id for c in convenios]:
+                valor = obter_valor_vigente(session, procedimento.id, convenio_id, hoje)
+                if valor is None:
+                    continue
+                linhas.append({
+                    "procedimento": f"{procedimento.codigo_tuss} - {procedimento.nome}",
+                    "tabela": _PARTICULAR if convenio_id is None else nomes_convenio.get(convenio_id, "?"),
+                    "valor": valor,
+                })
+
+    renderizar_secao(titulo="Tabela vigente hoje")
+    renderizar_grid(
+        linhas,
+        colunas=[
+            ColunaGrid("procedimento", "Procedimento"),
+            ColunaGrid("tabela", "Tabela", largura=200),
+            ColunaGrid("valor", "Valor", tipo="moeda", largura=140),
+        ],
+        chave="grid_tabela_precos",
+        altura=300,
+        mensagem_vazio="Nenhum preço vigente. Defina um valor abaixo.",
+    )
 
 
 def _procedimentos() -> list:
