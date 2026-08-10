@@ -9,7 +9,12 @@ from src.compras.insumo.models import InsumoMaterial
 
 
 def criar_insumo(session: Session, dto: InsumoCreate) -> InsumoRead:
-    insumo = InsumoMaterial(nome=dto.nome, finalidade=dto.finalidade)
+    insumo = InsumoMaterial(
+        nome=dto.nome,
+        finalidade=dto.finalidade,
+        quantidade_estoque=dto.quantidade_estoque,
+        estoque_minimo=dto.estoque_minimo,
+    )
     repository.salvar_insumo(session, insumo)
     session.commit()
     session.refresh(insumo)

@@ -374,7 +374,7 @@ O container executa `alembic upgrade head` → `python -m src.seeder` → `strea
 | `make clean` | Derruba **e apaga o volume** |
 | `docker compose exec app python -m src.bi.etl` | Recarrega só o BI |
 
-Base de demonstração: ~400 OS, ~1600 itens, ~960 laudos, ~76 lotes, glosas, carteira parcialmente liquidada e compras com estoque movimentado. Semente fixa (`SEED_SEMENTE`), escala ajustável por `--escala`.
+Base de demonstração: ~326 OS, ~1290 itens, ~817 laudos, ~32 lotes (um por convênio+competência, não mais um a cada tantos laudos), glosas, carteira parcialmente liquidada e compras com estoque movimentado. Semente fixa (`SEED_SEMENTE`), escala ajustável por `--escala`.
 
 ---
 

@@ -19,6 +19,9 @@ class InsumoMaterial(Base):
     nome: Mapped[str] = mapped_column(String(150), nullable=False)
     finalidade: Mapped[str] = mapped_column(String(255), nullable=False)
     quantidade_estoque: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False, default=0)
+    # So alerta visual (tela de Estoque) -- nao bloqueia nada, nao esta ligado
+    # a nenhum procedimento. Ver F16 (candidata) em docs/roadmap-execucao.md.
+    estoque_minimo: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False, default=0)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_agora)
 
 

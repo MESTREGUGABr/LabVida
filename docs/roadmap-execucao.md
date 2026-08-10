@@ -35,17 +35,18 @@ Além disso, a conferência do código contra a documentação encontrou **sete 
 | **F2** | ✅ **BI onda 1 — concluída em 02/08/2026.** 8 bugs + 2 problemas de grão corrigidos; 7 dimensões e 6 fatos com chave natural; ETL idempotente (**35s → 1,3s**); `metricas.py`; Altair; filtro de período; 4 dashboards; 41 testes de BI | `0014` | F0 | F1, F3 | **[plano-bi.md](plano-bi.md) §10** |
 | **F3** | ✅ **Preço, catálogo e regra do valor — concluída em 03/08/2026.** Preço particular + `vigencia_fim` + EXCLUDE · regra do valor na abertura da OS (4 saídas, com rastro de `valor_tabela`/`origem_valor`/`motivo_excecao`) · catálogo de analitos + painel do exame + faixa por sexo/idade · exame enriquecido (material, método, prazo, mnemônico) · tela de preços com "Particular" e grade vigente · seeder com tabela particular | `0015` `0016` | F0 | F1, F2 | evolucao §4 · faturamento §1.9-1.10 |
 | **F4** | ✅ **Competência — concluída em 03/08/2026.** Tabela com PK natural `DATE` e estado · backfill de série mensal contínua · `competencia_de()` no fuso `America/Recife` (ADR 0007) · apuração pelo fato gerador · fechamento congelando totais e exigindo ordem cronológica · reabertura com justificativa auditada · `exigir_aberta()` pronto para os lançamentos da F5 · tela de apuração | `0017` | F3 | — | faturamento §1.1 |
-| **F5** | **Item faturável** — tabela, backfill, hook na liberação do laudo, `StatusOsItem.FATURADO` finalmente atribuído | `0018` | F4 | — | faturamento §1.2 |
-| **F6** | **Remessa** — rename lote→remessa, sequence, unique parcial, pacote `remessa` | `0018` | F5 | — | faturamento §1.5 |
-| **F7** | ⭐ **Guia por paciente** — explosão das guias degeneradas, `item_faturavel_id`, reescrita de `faturamento_guias.py` — **a entrega visível para o professor** | `0019` | F6 | — | faturamento §1.3-1.4 |
-| **F8** | **Glosa com ciclo de vida** — status, `recursos_glosa`, reapresentação, abatimento no título | `0020` | F7 | F9 | faturamento §1.6 |
-| **F9** | ⭐ **Divergências** — tabela, 5 detectores, pré-auditoria consultando a tabela de preços, painel — **o outro pedido explícito** | `0021` | F7 | F8 | faturamento §1.8 |
-| **F10** | **Título e baixa parcial** — `baixas_titulo_receber`, `ATRASADO` derivado, `CANCELADO` alcançável | `0022` | F9 | — | faturamento §1.7 |
-| **F11** | **Caixa, contas e a pagar** + fechamento de competência **com bloqueio** | `0023` | F10 | — | faturamento §1.11 |
+| **F5** | **Item faturável** — tabela, backfill, hook na liberação do laudo, `StatusOsItem.FATURADO` finalmente atribuído | a definir (§2) | F4 | — | faturamento §1.2 |
+| **F6** | ⚠️ **Remessa — parcial, concluído em 10/08/2026.** `competencia DATE` no `lotes_faturamento` existente + índice único parcial `(convenio_id, competencia) WHERE status='ABERTO'` (`NULLS NOT DISTINCT`) — resolve o essencial pedido fora de ordem (poluição visual de lotes soltos no mês). **Falta**: rename lote→remessa, sequence, pacote `remessa` | `0019_lote_competencia` (parcial) + a definir (resto) | F5 | — | faturamento §1.5 |
+| **F7** | ⭐ **Guia por paciente** — explosão das guias degeneradas, `item_faturavel_id`, reescrita de `faturamento_guias.py` — **a entrega visível para o professor** | a definir (§2) | F6 | — | faturamento §1.3-1.4 |
+| **F8** | **Glosa com ciclo de vida** — status, `recursos_glosa`, reapresentação, abatimento no título | a definir (§2) | F7 | F9 | faturamento §1.6 |
+| **F9** | ⭐ **Divergências** — tabela, 5 detectores, pré-auditoria consultando a tabela de preços, painel — **o outro pedido explícito** | a definir (§2) | F7 | F8 | faturamento §1.8 |
+| **F10** | **Título e baixa parcial** — `baixas_titulo_receber`, `ATRASADO` derivado, `CANCELADO` alcançável | a definir (§2) | F9 | — | faturamento §1.7 |
+| **F11** | **Caixa, contas e a pagar** + fechamento de competência **com bloqueio** | a definir (§2) | F10 | — | faturamento §1.11 |
 | **F12** | **BI onda 2** — competência como eixo, `FatoGlosa` com código TISS, DRE, previsto × realizado, divergências no BI | — | F4, F8, F10 | — | **[plano-bi.md](plano-bi.md) §10** |
 | **F13** | **OMOP** — conforme decisão da equipe | a definir | F3 | qualquer | evolucao §6 |
 | **F14** | **Segurança** — auditoria de leitura de PII, salt no hash de CPF (os itens de JWT/`state` do fluxo Google são absorvidos pela F15, que remove esse fluxo) | — | — | qualquer | evolucao §7.3 |
 | **F15** | ✅ ⭐ **Autenticação local email/senha — concluída em 09/08/2026.** Correção pedida pelo professor. Substituiu o login Google/Auth0 (`src/auth.py`, removido) por e-mail+senha: `usuarios.senha_hash`/`senha_definida_em`, hash bcrypt, duas abas sempre visíveis (Entrar/Criar conta), todo cadastro novo vira `admin` diretamente (decisão aceitável só por não ir a produção real), seeder com senha real via `SENHA_PADRAO_SEED` | `0018` | F14 | — | [ADR 0010](adr/0010-substituir-login-google-por-email-senha.md) |
+| **F16** | *(candidata, não priorizada)* **Estoque real — consumo por procedimento e bloqueio na coleta.** Hoje (10/08/2026) só existe o alerta de estoque baixo (`insumos_materiais.estoque_minimo`, `0020_estoque_minimo`) — nenhum código debita insumo por exame executado. Versão completa exigiria tabela `procedimento_insumo` (receita padrão), débito automático em `atendimento/amostra/service.py::registrar_coleta`, e decisão de martelo entre bloqueio duro vs. aviso com opção de forçar | a definir | — | qualquer | evolucao §7.5 |
 
 **Mudança de rumo mais importante em relação aos planos anteriores:** o BI saiu do fim da fila. Ele era "Fase 6, depende de tudo". A conferência do código mostrou que as datas e medidas que faltam **já existem no OLTP e simplesmente não são consultadas** ([plano-bi.md §1.6](plano-bi.md)) — cerca de 70% do BI é independente e vira **F2, em paralelo**. O que sobra vira F12.
 
@@ -55,7 +56,7 @@ Além disso, a conferência do código contra a documentação encontrou **sete 
 
 ## 2. Numeração de migrations
 
-Head atual verificado (09/08/2026): **`0018_login_local`**, cadeia única e limpa (o `0012_merge_heads_c_d` já resolveu as heads paralelas anteriores).
+Head atual verificado (10/08/2026): **`0020_estoque_minimo`**, cadeia única e limpa (o `0012_merge_heads_c_d` já resolveu as heads paralelas anteriores).
 
 **Regra de sequenciamento:** `0014` (BI) entra **antes** da trilha de faturamento. Motivo: F2 e F3 rodam em paralelo, e se as duas partirem de `0013` o Alembic ganha **duas heads** e alguém vai ter que escrever outro merge. A migration de BI toca apenas tabelas `bi_*` (zero impacto no OLTP) e é pequena — então ela **entra primeiro e sozinha**, e a trilha de faturamento parte de `0014` em diante.
 
@@ -66,15 +67,17 @@ Head atual verificado (09/08/2026): **`0018_login_local`**, cadeia única e limp
 | `0016_catalogo_analitos` | F3 | catálogo de analitos, painel do exame, faixa por sexo/idade, exame enriquecido |
 | `0017_competencias` | F4 | (era `0015`) |
 | `0018_login_local` | **F15** | senha local (`usuarios.senha_hash`/`senha_definida_em`) — correção do professor, encaixada fora de ordem por ser urgente e independente do faturamento |
-| `0019_itens_faturaveis` | F5 | (era `0016`) |
-| `0020_remessa` | F6 | (era `0017`) |
-| `0021_guia_por_paciente` | F7 | (era `0018`) |
-| `0022_glosa_ciclo_de_vida` | F8 | (era `0019`) |
-| `0023_divergencias` | F9 | (era `0020`) |
-| `0024_titulo_receber_baixa_parcial` | F10 | (era `0021`) |
-| `0025_caixa_contas_e_pagar` | F11 | (era `0022`) |
+| `0019_lote_competencia` | **F6 (parcial)** | `competencia` no lote existente + unicidade `(convenio_id, competencia)` — encaixada fora de ordem, mesmo motivo da F15: pedido direto sobre a poluição visual do faturamento, sem depender de F5 |
+| `0020_estoque_minimo` | — | campo `estoque_minimo` em `insumos_materiais` + alerta de estoque baixo — não é uma fase numerada do faturamento, ver F16 (candidata) |
+| `0021_itens_faturaveis` | F5 | (era `0016`, depois `0019`) |
+| `0022_remessa_completa` | F6 (resto) | rename lote→remessa, sequence, pacote `remessa` (era `0017`, depois `0020`) |
+| `0023_guia_por_paciente` | F7 | (era `0018`, depois `0021`) |
+| `0024_glosa_ciclo_de_vida` | F8 | (era `0019`, depois `0022`) |
+| `0025_divergencias` | F9 | (era `0020`, depois `0023`) |
+| `0026_titulo_receber_baixa_parcial` | F10 | (era `0021`, depois `0024`) |
+| `0027_caixa_contas_e_pagar` | F11 | (era `0022`, depois `0025`) |
 
-> ⚠️ Ao ler o anexo [plano-faturamento-competencia.md](plano-faturamento-competencia.md) §2, **some 3** em todo número de migration a partir de `competencias` (a F3 consumiu 0015 e 0016, e a F15 — correção do professor, fora da ordem original — consumiu 0018). O conteúdo de cada uma está correto; só o número mudou.
+> ⚠️ Ao ler o anexo [plano-faturamento-competencia.md](plano-faturamento-competencia.md) §2, **some 5** em todo número de migration a partir de `competencias` (a F3 consumiu 0015 e 0016; a F15 e a F6-parcial, ambas fora da ordem original, consumiram 0018 e 0019; a `0020_estoque_minimo`, fora do escopo do faturamento, consumiu mais uma). O conteúdo de cada migration futura está correto; só o número muda — e pode mudar de novo se mais alguma correção urgente for encaixada fora de ordem antes da F5.
 
 **Regra obrigatória a partir daqui:** migrations **escritas à mão** (`alembic revision -m`, **sem** `--autogenerate`). O autogenerate **não detecta rename** — ele emite `drop_table` + `create_table`, o que destruiria os 73 lotes na `0018`. O alvo `make revision` do Makefile usa `--autogenerate` e **não serve** para esta remodelagem. Documentar no Makefile e no README.
 

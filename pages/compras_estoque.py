@@ -44,9 +44,16 @@ def _render_insumos() -> None:
         renderizar_secao(titulo="Novo Insumo")
         nome = st.text_input("Nome")
         finalidade = st.text_input("Finalidade")
+        estoque_inicial = st.number_input("Estoque inicial", min_value=0.0, value=0.0, step=1.0)
+        estoque_minimo = st.number_input("Estoque mínimo (alerta)", min_value=0.0, value=0.0, step=1.0)
         if st.button("Cadastrar", type="primary"):
             try:
-                dto = InsumoCreate(nome=nome, finalidade=finalidade)
+                dto = InsumoCreate(
+                    nome=nome,
+                    finalidade=finalidade,
+                    quantidade_estoque=estoque_inicial,
+                    estoque_minimo=estoque_minimo,
+                )
                 with session_scope() as session:
                     criar_insumo(session, dto)
                 st.toast(f"Insumo {nome} cadastrado!")
@@ -63,12 +70,22 @@ def _render_insumos() -> None:
             st.info("Nenhum insumo cadastrado.")
             return
 
+        baixos = [i for i in insumos if i.estoque_minimo > 0 and i.quantidade_estoque < i.estoque_minimo]
+        if baixos:
+            nomes = ", ".join(i.nome for i in baixos)
+            st.warning(f"⚠️ {len(baixos)} insumo(s) com estoque abaixo do mínimo: {nomes}")
+
         renderizar_grid(
             [
                 {
                     "nome": i.nome,
                     "finalidade": i.finalidade,
                     "quantidade_estoque": i.quantidade_estoque,
+                    "estoque_minimo": i.estoque_minimo,
+                    "situacao": (
+                        "Baixo" if i.estoque_minimo > 0 and i.quantidade_estoque < i.estoque_minimo
+                        else "OK"
+                    ),
                 }
                 for i in insumos
             ],
@@ -76,6 +93,8 @@ def _render_insumos() -> None:
                 ColunaGrid("nome", "Insumo"),
                 ColunaGrid("finalidade", "Finalidade"),
                 ColunaGrid("quantidade_estoque", "Qtd em estoque", tipo="numero", largura=160),
+                ColunaGrid("estoque_minimo", "Mínimo", tipo="numero", largura=120),
+                ColunaGrid("situacao", "Situação", largura=100),
             ],
             chave="grid_insumos",
             altura=360,

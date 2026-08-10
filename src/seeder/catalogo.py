@@ -205,6 +205,10 @@ FORNECEDORES: tuple[str, ...] = (
     "Alfa Reagentes",
     "Nordeste Hospitalar",
     "PontoLab Distribuidora",
+    "Cirúrgica Pernambuco",
+    "BioSafe EPI",
+    "Reagentes do Vale",
+    "Distrilab Nacional",
 )
 
 # (nome, finalidade, valor unitário, quantidade típica de compra). Preço e
@@ -235,6 +239,16 @@ INSUMOS: tuple[tuple[str, str, Decimal, int], ...] = (
     ("Papel Termossensível para Etiqueta", "Etiquetagem de amostras", Decimal("18.50"), 20),
     ("Caixa Térmica para Malote", "Transporte de amostras entre unidades", Decimal("165.00"), 2),
     ("Gelo Reciclável", "Conservação de amostras em trânsito", Decimal("9.80"), 20),
+    ("Seringa Descartável 5mL", "Punção em coleta especial", Decimal("0.35"), 300),
+    ("Swab Estéril", "Coleta de amostra para cultura", Decimal("0.75"), 200),
+    ("Máscara Cirúrgica Descartável", "EPI da equipe de coleta e bancada", Decimal("0.28"), 500),
+    ("Óculos de Proteção", "EPI da bancada", Decimal("14.50"), 10),
+    ("Avental Descartável", "EPI da coleta e bancada", Decimal("2.10"), 100),
+    ("Reagente Coagulação", "TAP e TTPA", Decimal("350.00"), 1),
+    ("Fita Reagente Urinálise", "Triagem de exame de urina", Decimal("95.00"), 3),
+    ("Frasco Coletor Estéril para Urocultura", "Coleta de urina para cultura", Decimal("0.68"), 300),
+    ("Papel para Impressora de Laudo", "Impressão de laudos e etiquetas", Decimal("22.00"), 15),
+    ("Toner para Impressora de Laudo", "Impressão de laudos", Decimal("185.00"), 2),
 )
 
 
