@@ -31,7 +31,7 @@ Além disso, a conferência do código contra a documentação encontrou **sete 
 | Fase | Escopo | Migration | Depende de | Paralelizável com | Detalhamento |
 |:---:|---|---|:---:|:---:|---|
 | **F0** | ✅ **Fundação — concluída em 02/08/2026.** `db.py` (rollback + `pool_pre_ping` + `pool_recycle`); glosa cumulativa (N3); `LEFT JOIN` do particular (N7); seed RBAC idempotente por linha (N13); fallback `50.0` removido; `tests/_tabelas.py` extraído dos **6** conftests; N19 (suíte no Windows); spike do AgGrid + 3 ADRs. **N11 já estava corrigido** pelo commit `4a07160` — o plano estava desatualizado | — | — | — | evolucao §8 |
-| **F1** | ✅ **Streamlit moderno — concluída em 02/08/2026.** `renderizar_grid()` com AgGrid como fronteira única · `tratar_erros()` · `st.navigation` nativa filtrada por permissão (morreram ~140 linhas de HTML inline e ~25 de CSS de combate) · `st.dialog` no lugar dos toggles de `session_state` em Fornecedores, Compras, Glosas, Contas e Admin · grid em 12 telas · smoke das 28 telas | — | F0 | F2, F3 | evolucao §2 |
+| **F1** | ✅ **Streamlit moderno — concluída em 02/08/2026.** `renderizar_grid()` com AgGrid como fronteira única · `tratar_erros()` · `st.dialog` no lugar dos toggles de `session_state` em Fornecedores, Compras, Glosas, Contas e Admin · grid em 12 telas · smoke das 28 telas. ⚠️ **Navegação revertida em 09/08/2026**: o `st.navigation` nativo (introduzido aqui) foi trocado de volta pelo menu HTML/CSS manual com ícones SVG, a pedido do professor. O flash do nav nativo (bug pré-F1) foi resolvido de raiz via `client.showSidebarNavigation = false` (`.streamlit/config.toml`), não por CSS; a barra "Deploy"/"⋮" foi escondida via `client.toolbarMode = "minimal"`. Um bug separado de CSS do projeto (`span` global sobrescrevendo a fonte de ícone nativo, não falta de rede) foi corrigido com exceção pontual em `src/ui_css.py`. AgGrid/`st.dialog`/`tratar_erros` continuam como estão | — | F0 | F2, F3 | evolucao §2 |
 | **F2** | ✅ **BI onda 1 — concluída em 02/08/2026.** 8 bugs + 2 problemas de grão corrigidos; 7 dimensões e 6 fatos com chave natural; ETL idempotente (**35s → 1,3s**); `metricas.py`; Altair; filtro de período; 4 dashboards; 41 testes de BI | `0014` | F0 | F1, F3 | **[plano-bi.md](plano-bi.md) §10** |
 | **F3** | ✅ **Preço, catálogo e regra do valor — concluída em 03/08/2026.** Preço particular + `vigencia_fim` + EXCLUDE · regra do valor na abertura da OS (4 saídas, com rastro de `valor_tabela`/`origem_valor`/`motivo_excecao`) · catálogo de analitos + painel do exame + faixa por sexo/idade · exame enriquecido (material, método, prazo, mnemônico) · tela de preços com "Particular" e grade vigente · seeder com tabela particular | `0015` `0016` | F0 | F1, F2 | evolucao §4 · faturamento §1.9-1.10 |
 | **F4** | ✅ **Competência — concluída em 03/08/2026.** Tabela com PK natural `DATE` e estado · backfill de série mensal contínua · `competencia_de()` no fuso `America/Recife` (ADR 0007) · apuração pelo fato gerador · fechamento congelando totais e exigindo ordem cronológica · reabertura com justificativa auditada · `exigir_aberta()` pronto para os lançamentos da F5 · tela de apuração | `0017` | F3 | — | faturamento §1.1 |
@@ -44,17 +44,18 @@ Além disso, a conferência do código contra a documentação encontrou **sete 
 | **F11** | **Caixa, contas e a pagar** + fechamento de competência **com bloqueio** | `0023` | F10 | — | faturamento §1.11 |
 | **F12** | **BI onda 2** — competência como eixo, `FatoGlosa` com código TISS, DRE, previsto × realizado, divergências no BI | — | F4, F8, F10 | — | **[plano-bi.md](plano-bi.md) §10** |
 | **F13** | **OMOP** — conforme decisão da equipe | a definir | F3 | qualquer | evolucao §6 |
-| **F14** | **Segurança** — validação de JWT, `state` próprio, auditoria de leitura de PII, salt no hash de CPF | — | — | qualquer | evolucao §7.3 |
+| **F14** | **Segurança** — auditoria de leitura de PII, salt no hash de CPF (os itens de JWT/`state` do fluxo Google são absorvidos pela F15, que remove esse fluxo) | — | — | qualquer | evolucao §7.3 |
+| **F15** | ✅ ⭐ **Autenticação local email/senha — concluída em 09/08/2026.** Correção pedida pelo professor. Substituiu o login Google/Auth0 (`src/auth.py`, removido) por e-mail+senha: `usuarios.senha_hash`/`senha_definida_em`, hash bcrypt, duas abas sempre visíveis (Entrar/Criar conta), todo cadastro novo vira `admin` diretamente (decisão aceitável só por não ir a produção real), seeder com senha real via `SENHA_PADRAO_SEED` | `0018` | F14 | — | [ADR 0010](adr/0010-substituir-login-google-por-email-senha.md) |
 
 **Mudança de rumo mais importante em relação aos planos anteriores:** o BI saiu do fim da fila. Ele era "Fase 6, depende de tudo". A conferência do código mostrou que as datas e medidas que faltam **já existem no OLTP e simplesmente não são consultadas** ([plano-bi.md §1.6](plano-bi.md)) — cerca de 70% do BI é independente e vira **F2, em paralelo**. O que sobra vira F12.
 
-**Corte se apertar:** F8 (manter só `status` + reapresentação, cortar recursos), F11 (contas bancárias/categorias), F13 (OMOP). **F7 e F9 não caem** — são literalmente o que o professor pediu.
+**Corte se apertar:** F8 (manter só `status` + reapresentação, cortar recursos), F11 (contas bancárias/categorias), F13 (OMOP). **F7, F9 e F15 não caem** — são literalmente o que o professor pediu (F15 na apresentação de 09/08/2026, F7/F9 na anterior).
 
 ---
 
 ## 2. Numeração de migrations
 
-Head atual verificado: **`0013_bi_paciente_hash`**, cadeia única e limpa (o `0012_merge_heads_c_d` já resolveu as heads paralelas anteriores).
+Head atual verificado (09/08/2026): **`0018_login_local`**, cadeia única e limpa (o `0012_merge_heads_c_d` já resolveu as heads paralelas anteriores).
 
 **Regra de sequenciamento:** `0014` (BI) entra **antes** da trilha de faturamento. Motivo: F2 e F3 rodam em paralelo, e se as duas partirem de `0013` o Alembic ganha **duas heads** e alguém vai ter que escrever outro merge. A migration de BI toca apenas tabelas `bi_*` (zero impacto no OLTP) e é pequena — então ela **entra primeiro e sozinha**, e a trilha de faturamento parte de `0014` em diante.
 
@@ -64,15 +65,16 @@ Head atual verificado: **`0013_bi_paciente_hash`**, cadeia única e limpa (o `00
 | `0015_precos_comerciais` | F3 | preço particular, `vigencia_fim`, EXCLUDE, condições comerciais, rastro do valor na OS |
 | `0016_catalogo_analitos` | F3 | catálogo de analitos, painel do exame, faixa por sexo/idade, exame enriquecido |
 | `0017_competencias` | F4 | (era `0015`) |
-| `0018_itens_faturaveis` | F5 | (era `0016`) |
-| `0019_remessa` | F6 | (era `0017`) |
-| `0020_guia_por_paciente` | F7 | (era `0018`) |
-| `0021_glosa_ciclo_de_vida` | F8 | (era `0019`) |
-| `0022_divergencias` | F9 | (era `0020`) |
-| `0023_titulo_receber_baixa_parcial` | F10 | (era `0021`) |
-| `0024_caixa_contas_e_pagar` | F11 | (era `0022`) |
+| `0018_login_local` | **F15** | senha local (`usuarios.senha_hash`/`senha_definida_em`) — correção do professor, encaixada fora de ordem por ser urgente e independente do faturamento |
+| `0019_itens_faturaveis` | F5 | (era `0016`) |
+| `0020_remessa` | F6 | (era `0017`) |
+| `0021_guia_por_paciente` | F7 | (era `0018`) |
+| `0022_glosa_ciclo_de_vida` | F8 | (era `0019`) |
+| `0023_divergencias` | F9 | (era `0020`) |
+| `0024_titulo_receber_baixa_parcial` | F10 | (era `0021`) |
+| `0025_caixa_contas_e_pagar` | F11 | (era `0022`) |
 
-> ⚠️ Ao ler o anexo [plano-faturamento-competencia.md](plano-faturamento-competencia.md) §2, **some 2** em todo número de migration a partir de `competencias` (a F3 consumiu 0015 e 0016). O conteúdo de cada uma está correto; só o número mudou.
+> ⚠️ Ao ler o anexo [plano-faturamento-competencia.md](plano-faturamento-competencia.md) §2, **some 3** em todo número de migration a partir de `competencias` (a F3 consumiu 0015 e 0016, e a F15 — correção do professor, fora da ordem original — consumiu 0018). O conteúdo de cada uma está correto; só o número mudou.
 
 **Regra obrigatória a partir daqui:** migrations **escritas à mão** (`alembic revision -m`, **sem** `--autogenerate`). O autogenerate **não detecta rename** — ele emite `drop_table` + `create_table`, o que destruiria os 73 lotes na `0018`. O alvo `make revision` do Makefile usa `--autogenerate` e **não serve** para esta remodelagem. Documentar no Makefile e no README.
 
@@ -115,6 +117,12 @@ Nenhuma bloqueia o início. Todas podem ser decididas até a fase que as consome
 | **D3** | **Grão da guia = OS?** Escolhido 1 OS = 1 guia (SP/SADT canônico). Alguns convênios aceitam guia mensal por beneficiário | F7 | Manter OS. Se o professor esperava guia mensal, muda só o índice parcial e o agrupamento |
 | **D4** | **Pagamento a maior** — capar no saldo e registrar divergência, ou permitir saldo negativo? | F10 | Capar. Saldo negativo volta a esconder o problema |
 | **D6** | **Qual opção de OMOP** (A camada analítica / B vocabulário / C CDM completo) | F13 | B primeiro — é pré-requisito das outras duas e entrega valor real ao laboratório |
+
+### 4.3 Decidida na apresentação de 09/08/2026
+
+| # | Decisão | Registro |
+|:---:|---|---|
+| **D7** | **Login Google/Auth0 é substituído por email e senha.** Correção pedida pelo professor. **Supersede o [ADR 0002](adr/0002-autenticacao-google-usuario-rbac-minimo.md)** no mecanismo de autenticação e na regra de bootstrap: todo cadastro novo vira `admin` diretamente, não só o primeiro (aceitável por não ir a produção real) | [ADR 0010](adr/0010-substituir-login-google-por-email-senha.md) · `accepted` |
 
 ---
 
@@ -182,8 +190,9 @@ Vale para **toda** fase, sem exceção:
 | Fornecedores — grid e informações | F1 | AgGrid + cadastro completo |
 | Compras — grid e produtos | F1 | AgGrid + ficha de insumo |
 | IMPLEMENTAR/AJEITAR GRIDS — AgGrid | F1 | `renderizar_grid()` em todas as telas |
-| Revisar UI & UX | F1 | `st.navigation` + `fragment` + `dialog` |
+| Revisar UI & UX | F1 | Menu manual HTML/CSS + SVG (navegação revertida em 09/08) + `dialog` |
 | **Altair melhor para BI** | **F2** | 10 gráficos migrados + drill-down |
+| **Login Google → email/senha** (apresentação de 09/08/2026) | **F15** | Tela de login local, sem redirect para Auth0 |
 
 ---
 

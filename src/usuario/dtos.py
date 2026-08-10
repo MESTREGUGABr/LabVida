@@ -11,3 +11,5 @@ class UsuarioRead(BaseModel):
     nome: str
     ativo: bool
     perfil_id: UUID | None = None
+    tem_senha: bool = False
+    """Derivado de `senha_hash is not None`. Nunca expor o hash em si."""

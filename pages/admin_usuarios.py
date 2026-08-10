@@ -3,6 +3,7 @@ from src.db import session_scope
 from src.rbac import service as rbac_service
 from src.rbac.dtos import PerfilCreate
 from src.usuario import repository as usuario_repository
+from src.usuario.service import criar_usuario_com_senha, definir_senha
 from src.ui import renderizar_menu, shell
 from src.ui_components import (
     ColunaGrid,
@@ -40,11 +41,65 @@ _COLUNAS_USUARIO = [
     ColunaGrid("nome", "Usuario"),
     ColunaGrid("email", "E-mail"),
     ColunaGrid("perfil", "Perfil atual", largura=200),
+    ColunaGrid("senha", "Senha", largura=120, filtravel=False),
     ColunaGrid("id", "id", oculta=True),
 ]
 
 _MANTER = "— Manter atual —"
 _REMOVER = "Remover perfil"
+
+
+@st.dialog("Novo usuario")
+def _dialogo_novo_usuario(perfis_opcoes: dict) -> None:
+    with st.form("form_novo_usuario"):
+        nome = st.text_input("Nome")
+        email = st.text_input("E-mail")
+        senha = st.text_input("Senha inicial", type="password", help="Minimo de 8 caracteres.")
+        perfil_nome = st.selectbox("Perfil", options=list(perfis_opcoes.keys()))
+        criar = st.form_submit_button("Criar usuario", type="primary", width="stretch")
+
+    if not criar:
+        return
+    if not nome or not email or not senha:
+        st.error("Preencha nome, e-mail e senha.")
+        return
+
+    with tratar_erros("criar o usuario") as resultado, session_scope() as session:
+        usuario = criar_usuario_com_senha(session, email, nome, senha)
+        rbac_service.vincular_usuario_ao_perfil(session, usuario.id, perfis_opcoes[perfil_nome])
+    if not resultado:
+        return
+
+    st.toast("Usuario criado.")
+    st.rerun()
+
+
+@st.dialog("Redefinir senha")
+def _dialogo_redefinir_senha(usuario: dict) -> None:
+    st.write(f"**{usuario['nome']}**")
+    st.caption(usuario["email"])
+
+    with st.form("form_redefinir_senha"):
+        nova_senha = st.text_input("Nova senha", type="password", help="Minimo de 8 caracteres.")
+        confirmar = st.text_input("Confirmar nova senha", type="password")
+        redefinir = st.form_submit_button("Redefinir", type="primary", width="stretch")
+
+    if not redefinir:
+        return
+    if not nova_senha:
+        st.error("Informe a nova senha.")
+        return
+    if nova_senha != confirmar:
+        st.error("As senhas nao coincidem.")
+        return
+
+    with tratar_erros("redefinir a senha") as resultado, session_scope() as session:
+        definir_senha(session, usuario["id"], nova_senha)
+    if not resultado:
+        return
+
+    st.toast("Senha redefinida.")
+    st.rerun()
 
 
 @st.dialog("Alterar perfil do usuario")
@@ -110,14 +165,19 @@ def _render_usuarios() -> None:
             "nome": u.nome or "—",
             "email": u.email or "—",
             "perfil": nomes_por_id.get(u.perfil_id, "Nenhum"),
+            "senha": "Definida" if u.senha_hash else "Pendente",
         }
         for u in usuarios
     ]
 
     sem_perfil = sum(1 for linha in linhas if linha["perfil"] == "Nenhum")
-    coluna_total, coluna_sem = st.columns(2)
+    coluna_total, coluna_sem, coluna_nova = st.columns([2, 2, 1])
     coluna_total.metric("Usuarios", len(linhas))
     coluna_sem.metric("Sem perfil", sem_perfil)
+    with coluna_nova:
+        st.write("")
+        if st.button("+ Novo usuario", width="stretch"):
+            _dialogo_novo_usuario(perfis_opcoes)
 
     grid = renderizar_grid(
         linhas,
@@ -129,12 +189,17 @@ def _render_usuarios() -> None:
 
     usuario = grid.selecionado
     if usuario is None:
-        st.caption("Selecione um usuario na tabela para alterar o perfil de acesso.")
+        st.caption("Selecione um usuario na tabela para alterar o perfil ou a senha de acesso.")
         return
 
     st.divider()
-    if st.button(f"Alterar perfil de {usuario['nome']}", type="primary"):
-        _dialogo_perfil(usuario, perfis_opcoes)
+    coluna_perfil, coluna_senha = st.columns(2)
+    with coluna_perfil:
+        if st.button(f"Alterar perfil de {usuario['nome']}", type="primary", width="stretch"):
+            _dialogo_perfil(usuario, perfis_opcoes)
+    with coluna_senha:
+        if st.button(f"Redefinir senha de {usuario['nome']}", width="stretch"):
+            _dialogo_redefinir_senha(usuario)
 
 
 # ── TAB PERFIS ─────────────────────────────────────────────

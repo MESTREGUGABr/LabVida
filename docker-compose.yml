@@ -7,11 +7,9 @@ services:
       streamlit run app.py --server.address=0.0.0.0 --server.port=8501"
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://labvida:labvida@postgres:5432/labvida}
-      AUTH0_DOMAIN: ${AUTH0_DOMAIN:?AUTH0_DOMAIN is required}
-      AUTH0_CLIENT_ID: ${AUTH0_CLIENT_ID:?AUTH0_CLIENT_ID is required}
-      AUTH0_CLIENT_SECRET: ${AUTH0_CLIENT_SECRET:?AUTH0_CLIENT_SECRET is required}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8501}
       LGPD_ENCRYPTION_KEY: ${LGPD_ENCRYPTION_KEY:?LGPD_ENCRYPTION_KEY is required}
+      SENHA_PADRAO_SEED: ${SENHA_PADRAO_SEED:-labvida123}
     ports:
       - "8501:8501"
     volumes:
@@ -43,12 +41,14 @@ services:
     command: sh -c "alembic upgrade head && pytest"
     environment:
       DATABASE_URL: postgresql+psycopg://labvida:labvida@postgres_test:5432/labvida_test
-      AUTH0_DOMAIN: labvida-test.auth0.com
-      AUTH0_CLIENT_ID: test-client-id
-      AUTH0_CLIENT_SECRET: test-client-secret
       APP_BASE_URL: http://localhost:8501
-      # Chave Fernet valida (32 bytes base64 url-safe) exclusiva para o ambiente de testes.
-      LGPD_ENCRYPTION_KEY: Q22r1OivohTtSBRaMi-hjLxXxrQ3SwEdOumlaNDfvw8=
+      # Chave Fernet de TESTE (32 bytes base64 url-safe), sem uso fora do CI — nao
+      # protege dado real nenhum, so precisa ser uma chave Fernet valida para o
+      # Fernet aceitar a sessao de testes. Mesmo valor documentado em .env.exemplo
+      # e usado como fallback em tests/conftest.py. Sobrescrevivel via
+      # LGPD_ENCRYPTION_KEY_TEST se quiser uma chave propria em CI.
+      LGPD_ENCRYPTION_KEY: ${LGPD_ENCRYPTION_KEY_TEST:-Q22r1OivohTtSBRaMi-hjLxXxrQ3SwEdOumlaNDfvw8=}
+      SENHA_PADRAO_SEED: labvida123
     volumes:
       - .:/app
     depends_on:

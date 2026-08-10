@@ -9,3 +9,15 @@ font = "Inter, system-ui, -apple-system, sans-serif"
 enableXsrfProtection = true
 enableCORS = false
 headless = true
+
+[client]
+# Menu lateral e desenhado a mao (src/ui.py:renderizar_menu). Sem isso, a
+# navegacao automatica do Streamlit pisca visivel por um instante em cada
+# troca de pagina antes do CSS conseguir escondê-la — com essa flag o
+# servidor nunca manda esse elemento, entao nao ha nada pra "piscar". Nao
+# desliga o roteamento entre paginas nem o `st.page_link`.
+showSidebarNavigation = false
+# Esconde a barra de ferramentas padrao do Streamlit ("Deploy" + menu "⋮" de
+# rerun/settings/clear cache) — e um app pronto pra usuario final, nao um
+# ambiente de dev. Nao afeta rerun de widget nem refresh manual do navegador.
+toolbarMode = "minimal"

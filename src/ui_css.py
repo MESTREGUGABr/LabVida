@@ -95,6 +95,20 @@ table, th, td, tr, li, ul, ol {{
     font-family: unset;
 }}
 
+/* A regra global de tipografia acima sobrescreve a fonte de icone
+   (Material Symbols Rounded, ja auto-hospedada pelo Streamlit — nao e
+   dependencia de rede) que o proprio Streamlit aplica via CSS-in-JS sem
+   `!important` em varios componentes nativos. Sem essa excecao, o
+   navegador cai no fallback de ligature e mostra o nome cru do icone
+   ("visibility", "keyboard_double_arrow_left" etc.) em vez do glifo.
+   `stTextInputIcon` e o botao de mostrar/ocultar senha; `stIconMaterial` e
+   o testid generico que cobre praticamente todo o resto (colapsar sidebar,
+   dataframe, paginacao, menu, feedback, file uploader...). */
+[data-testid="stTextInputIcon"],
+[data-testid="stIconMaterial"] {{
+    font-family: "Material Symbols Rounded" !important;
+}}
+
 /* ===== RESET & BASE ===== */
 .stApp {{
     background-color: var(--lv-bg-page);
@@ -117,22 +131,13 @@ section[data-testid="stSidebar"]::before {{
     z-index: 10;
 }}
 
-/* A navegacao nativa (st.navigation) e estilizada, nao escondida.
-   Ate a fase F1 este bloco tinha ~25 linhas de `display: none !important`
-   sobre o nav do Streamlit, porque o menu era HTML inline renderizado por
-   cima. O menu virou nativo, entao o CSS de combate saiu. */
-[data-testid="stSidebarNav"] {{
-    padding-top: 4px;
-}}
-
-[data-testid="stSidebarNav"] a {{
-    border-radius: 8px;
-    margin: 1px 6px;
-}}
-
-[data-testid="stSidebarNav"] a:hover {{
-    background: rgba(255, 255, 255, 0.08);
-}}
+/* O menu lateral e desenhado a mao em src/ui.py (HTML/CSS + SVG) em vez de
+   `st.navigation` — os icones nativos (`:material/...:`) sao ligature de
+   fonte e ficam sensiveis a conflito de CSS (ver acima). A navegacao
+   automatica do Streamlit fica desligada do lado do servidor via
+   `client.showSidebarNavigation = false` em `.streamlit/config.toml`, nao
+   por CSS — o servidor nunca manda esse elemento, entao nao ha nada pra
+   esconder aqui nem pra "piscar" antes de ser escondido. */
 
 section[data-testid="stSidebar"] > div:first-child {{
     padding-top: 6px;

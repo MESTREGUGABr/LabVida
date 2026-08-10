@@ -17,7 +17,7 @@
   <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL 16">
   <img src="https://img.shields.io/badge/Alembic-Migrations-red?logo=alembic&logoColor=white" alt="Alembic">
   <img src="https://img.shields.io/badge/Docker-Compose_v2-2496ED?logo=docker&logoColor=white" alt="Docker Compose">
-  <img src="https://img.shields.io/badge/Auth0-OAuth2.0-EB5424?logo=auth0&logoColor=white" alt="Auth0">
+  <img src="https://img.shields.io/badge/Auth-Local_(email%2Fsenha)-2E7D32?logo=lock&logoColor=white" alt="Autenticação local">
 </p>
 
 ---
@@ -54,15 +54,13 @@ Caminho mais curto para ter o sistema completo rodando (app + PostgreSQL + migra
 # 1. Criar o .env a partir do modelo  (Windows:  copy .env.exemplo .env)
 cp .env.exemplo .env
 
-# 2. Preencher AUTH0_DOMAIN, AUTH0_CLIENT_ID e AUTH0_CLIENT_SECRET no .env
-#    Sem isso o compose aborta com:
-#    "required variable AUTH0_DOMAIN is missing a value"
+# 2. Preencher LGPD_ENCRYPTION_KEY no .env (ver seção 10 — obrigatória)
 
 # 3. Subir tudo
 docker compose up --build -d
 ```
 
-Acesse **http://localhost:8501**.
+Acesse **http://localhost:8501**. Na tela de login, use a aba **"Criar conta"** (qualquer conta criada já entra como admin) ou entre com um usuário do seeder — ver [seção 12](#12-usuários-e-senhas-de-acesso-ao-sistema).
 
 > **Não é preciso criar `venv`, instalar dependências nem rodar `make migrate` para usar o sistema via Docker.** O próprio container executa `alembic upgrade head` (migrações) e `python -m src.seeder` (dados de exemplo) no boot — o banco já sobe estruturado e populado.
 
@@ -160,7 +158,7 @@ O sistema é organizado em módulos especializados que refletem os setores reais
 
 ```
 LabVida/
-├── app.py                         → Tela de login (Google via Auth0)
+├── app.py                         → Tela de login local (e-mail/senha) com abas Entrar/Criar conta
 ├── pages/
 │   ├── home.py                    → Home pós-login
 │   ├── cadastro_*.py              → Cadastros (Pacientes, Convênios, Médicos, Procedimentos, Unidades)
@@ -171,7 +169,6 @@ LabVida/
 │   ├── financeiro_*.py            → Contas a Receber/Pagar e Fluxo de Caixa
 │   └── compras_*.py               → Fornecedores, Pedidos e Estoque
 ├── src/
-│   ├── auth.py                    → Autenticação OAuth 2.0 / OIDC com Auth0
 │   ├── config.py                  → Carga de configuração (.env)
 │   ├── db.py                      → Engine SQLAlchemy + session_scope()
 │   ├── ui.py                      → Helpers Streamlit (exigir_login)
@@ -182,7 +179,7 @@ LabVida/
 │   ├── faturamento/               → Lotes de Faturamento, Guias TISS e Glosas
 │   ├── financeiro/                → Títulos a Receber/Pagar, Caixa e Conciliação
 │   ├── compras/                   → Fornecedores, Pedidos de Compra e Estoque
-│   ├── usuario/                   → Identidade do Auth0
+│   ├── usuario/                   → Identidade, hash de senha (bcrypt) e autenticação local
 │   ├── bi/                        → Esquema estrela e ETL de carga dos fatos
 │   └── seeder/                    → Base de demonstração (~3 meses de operação)
 │       ├── catalogo.py            → Procedimentos, convênios, insumos e equipe
@@ -213,7 +210,6 @@ Para executar o LabVida localmente (via Docker ou Python nativo), os requisitos 
 | **PostgreSQL** | `16+` (imagem `postgres:16-alpine` no Docker; ver [seção 6](#6-versão-do-postgresql-utilizada)) |
 | **Docker + Docker Compose** | Docker `24+` / Docker Compose `v2+` (Recomendado para subir ambiente completo) |
 | **GNU Make** | Opcional, para atalhos do `Makefile` |
-| **Conta Auth0** | Plano gratuito, usada para login social via Google |
 | **Git** | Para clonar o repositório |
 
 Bibliotecas Python principais (ver [`requirements.txt`](requirements.txt) para a lista completa com versões congeladas):
@@ -423,7 +419,7 @@ SEED_ESCALA=3 python -m src.seeder  # 3x o volume
 
 **10.2. Preencher as Variáveis de Ambiente**
 
-No arquivo `.env`, preencha os parâmetros de conexão e credenciais do Auth0:
+No arquivo `.env`, preencha os parâmetros de conexão e a chave de criptografia:
 
 ```dotenv
 DATABASE_URL=postgresql+psycopg://labvida:labvida@postgres:5432/labvida
@@ -431,20 +427,20 @@ POSTGRES_USER=labvida
 POSTGRES_PASSWORD=labvida
 POSTGRES_DB=labvida
 
-AUTH0_DOMAIN=SEU_DOMINIO.auth0.com
-AUTH0_CLIENT_ID=SEU_CLIENT_ID
-AUTH0_CLIENT_SECRET=SEU_CLIENT_SECRET
-
 APP_BASE_URL=http://localhost:8501
 PORT=8501
+
+# Login local (F15) — senha de todos os usuários do seeder de demo. Opcional,
+# default "labvida123" se ausente. Ver seção 12.
+SENHA_PADRAO_SEED=labvida123
 
 LGPD_ENCRYPTION_KEY=Q22r1OivohTtSBRaMi-hjLxXxrQ3SwEdOumlaNDfvw8=
 ```
 
-> ⚠️ **`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` e `LGPD_ENCRYPTION_KEY` são obrigatórios e precisam estar preenchidos antes de `docker compose up`** — o Compose interrompe a subida logo no início se algum estiver vazio:
+> ⚠️ **`LGPD_ENCRYPTION_KEY` é obrigatória e precisa estar preenchida antes de `docker compose up`** — o Compose interrompe a subida logo no início se estiver vazia:
 > ```
-> error while interpolating services.app.environment.AUTH0_DOMAIN:
-> required variable AUTH0_DOMAIN is missing a value
+> error while interpolating services.app.environment.LGPD_ENCRYPTION_KEY:
+> required variable LGPD_ENCRYPTION_KEY is missing a value
 > ```
 >
 > Sobre o `DATABASE_URL`: use `@postgres:5432` para executar **via Docker** (nome do serviço na rede do Compose) e `@localhost:5432` para executar **na máquina host** (ver [seção 8, Opção B](#opção-b--postgresql-local-sem-docker)).
@@ -474,20 +470,28 @@ Acesse no navegador: `http://localhost:8501`
 **Fluxo de Autenticação / Login:**
 
 ```
-Tela de login → "Entrar com Google" → Auth0 → Google → LabVida Home
-                                                               ↓
-                                                            "Sair"
+Tela de login (abas "Entrar" / "Criar conta") → LabVida Home
+                                                       ↓
+                                                    "Sair"
 ```
 
 ---
 
 ## 12. Usuário(s) e Senha(s) de Acesso ao Sistema
 
-O LabVida utiliza autenticação via **Auth0 + Login Social do Google (OAuth 2.0 / OIDC)**.
+O LabVida usa **autenticação local por e-mail e senha** (fase F15 — correção pedida pelo professor na apresentação de 09/08/2026, substituindo o login social por Google/Auth0; ver [ADR 0010](docs/adr/0010-substituir-login-google-por-email-senha.md)). A tela de login tem duas abas, sempre visíveis:
 
-* **Ambiente com Auth0 Configurado:** Qualquer conta Google autorizada no tenant Auth0.
-* **Ambiente de Desenvolvimento Local / Testes:** Caso a aplicação seja executada sem credenciais Auth0 ativas no `.env`, o sistema permite navegação no modo de desenvolvimento para testes completos de todos os módulos.
-* **Dados de Teste:** O seeder automatizado (`python -m src.seeder`) popula ~3 meses de operação completa — ver [seção 9.2](#92-popular-o-banco-com-dados-de-exemplo-seed).
+* **Entrar** — e-mail e senha de uma conta já existente.
+* **Criar conta** — nome, e-mail e senha. **Toda conta criada aqui recebe automaticamente o perfil `admin`** — decisão aceitável só porque o projeto é acadêmico e não vai a produção real; simplifica testes, já que qualquer conta nova já administra o sistema (rebaixar para outro perfil é feito depois em *Administração → Usuários*, se quiser).
+
+**Dados de Teste:** o seeder automatizado (`python -m src.seeder`) popula ~3 meses de operação completa — ver [seção 9.2](#92-popular-o-banco-com-dados-de-exemplo-seed) — e cria toda a equipe de demonstração **já com senha definida**, pronta para logar. A senha de todos eles é a variável `SENHA_PADRAO_SEED` do `.env` (default `labvida123` se não for definida). Exemplo, com o admin de demonstração:
+
+| Campo | Valor |
+|---|---|
+| E-mail | `direcao@labvida.com.br` |
+| Senha | valor de `SENHA_PADRAO_SEED` (default `labvida123`) |
+
+Qualquer outro e-mail da lista em [`src/seeder/catalogo.py`](src/seeder/catalogo.py) (`USUARIOS`) usa a mesma senha. Trocar `SENHA_PADRAO_SEED` no `.env` só afeta usuários criados ou re-semeados **depois** da troca — não redefine a senha de quem já tem uma.
 
 ---
 
@@ -521,7 +525,8 @@ O LabVida utiliza autenticação via **Auth0 + Login Social do Google (OAuth 2.0
 |---|---|---|
 | `Python não foi encontrado; executar sem argumentos para instalar do Microsoft Store` | `python3` não existe no Windows — é um alias da Store | Use `py -3.12 -m venv .venv` ([seção 7.1](#7-como-instalar-as-dependências)) |
 | `ERROR: Could not find a version that satisfies the requirement numpy==2.5.1` | O venv foi criado com Python 3.11 ou inferior | Recrie o venv com Python 3.12+ ([seção 5](#5-versão-do-python-utilizada)) |
-| `required variable AUTH0_DOMAIN is missing a value` | `.env` ausente ou com variáveis Auth0 vazias | Preencha o `.env` antes de subir ([seção 10](#10-como-configurar-o-arquivo-env)) |
+| `required variable LGPD_ENCRYPTION_KEY is missing a value` | `.env` ausente ou com `LGPD_ENCRYPTION_KEY` vazia | Preencha o `.env` antes de subir ([seção 10](#10-como-configurar-o-arquivo-env)) |
+| `E-mail ou senha inválidos` ao logar com usuário do seeder | `SENHA_PADRAO_SEED` foi trocada depois que o seeder já tinha criado o usuário | Use a senha com a qual o usuário foi criado, ou redefina a senha dele em *Administração → Usuários* |
 | `O termo 'make' não é reconhecido...` | GNU Make não instalado (padrão no Windows) | Use o comando `docker compose` equivalente da tabela acima |
 | `failed to resolve host 'postgres'` | `DATABASE_URL` com host da rede interna do Docker sendo usado na máquina host | Use `@localhost:5432` para rodar fora do Docker ([seção 8, Opção B](#opção-b--postgresql-local-sem-docker)) |
 | `docker compose up` conclui mas a porta 8501 não responde | Migrações/seed ainda executando no boot | Acompanhe com `docker compose logs -f app` |

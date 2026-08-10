@@ -10,7 +10,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 
 @pytest.fixture()
 def usuario_logado(monkeypatch) -> dict:
-    """Simula a sessao pos-login: usuario sincronizado do Auth0 (shell exige user["id"]).
+    """Simula a sessao pos-login: usuario sincronizado localmente (shell exige user["id"]).
 
     O menu lateral usa st.page_link, que exige o registro de paginas MPA — indisponivel
     quando o AppTest roda uma pagina isolada. Neutralizamos o menu para focar na pagina.
@@ -73,12 +73,7 @@ def paciente_ativo() -> Iterator[None]:
         session.commit()
 
 
-def test_login_page_renders(monkeypatch) -> None:
-    monkeypatch.setenv("AUTH0_DOMAIN", "labvida-test.auth0.com")
-    monkeypatch.setenv("AUTH0_CLIENT_ID", "test-client-id")
-    monkeypatch.setenv("AUTH0_CLIENT_SECRET", "test-client-secret")
-    monkeypatch.setenv("APP_BASE_URL", "http://localhost:8501")
-
+def test_login_page_renders() -> None:
     app = AppTest.from_file(str(PROJECT_ROOT / "app.py"))
     app.run()
 
@@ -86,7 +81,32 @@ def test_login_page_renders(monkeypatch) -> None:
 
     all_markdown = " ".join(md.value for md in app.markdown)
     assert "LabVida" in all_markdown
-    assert "Entrar com Google" in all_markdown
+    assert "Google" not in all_markdown
+
+    # Aba "Entrar" (e-mail + senha) e aba "Criar conta" (nome + e-mail +
+    # senha + confirmar senha), ambas renderizadas de uma vez pelo Streamlit.
+    assert len(app.text_input) == 6
+
+
+def test_login_com_credenciais_invalidas_mostra_erro_generico(monkeypatch) -> None:
+    from src.usuario.errors import CredenciaisInvalidas
+
+    def _autenticar_falso(*args, **kwargs):
+        raise CredenciaisInvalidas("E-mail ou senha inválidos.")
+
+    monkeypatch.setattr("src.usuario.service.autenticar", _autenticar_falso)
+
+    app = AppTest.from_file(str(PROJECT_ROOT / "app.py"))
+    app.run()
+
+    # A aba "Entrar" e renderizada primeiro no script: os dois primeiros
+    # text_input e o primeiro button (form_submit_button) pertencem a ela.
+    app.text_input[0].set_value("alguem@labvida.test")
+    app.text_input[1].set_value("senha-qualquer")
+    app.button[0].click().run()
+
+    assert not app.exception
+    assert any("inválidos" in e.value for e in app.error)
 
 
 def test_home_page_redirects_when_not_logged_in() -> None:

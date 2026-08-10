@@ -2,8 +2,6 @@ import os
 
 from dotenv import load_dotenv
 
-from src.auth import AuthConfig
-
 
 # Fuso unico de apuracao da competencia (ADR 0007).
 #
@@ -19,15 +17,15 @@ def get_database_url() -> str:
     return _get_required_env("DATABASE_URL")
 
 
-def get_auth_config() -> AuthConfig:
-    load_dotenv(dotenv_path=".env")
+def get_senha_padrao_seed() -> str:
+    """Senha usada pelo seeder para todos os usuários de demonstração (F15).
 
-    return AuthConfig(
-        domain=_get_required_env("AUTH0_DOMAIN"),
-        client_id=_get_required_env("AUTH0_CLIENT_ID"),
-        client_secret=_get_required_env("AUTH0_CLIENT_SECRET"),
-        redirect_uri=os.environ.get("APP_BASE_URL", "http://localhost:8501"),
-    )
+    Só afeta `python -m src.seeder` — nunca é lida pelo fluxo de login real.
+    Tem um default de conveniência para `docker compose up` funcionar de
+    primeira; documentado em `.env.exemplo` para quem quiser sobrescrever.
+    """
+    load_dotenv(dotenv_path=".env")
+    return os.environ.get("SENHA_PADRAO_SEED", "labvida123")
 
 
 def _get_required_env(name: str) -> str:

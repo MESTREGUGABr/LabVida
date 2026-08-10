@@ -1,8 +1,8 @@
-"""Navegacao nativa filtrada por permissao (fase F1).
+"""Regra de visibilidade do menu, filtrada por permissao.
 
-Ate a F1 o menu era HTML inline desenhado por cima do nav do Streamlit, que
-ficava escondido por ~25 linhas de `display: none !important`. Agora e
-`st.navigation`, montado a partir das permissoes do usuario.
+`paginas_permitidas()` e logica pura (sem `st.Page`/`st.navigation`), reusada
+tanto pelo menu HTML/CSS manual (`src/ui.py:renderizar_menu`, revertido da F1
+a pedido do professor) quanto testavel isoladamente aqui.
 
 O que precisa continuar valendo: o menu nunca mostra uma tela que o `shell()`
 daquela pagina vai barrar — item visivel que responde "acesso negado" e pior do

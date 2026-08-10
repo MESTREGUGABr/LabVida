@@ -96,6 +96,7 @@ class ColunaGrid:
     largura: int | None = None
     editavel: bool = False
     oculta: bool = False
+    filtravel: bool = True
 
 
 @dataclass
@@ -166,7 +167,11 @@ def renderizar_grid(
 
     construtor = GridOptionsBuilder.from_dataframe(df)
     construtor.configure_default_column(
-        filterable=permitir_busca,
+        # `filterable` nao existe mais nesta versao do st_aggrid — vira kwarg
+        # morto no defaultColDef e o AgGrid ignora. `filter` e a propriedade
+        # real que liga o componente de filtro por coluna.
+        filter=permitir_busca,
+        floatingFilter=permitir_busca,
         sortable=True,
         resizable=True,
         wrapText=False,
@@ -185,6 +190,9 @@ def renderizar_grid(
             opcoes["type"] = ["numericColumn", "rightAligned"]
         if coluna.tipo in _FORMATADORES:
             opcoes["valueFormatter"] = JsCode(_FORMATADORES[coluna.tipo])
+        if not coluna.filtravel:
+            opcoes["filter"] = False
+            opcoes["floatingFilter"] = False
         construtor.configure_column(coluna.campo, **opcoes)
 
     if selecao != "nenhuma":

@@ -58,7 +58,7 @@ A página em `pages/` **orquestra**: chama service, trata erro, renderiza. Não 
 ### 2.2 Camadas
 
 ```
-pages/*.py                  Streamlit — 27 telas, montadas por st.navigation
+pages/*.py                  Streamlit — 27 telas, MPA classico + menu manual
    │  (só chama service; a partir da F2, BI não tem SQL em página)
    ▼
 src/<dominio>/service.py    Regra de negócio · RBAC · auditoria · transação
@@ -74,12 +74,17 @@ PostgreSQL
 
 `session_scope()` ([src/db.py](../src/db.py)) entrega a sessão, faz **rollback em exceção** e fecha. O `commit` é responsabilidade do service — não há auto-commit. O engine usa `pool_pre_ping` e `pool_recycle=1800` para não quebrar na primeira query após conexão ociosa.
 
-### 2.4 Camada de UI (fase F1)
+### 2.4 Camada de UI (fase F1, navegação revertida em 09/08/2026)
+
+> A F1 trocou o menu HTML/CSS manual pelo `st.navigation` nativo do Streamlit. Revertido em 09/08/2026 a pedido do professor (preferência por HTML/CSS nativo do Streamlit para os ícones). O menu voltou a ser desenhado à mão em `src/ui.py:renderizar_menu()` (HTML/CSS + SVG de `src/ui_icons.py`, embutido, sem dependência de fonte externa), reaproveitando `paginas_permitidas()` sem alteração. O flash do nav nativo antes do CSS escondê-lo (bug que existia antes da F1) foi eliminado do lado do servidor via `client.showSidebarNavigation = false` em `.streamlit/config.toml` — não por CSS. A barra "Deploy"/"⋮" do Streamlit também foi escondida (`client.toolbarMode = "minimal"`, mesmo arquivo). O resto da F1 (AgGrid, `st.dialog`, `tratar_erros()`) continua intacto — só a navegação voltou atrás.
+>
+> À parte, um ícone nativo (`:material/...:`, `data-testid="stIconMaterial"`) quebrava em vários componentes do Streamlit (botão de mostrar senha, colapsar sidebar, etc.) — não por falta de rede (a fonte já vem embutida no próprio Streamlit), mas porque a regra global de tipografia do projeto (`span { font-family: Inter !important }` em `src/ui_css.py`) sobrescrevia a fonte de ícone. Corrigido com uma exceção CSS pontual para esse `data-testid`.
 
 | Peça | Papel |
 |---|---|
-| `app.py` | **Entrypoint e roteador.** Decide entre login e aplicação, e monta `st.navigation` a partir das permissões. Única chamada de `set_page_config` |
-| [ui.py](../src/ui.py) `paginas_permitidas()` | Regra de visibilidade do menu — função pura, testável |
+| `app.py` | **Entrypoint e roteador.** Decide entre login e aplicação; se logado, redireciona (`st.switch_page`) para `pages/home.py` — a navegação entre as demais páginas usa o MPA clássico do Streamlit (auto-descoberta de `pages/`). Única chamada de `set_page_config` na raiz |
+| [ui.py](../src/ui.py) `paginas_permitidas()` | Regra de visibilidade do menu — função pura, testável, reusada pelo menu manual |
+| [ui.py](../src/ui.py) `renderizar_menu()` | Desenha a sidebar (logo, seções com ícone SVG, `st.page_link` por página, rodapé com logout) |
 | [ui_components/data_grid.py](../src/ui_components/data_grid.py) | `renderizar_grid()` — **fronteira única** com o AgGrid. Formatação pt-BR, ordenação, filtro, paginação e seleção num só lugar |
 | [ui_components/erros.py](../src/ui_components/erros.py) | `tratar_erros()` — converte falha em mensagem legível, classificando pela origem da exceção |
 | [ui_components/](../src/ui_components/) | Cabeçalho, seção, KPI, badge de status, estado vazio |
@@ -257,7 +262,12 @@ Roda pelo seeder, por `python -m src.bi.etl`, ou pelo botão **Atualizar dados d
 
 ### 6.1 Autenticação
 
-Auth0 via OAuth2 com PKCE ([src/auth.py](../src/auth.py)). O usuário é sincronizado em `usuarios` no primeiro login.
+Login local por e-mail e senha (F15 — [ADR 0010](adr/0010-substituir-login-google-por-email-senha.md), que supera o [ADR 0002](adr/0002-autenticacao-google-usuario-rbac-minimo.md) apenas no mecanismo de login). `app.py` renderiza duas abas sempre visíveis:
+
+- **Entrar** — `src/usuario/service.autenticar()`. Uma única exceção (`CredenciaisInvalidas`) para e-mail inexistente, senha errada, conta sem senha ou conta inativa — nunca dá pista de qual foi, para não permitir enumeração de contas.
+- **Criar conta** — `src/usuario/service.criar_usuario_com_senha()`, que reaproveita `sincronizar_usuario` + `_atribuir_perfil_inicial` (§6.2): todo cadastro novo vira `admin` diretamente.
+
+Hash de senha em `src/usuario/senha.py` (bcrypt): `senha_hash IS NULL` nunca autentica, comparação sempre via `bcrypt.checkpw` (constant-time), com dummy-verify quando a conta não existe ou não tem senha, para equalizar o tempo de resposta. O seeder (`src/seeder/rbac.py`) dá senha real a todos os usuários de demonstração, controlada pela env `SENHA_PADRAO_SEED` (default `labvida123`).
 
 ### 6.2 RBAC
 
@@ -267,7 +277,7 @@ Perfis: `admin`, `atendente`, `coletador`, `tecnico_laboratorio`, `responsavel_t
 
 O seed é **idempotente linha a linha**: permissão, perfil e vínculo são conferidos um a um, então base já semeada recebe o que for adicionado depois.
 
-**Bootstrap** ([ADR 0002](adr/0002-autenticacao-google-usuario-rbac-minimo.md)): o primeiro usuário vira `admin`, os demais `visualizador`.
+**Bootstrap** ([ADR 0002](adr/0002-autenticacao-google-usuario-rbac-minimo.md), superado na regra de nivelamento pelo [ADR 0010](adr/0010-substituir-login-google-por-email-senha.md)): todo cadastro novo vira `admin` diretamente — decisão aceitável só por o projeto não ir a produção real. Promoção/rebaixamento manual continua em *Administração → Usuários*.
 
 ### 6.3 LGPD
 
@@ -325,7 +335,7 @@ O **seeder é o teste de integração de fato**: atravessa ~400 OS pelo fluxo re
 
 ## 9. Migrations
 
-15 arquivos, head **`0014_bi_reconstrucao`**, cadeia única.
+19 arquivos, head **`0018_login_local`**, cadeia única.
 
 | Revisão | Conteúdo |
 |---|---|
@@ -337,7 +347,10 @@ O **seeder é o teste de integração de fato**: atravessa ~400 OS pelo fluxo re
 | `0011` | BI — esquema estrela |
 | `0012` | Merge das heads paralelas |
 | `0013` | BI — paciente por hash |
-| `0014` | **BI — reconstrução** (grão, chave natural, calendário denso) |
+| `0014` | BI — reconstrução (grão, chave natural, calendário denso) |
+| `0015`–`0016` | F3 — preços comerciais, catálogo de analitos |
+| `0017` | F4 — competências |
+| `0018` | **F15 — login local** (`usuarios.senha_hash`, `senha_definida_em`, ambas nullable) |
 
 > ⚠️ A partir daqui, migrations são **escritas à mão**. `alembic revision --autogenerate` **não detecta rename** — emite `drop_table` + `create_table`, o que destruiria dados na remodelagem de faturamento. O alvo `make revision` usa autogenerate e **não serve** para as fases F4–F11.
 
@@ -346,7 +359,7 @@ O **seeder é o teste de integração de fato**: atravessa ~400 OS pelo fluxo re
 ## 10. Como rodar
 
 ```bash
-cp .env.exemplo .env        # preencher AUTH0_* e LGPD_ENCRYPTION_KEY
+cp .env.exemplo .env        # preencher LGPD_ENCRYPTION_KEY (obrigatória)
 docker compose up --build -d
 docker compose logs -f app
 ```
@@ -377,7 +390,8 @@ Base de demonstração: ~400 OS, ~1600 itens, ~960 laudos, ~76 lotes, glosas, ca
 | F5–F11 | Item faturável → remessa → guia por paciente → glosa → divergências → baixa parcial → caixa | ⬜ |
 | F12 | BI onda 2 | ⬜ |
 | F13 | OMOP | ⬜ |
-| F14 | Segurança (JWT, `state`, auditoria de PII, salt no CPF) | ⬜ |
+| F14 | Segurança (auditoria de PII, salt no CPF) | ⬜ |
+| **F15** | ⭐ Autenticação local email/senha (correção do professor, 09/08/2026) | ✅ |
 
 ### Pendências conhecidas
 
@@ -391,7 +405,9 @@ Base de demonstração: ~400 OS, ~1600 itens, ~960 laudos, ~76 lotes, glosas, ca
 - `Resultado.analito` e `ValorReferencia.analito` são textos livres desconectados — a bancada não sabe a faixa de referência do que digitou (F3).
 - `StatusOsItem.FATURADO`, `StatusGuiaTiss` e `xml_tiss` são estados inalcançáveis ou colunas nunca escritas (F5/F7).
 
-**Segurança** (F14): `id_token` não é validado (sem JWKS, `nonce`, `aud`, `exp`); `state` carrega o `code_verifier` do PKCE; leitura de PII não é auditada; `cpf_hash` é SHA-256 sem salt.
+**Segurança** (F14): leitura de PII não é auditada; `cpf_hash` é SHA-256 sem salt. Os itens de `id_token` não validado (sem JWKS, `nonce`, `aud`, `exp`) e `state` carregando o `code_verifier` do PKCE **não se aplicam mais** — a F15 removeu o fluxo Google/Auth0 que os continha, em vez de corrigi-los.
+
+**Autenticação** (F15 ✅): login Google/Auth0 substituído por e-mail e senha local — correção pedida pelo professor na apresentação de 09/08/2026. Ver [ADR 0010](adr/0010-substituir-login-google-por-email-senha.md) e §6.1.
 
 **Vocabulário**: a F6 introduz `RemessaFaturamento`, mas o [CONTEXT.md](../CONTEXT.md) hoje manda *evitar* "remessa" como sinônimo de malote. Precisa ser resolvido junto com a fase.
 

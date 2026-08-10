@@ -216,16 +216,40 @@ def _seed_usuarios(session) -> int:
 
     O resto do seeder depende disso: coleta, compras e baixa de título passam
     pelo gate de RBAC e só funcionam com um usuário que tenha a permissão.
+
+    F15: cada usuário de demo recebe uma senha real (`SENHA_PADRAO_SEED`), não
+    só o admin — dá pra logar com a conta de qualquer um deles. O hash é
+    calculado uma única vez fora do loop (bcrypt custa ~250ms por chamada) e
+    reaplicado a todos. Curativo: usuário já existente sem `senha_hash` (criado
+    antes desta fase) recebe a senha padrão também, sem precisar de `make clean`.
     """
+    from datetime import datetime, timezone
+
+    from src.config import get_senha_padrao_seed
     from src.usuario.models import Usuario
+    from src.usuario.senha import hash_senha
+
+    senha_hash_padrao = hash_senha(get_senha_padrao_seed())
+    agora = datetime.now(timezone.utc)
 
     criados = 0
     for email, nome, nome_perfil in USUARIOS:
-        if usuario_repository.obter_por_email(session, email) is not None:
+        existente = usuario_repository.obter_por_email(session, email)
+        if existente is not None:
+            if existente.senha_hash is None:
+                existente.senha_hash = senha_hash_padrao
+                existente.senha_definida_em = agora
             continue
         perfil = repository.obter_perfil_por_nome(session, nome_perfil)
         session.add(
-            Usuario(email=email, nome=nome, ativo=True, perfil_id=perfil.id if perfil else None)
+            Usuario(
+                email=email,
+                nome=nome,
+                ativo=True,
+                perfil_id=perfil.id if perfil else None,
+                senha_hash=senha_hash_padrao,
+                senha_definida_em=agora,
+            )
         )
         criados += 1
 

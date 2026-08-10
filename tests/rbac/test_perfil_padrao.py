@@ -49,32 +49,30 @@ def test_primeiro_usuario_vira_admin(session: Session) -> None:
     assert usuario.perfil_id == admin.id
 
 
-def test_usuarios_seguintes_recebem_visualizador(session: Session) -> None:
+def test_todos_os_cadastros_viram_admin(session: Session) -> None:
+    """Projeto acadêmico, sem produção real: todo cadastro novo vira admin,
+    não só o primeiro (decisão deliberada para facilitar testes)."""
     _semear_perfis(session)
     admin = session.query(Perfil).filter_by(nome="admin").one()
-    visualizador = session.query(Perfil).filter_by(nome="visualizador").one()
     primeiro = sincronizar_usuario(session, _email("adminboot"), "Admin Boot")
     segundo = sincronizar_usuario(session, _email("comum"), "Comum")
     assert primeiro.perfil_id == admin.id
-    assert segundo.perfil_id == visualizador.id
+    assert segundo.perfil_id == admin.id
 
 
-def test_relogin_nao_sobrescreve_perfil_existente(session: Session) -> None:
+def test_relogin_nao_sobrescreve_perfil_rebaixado_manualmente(session: Session) -> None:
     _semear_perfis(session)
     visualizador = session.query(Perfil).filter_by(nome="visualizador").one()
-    email_promovido = _email("promovido")
+    email = _email("rebaixado")
 
-    # Primeiro usuário vira admin (bootstrap).
-    sincronizar_usuario(session, _email("boot"), "Boot")
-    # Segundo usuário nasce visualizador...
-    segundo = sincronizar_usuario(session, email_promovido, "Promovido")
-    # ...e é promovido a admin manualmente.
-    usuario = session.get(Usuario, segundo.id)
-    admin = session.query(Perfil).filter_by(nome="admin").one()
-    usuario.perfil_id = admin.id
+    # Cadastro nasce admin...
+    criado = sincronizar_usuario(session, email, "Rebaixado")
+    # ...e é rebaixado a visualizador manualmente por um admin.
+    usuario = session.get(Usuario, criado.id)
+    usuario.perfil_id = visualizador.id
     session.commit()
 
-    # Novo login do mesmo e-mail não deve rebaixar o perfil.
-    relogin = sincronizar_usuario(session, email_promovido, "Promovido")
-    assert relogin.perfil_id == admin.id
-    assert relogin.perfil_id != visualizador.id
+    # Novo login do mesmo e-mail não deve repromover o perfil rebaixado
+    # (só usuário sem perfil nenhum, perfil_id=None, é reatribuído).
+    relogin = sincronizar_usuario(session, email, "Rebaixado")
+    assert relogin.perfil_id == visualizador.id
