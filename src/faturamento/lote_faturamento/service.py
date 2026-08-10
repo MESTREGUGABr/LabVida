@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from src.auditoria import registrar_auditoria
 from src.cadastro.convenio import repository as convenio_repository
 from src.cadastro.convenio.dtos import StatusConvenio
+from src.faturamento.competencia import service as competencia_service
 from src.faturamento.lote_faturamento import repository
 from src.faturamento.lote_faturamento.dtos import (
     GuiaItemCreate,
@@ -47,14 +48,30 @@ def _acumular(total_atual, valor_faturado) -> Decimal:
 
 
 def criar_lote(session: Session, dto: LoteFaturamentoCreate) -> LoteFaturamentoRead:
+    """Abre um lote, ou devolve o ja ABERTO do mesmo convenio+competencia.
+
+    Idempotente por (convenio_id, competencia): um clique repetido no mesmo
+    mes devolve o mesmo lote em vez de espalhar varios soltos.
+    """
     if dto.convenio_id is not None:
         convenio = convenio_repository.obter_por_id(session, dto.convenio_id)
         if convenio is None or convenio.status != StatusConvenio.ATIVO:
             raise ConvenioInvalidoParaLote("Convênio inválido ou inativo")
 
+    competencia = dto.competencia or competencia_service.competencia_corrente()
+    # `obter_ou_criar` so garante a FK -- nao usamos `exigir_aberta` porque
+    # bloquear lancamento retroativo em competencia FECHADA e regra da fase
+    # F5 (fora de escopo aqui) e quebraria o seeder, que retrodata lotes.
+    competencia_service.obter_ou_criar(session, competencia)
+
+    existente = repository.obter_lote_aberto(session, dto.convenio_id, competencia)
+    if existente is not None:
+        return LoteFaturamentoRead.model_validate(existente)
+
     lote = LoteFaturamento(
         codigo_lote=_gerar_codigo_lote(session),
         convenio_id=dto.convenio_id,
+        competencia=competencia,
         status=StatusLote.ABERTO,
     )
     repository.salvar_lote(session, lote)
@@ -230,6 +247,20 @@ def adicionar_itens_ao_lote(session: Session, lote_id: UUID, itens: list[GuiaIte
 
 def listar_lotes(session: Session) -> list[LoteFaturamentoRead]:
     return [LoteFaturamentoRead.model_validate(l) for l in repository.listar_lotes(session)]
+
+
+def obter_lote_aberto_atual(
+    session: Session, convenio_id: UUID | None, competencia: date | None = None
+) -> LoteFaturamentoRead | None:
+    """So consulta -- nao cria nada. Usado pela UI pra saber, antes de agir,
+    se ja existe um lote aberto do convenio+competencia."""
+    competencia = competencia or competencia_service.competencia_corrente()
+    lote = repository.obter_lote_aberto(session, convenio_id, competencia)
+    return LoteFaturamentoRead.model_validate(lote) if lote is not None else None
+
+
+def listar_itens_faturados(session: Session, lote_id: UUID) -> list[dict]:
+    return repository.listar_itens_do_lote(session, lote_id)
 
 
 def contar_laudos_pendentes(session: Session, convenio_id: UUID | None) -> int:

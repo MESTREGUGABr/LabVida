@@ -1,9 +1,12 @@
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.atendimento.ordem_servico.models import OrdemServico, OsItem
+from src.cadastro.models import Paciente
+from src.cadastro.procedimento.models import Procedimento
 from src.faturamento.lote_faturamento.dtos import StatusLote
 from src.faturamento.lote_faturamento.models import GuiaItem, GuiaTiss, LoteFaturamento
 from src.laboratorial.models import Laudo, StatusLaudo
@@ -26,6 +29,19 @@ def obter_lote_por_codigo(session: Session, codigo_lote: str) -> LoteFaturamento
 def listar_lotes(session: Session) -> list[LoteFaturamento]:
     stmt = select(LoteFaturamento).order_by(LoteFaturamento.criado_em.desc())
     return list(session.scalars(stmt).all())
+
+
+def obter_lote_aberto(
+    session: Session, convenio_id: UUID | None, competencia: date
+) -> LoteFaturamento | None:
+    stmt = select(LoteFaturamento).where(
+        LoteFaturamento.convenio_id == convenio_id
+        if convenio_id is not None
+        else LoteFaturamento.convenio_id.is_(None),
+        LoteFaturamento.competencia == competencia,
+        LoteFaturamento.status == StatusLote.ABERTO,
+    )
+    return session.execute(stmt).scalar_one_or_none()
 
 
 def listar_lotes_abertos(session: Session) -> list[LoteFaturamento]:
@@ -78,6 +94,33 @@ def contar_laudos_pendentes_por_convenio(session: Session, convenio_id: UUID | N
         )
     )
     return session.execute(stmt).scalar_one()
+
+
+def listar_itens_do_lote(session: Session, lote_id: UUID) -> list[dict]:
+    stmt = (
+        select(
+            GuiaItem.id, GuiaItem.valor_faturado, GuiaItem.status,
+            Paciente.nome.label("paciente_nome"), Procedimento.nome.label("procedimento_nome"),
+        )
+        .join(GuiaTiss, GuiaItem.guia_tiss_id == GuiaTiss.id)
+        .join(Laudo, GuiaItem.laudo_id == Laudo.id)
+        .join(OsItem, Laudo.os_item_id == OsItem.id)
+        .join(OrdemServico, OsItem.ordem_servico_id == OrdemServico.id)
+        .join(Paciente, OrdemServico.paciente_id == Paciente.id)
+        .join(Procedimento, GuiaItem.procedimento_id == Procedimento.id)
+        .where(GuiaTiss.lote_faturamento_id == lote_id)
+    )
+    results = session.execute(stmt).all()
+    return [
+        {
+            "id": str(r.id),
+            "paciente": r.paciente_nome,
+            "procedimento": r.procedimento_nome,
+            "valor": float(r.valor_faturado),
+            "status": r.status,
+        }
+        for r in results
+    ]
 
 
 def listar_laudos_liberados_por_convenio(session: Session, convenio_id: UUID | None) -> list[dict]:

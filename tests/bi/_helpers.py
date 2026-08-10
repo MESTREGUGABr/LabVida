@@ -18,6 +18,7 @@ from src.cadastro.dtos import SexoPaciente
 from src.cadastro.models import Paciente
 from src.cadastro.procedimento.models import Procedimento
 from src.cadastro.unidade.models import Unidade
+from src.faturamento.competencia.service import obter_ou_criar as obter_ou_criar_competencia
 from src.faturamento.glosa.models import Glosa
 from src.faturamento.lote_faturamento.models import GuiaItem, GuiaTiss, LoteFaturamento
 from src.financeiro.movimento_caixa.models import MovimentoCaixa
@@ -196,12 +197,17 @@ def faturar(
     valor: Decimal = Decimal("50.00"),
 ) -> LoteFaturamento:
     """Lote com guia e itens. `fechado_em=None` deixa o lote ABERTO."""
+    criado_em = (fechado_em or utc(2026, 1, 1)) - timedelta(days=1)
+    # `obter_ou_criar` garante a linha em `competencias` que a FK exige --
+    # esse helper monta o lote direto via ORM, sem passar pelo service.
+    competencia = obter_ou_criar_competencia(session, criado_em.date().replace(day=1)).competencia
     lote = LoteFaturamento(
         codigo_lote=f"LT{uuid.uuid4().hex[:8].upper()}",
         convenio_id=cenario.convenio if convenio_id is ... else convenio_id,
         status="FECHADO" if fechado_em else "ABERTO",
         valor_total=valor * len(laudos),
-        criado_em=(fechado_em or utc(2026, 1, 1)) - timedelta(days=1),
+        competencia=competencia,
+        criado_em=criado_em,
         fechado_em=fechado_em,
     )
     session.add(lote)
