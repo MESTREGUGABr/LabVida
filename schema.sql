@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict dFRUsYUR1RMaQIh8ZqOyrzvDjdcUmQjhfZWIEbJcOk4zfiP01u3POajjViaLWW2
+\restrict ApKBeZtWtvhF1f9B6UvhlgWgFeltmdQrBFTdhSYUG1lksVmywRFFgcYFTjzKwdQ
 
 -- Dumped from database version 16.14
 -- Dumped by pg_dump version 16.14
@@ -1081,6 +1081,7 @@ CREATE TABLE public.os_itens (
     valor_tabela numeric(12,2),
     origem_valor character varying(16) DEFAULT 'TABELA'::character varying NOT NULL,
     motivo_excecao character varying(255),
+    insumo_consumido_em timestamp with time zone,
     CONSTRAINT ck_os_item_origem_valor CHECK (((origem_valor)::text = ANY ((ARRAY['TABELA'::character varying, 'NEGOCIADO'::character varying, 'SEM_TABELA'::character varying])::text[]))),
     CONSTRAINT ck_os_item_status CHECK (((status)::text = ANY ((ARRAY['SOLICITADO'::character varying, 'COLETADO'::character varying, 'RESULTADO_LIBERADO'::character varying, 'FATURADO'::character varying, 'CANCELADO'::character varying])::text[])))
 );
@@ -3325,5 +3326,5 @@ ALTER TABLE ONLY public.valores_referencia
 -- PostgreSQL database dump complete
 --
 
-\unrestrict dFRUsYUR1RMaQIh8ZqOyrzvDjdcUmQjhfZWIEbJcOk4zfiP01u3POajjViaLWW2
+\unrestrict ApKBeZtWtvhF1f9B6UvhlgWgFeltmdQrBFTdhSYUG1lksVmywRFFgcYFTjzKwdQ
 

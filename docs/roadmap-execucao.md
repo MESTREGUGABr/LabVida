@@ -46,7 +46,7 @@ Além disso, a conferência do código contra a documentação encontrou **sete 
 | **F13** | **OMOP** — conforme decisão da equipe | a definir | F3 | qualquer | evolucao §6 |
 | **F14** | **Segurança** — auditoria de leitura de PII, salt no hash de CPF (os itens de JWT/`state` do fluxo Google são absorvidos pela F15, que remove esse fluxo) | — | — | qualquer | evolucao §7.3 |
 | **F15** | ✅ ⭐ **Autenticação local email/senha — concluída em 09/08/2026.** Correção pedida pelo professor. Substituiu o login Google/Auth0 (`src/auth.py`, removido) por e-mail+senha: `usuarios.senha_hash`/`senha_definida_em`, hash bcrypt, duas abas sempre visíveis (Entrar/Criar conta), todo cadastro novo vira `admin` diretamente (decisão aceitável só por não ir a produção real), seeder com senha real via `SENHA_PADRAO_SEED` | `0018` | F14 | — | [ADR 0010](adr/0010-substituir-login-google-por-email-senha.md) |
-| **F16** | *(candidata, não priorizada)* **Estoque real — consumo por procedimento e bloqueio na coleta.** Hoje (10/08/2026) só existe o alerta de estoque baixo (`insumos_materiais.estoque_minimo`, `0020_estoque_minimo`) — nenhum código debita insumo por exame executado. Versão completa exigiria tabela `procedimento_insumo` (receita padrão), débito automático em `atendimento/amostra/service.py::registrar_coleta`, e decisão de martelo entre bloqueio duro vs. aviso com opção de forçar | a definir | — | qualquer | evolucao §7.5 |
+| **F16** | ✅ **Estoque real — consumo por procedimento e bloqueio na coleta, concluída em 10/08/2026.** Tabela `procedimentos_insumos` (receita padrão por procedimento) + débito automático de estoque em `registrar_coleta` + bloqueio duro (`EstoqueInsuficienteError`) quando o saldo não cobre a receita. Implementada em paralelo por outro integrante da equipe, sem depender do alerta leve (`estoque_minimo`) que já existia. **Bug de consumo em dobro corrigido na revisão final**: `os_itens.insumo_consumido_em` garante que cada item da OS só é debitado uma vez, mesmo com várias coletas na mesma OS (a tela orienta uma coleta por tipo de material) | `0021` `0022` | — | qualquer | evolucao §7.5 |
 
 **Mudança de rumo mais importante em relação aos planos anteriores:** o BI saiu do fim da fila. Ele era "Fase 6, depende de tudo". A conferência do código mostrou que as datas e medidas que faltam **já existem no OLTP e simplesmente não são consultadas** ([plano-bi.md §1.6](plano-bi.md)) — cerca de 70% do BI é independente e vira **F2, em paralelo**. O que sobra vira F12.
 
@@ -56,7 +56,7 @@ Além disso, a conferência do código contra a documentação encontrou **sete 
 
 ## 2. Numeração de migrations
 
-Head atual verificado (10/08/2026): **`0020_estoque_minimo`**, cadeia única e limpa (o `0012_merge_heads_c_d` já resolveu as heads paralelas anteriores).
+Head atual verificado (10/08/2026): **`0022_os_item_insumo_consumido`**, cadeia única e limpa (o `0012_merge_heads_c_d` já resolveu as heads paralelas anteriores).
 
 **Regra de sequenciamento:** `0014` (BI) entra **antes** da trilha de faturamento. Motivo: F2 e F3 rodam em paralelo, e se as duas partirem de `0013` o Alembic ganha **duas heads** e alguém vai ter que escrever outro merge. A migration de BI toca apenas tabelas `bi_*` (zero impacto no OLTP) e é pequena — então ela **entra primeiro e sozinha**, e a trilha de faturamento parte de `0014` em diante.
 
@@ -68,16 +68,18 @@ Head atual verificado (10/08/2026): **`0020_estoque_minimo`**, cadeia única e l
 | `0017_competencias` | F4 | (era `0015`) |
 | `0018_login_local` | **F15** | senha local (`usuarios.senha_hash`/`senha_definida_em`) — correção do professor, encaixada fora de ordem por ser urgente e independente do faturamento |
 | `0019_lote_competencia` | **F6 (parcial)** | `competencia` no lote existente + unicidade `(convenio_id, competencia)` — encaixada fora de ordem, mesmo motivo da F15: pedido direto sobre a poluição visual do faturamento, sem depender de F5 |
-| `0020_estoque_minimo` | — | campo `estoque_minimo` em `insumos_materiais` + alerta de estoque baixo — não é uma fase numerada do faturamento, ver F16 (candidata) |
-| `0021_itens_faturaveis` | F5 | (era `0016`, depois `0019`) |
-| `0022_remessa_completa` | F6 (resto) | rename lote→remessa, sequence, pacote `remessa` (era `0017`, depois `0020`) |
-| `0023_guia_por_paciente` | F7 | (era `0018`, depois `0021`) |
-| `0024_glosa_ciclo_de_vida` | F8 | (era `0019`, depois `0022`) |
-| `0025_divergencias` | F9 | (era `0020`, depois `0023`) |
-| `0026_titulo_receber_baixa_parcial` | F10 | (era `0021`, depois `0024`) |
-| `0027_caixa_contas_e_pagar` | F11 | (era `0022`, depois `0025`) |
+| `0020_estoque_minimo` | — | campo `estoque_minimo` em `insumos_materiais` + alerta de estoque baixo |
+| `0021_procedimento_insumo` | **F16** | tabela `procedimentos_insumos` (receita padrão procedimento↔insumo) — implementada por outro integrante da equipe, em paralelo, fora de ordem |
+| `0022_os_item_insumo_consumido` | **F16** | `os_itens.insumo_consumido_em` — corrige o consumo em dobro encontrado na revisão final (ver evolucao §7.5) |
+| `0023_itens_faturaveis` | F5 | (era `0016`, depois `0019`, depois `0021`) |
+| `0024_remessa_completa` | F6 (resto) | rename lote→remessa, sequence, pacote `remessa` (era `0017`, depois `0020`, depois `0022`) |
+| `0025_guia_por_paciente` | F7 | (era `0018`, depois `0021`, depois `0023`) |
+| `0026_glosa_ciclo_de_vida` | F8 | (era `0019`, depois `0022`, depois `0024`) |
+| `0027_divergencias` | F9 | (era `0020`, depois `0023`, depois `0025`) |
+| `0028_titulo_receber_baixa_parcial` | F10 | (era `0021`, depois `0024`, depois `0026`) |
+| `0029_caixa_contas_e_pagar` | F11 | (era `0022`, depois `0025`, depois `0027`) |
 
-> ⚠️ Ao ler o anexo [plano-faturamento-competencia.md](plano-faturamento-competencia.md) §2, **some 5** em todo número de migration a partir de `competencias` (a F3 consumiu 0015 e 0016; a F15 e a F6-parcial, ambas fora da ordem original, consumiram 0018 e 0019; a `0020_estoque_minimo`, fora do escopo do faturamento, consumiu mais uma). O conteúdo de cada migration futura está correto; só o número muda — e pode mudar de novo se mais alguma correção urgente for encaixada fora de ordem antes da F5.
+> ⚠️ Ao ler o anexo [plano-faturamento-competencia.md](plano-faturamento-competencia.md) §2, **some 7** em todo número de migration a partir de `competencias` (a F3 consumiu 0015 e 0016; a F15 e a F6-parcial, fora da ordem original, consumiram 0018 e 0019; `0020_estoque_minimo` e o par `0021`/`0022` da F16, todas fora do escopo do faturamento, consumiram mais três). O conteúdo de cada migration futura está correto; só o número muda — e pode mudar de novo se mais alguma correção urgente for encaixada fora de ordem antes da F5.
 
 **Regra obrigatória a partir daqui:** migrations **escritas à mão** (`alembic revision -m`, **sem** `--autogenerate`). O autogenerate **não detecta rename** — ele emite `drop_table` + `create_table`, o que destruiria os 73 lotes na `0018`. O alvo `make revision` do Makefile usa `--autogenerate` e **não serve** para esta remodelagem. Documentar no Makefile e no README.
 

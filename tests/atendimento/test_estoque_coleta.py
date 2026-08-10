@@ -114,3 +114,67 @@ def test_coleta_bloqueia_quando_estoque_insuficiente(session: Session) -> None:
                 coletor_usuario_id=base.usuario_id,
             ),
         )
+
+
+def test_segunda_coleta_na_mesma_os_nao_consome_insumo_novamente(session: Session) -> None:
+    """Regressao: a tela orienta 'uma coleta por tipo de material' — uma OS
+    com mais de um exame dispara `registrar_coleta` varias vezes. Sem a marca
+    `insumo_consumido_em`, cada chamada reprocessava TODOS os itens ativos da
+    OS e debitava o mesmo insumo de novo."""
+    base = montar_base(session)
+
+    insumo = criar_insumo(
+        session,
+        InsumoCreate(
+            nome="Tubo Coleta Multipla",
+            finalidade="Teste consumo unico",
+            quantidade_estoque=10.0,
+            estoque_minimo=2.0,
+        ),
+    )
+    vincular_insumo(session, base.procedimento_id, insumo.id, quantidade_necessaria=6.0)
+    session.commit()
+
+    ordem = abrir_os(
+        session,
+        OrdemServicoCreate(
+            paciente_id=base.paciente_id,
+            unidade_id=base.unidade_id,
+            convenio_id=None,
+            itens=[
+                OsItemInput(
+                    procedimento_id=base.procedimento_id,
+                    valor_negociado=Decimal("50"),
+                    motivo_excecao="Teste coleta multipla",
+                )
+            ],
+        ),
+        base.usuario_id,
+    )
+
+    registrar_coleta(
+        session,
+        ColetaCreate(
+            ordem_servico_id=ordem.id,
+            tipo_material=TipoMaterial.SANGUE,
+            coletor_usuario_id=base.usuario_id,
+        ),
+    )
+    # Segunda coleta na MESMA OS (ex.: outro material do mesmo pedido) — nao
+    # deve debitar o insumo de novo, nem levantar EstoqueInsuficienteError.
+    registrar_coleta(
+        session,
+        ColetaCreate(
+            ordem_servico_id=ordem.id,
+            tipo_material=TipoMaterial.URINA,
+            coletor_usuario_id=base.usuario_id,
+        ),
+    )
+
+    insumo_atual = obter_insumo(session, insumo.id)
+    assert insumo_atual.quantidade_estoque == 4.0
+
+    movs = listar_todos_movimentos(session)
+    mov_saida = [m for m in movs if m.insumo_material_id == insumo.id and m.tipo == TipoMovimentoEstoque.SAIDA]
+    assert len(mov_saida) == 1
+    assert Decimal(str(mov_saida[0].quantidade)) == Decimal("6.000")

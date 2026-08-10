@@ -56,6 +56,10 @@ class OsItem(Base):
     cancelado_por_usuario_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("usuarios.id"), nullable=True
     )
+    # Marca quando o insumo deste item foi debitado do estoque (F16). Sem
+    # isso, cada coleta nova na mesma OS reprocessava TODOS os itens ativos
+    # e debitava o insumo de novo -- bug real corrigido em 0022.
+    insumo_consumido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     ordem_servico: Mapped["OrdemServico"] = relationship("OrdemServico")
     procedimento: Mapped[Procedimento] = relationship("Procedimento")
