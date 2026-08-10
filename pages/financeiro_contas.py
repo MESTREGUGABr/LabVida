@@ -206,12 +206,6 @@ def _conv_label(convs, lotes, lote_id):
             return f"Lote → {nome}"
     return "Lote (Particular)"
 
-
-
-if __name__ == "__main__":
-    main()
-
-
 _COLUNAS_RECEBER = [
     ColunaGrid("valor", "Valor", tipo="moeda", largura=140),
     ColunaGrid("vencimento", "Vencimento", tipo="data", largura=140),
@@ -282,3 +276,7 @@ def _dialogo_baixa_pagar(titulo: dict) -> None:
     with coluna_cancelar:
         if st.button("Cancelar", width="stretch"):
             st.rerun()
+
+
+if __name__ == "__main__":
+    main()

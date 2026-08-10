@@ -84,6 +84,7 @@ _FORMATADORES: dict[str, str] = {
 }
 
 _NUMERICAS = {"moeda", "numero", "inteiro"}
+_DATAS = {"data", "data_hora"}
 
 
 @dataclass(frozen=True)
@@ -140,6 +141,20 @@ def _normalizar_numericas(df: pd.DataFrame, colunas: list[ColunaGrid]) -> pd.Dat
     return df
 
 
+def _normalizar_datas(df: pd.DataFrame, colunas: list[ColunaGrid]) -> pd.DataFrame:
+    """`date`/`datetime` puro fica com dtype `object` no DataFrame — o
+    st_aggrid so converte pra ISO string automaticamente em colunas com dtype
+    `datetime64`. Sem isso o valor cru chega ao browser e o `_FMT_DATA`
+    (JS) nao consegue parsear, mostrando "[object Object]"."""
+    for coluna in colunas:
+        if coluna.tipo in _DATAS and coluna.campo in df.columns:
+            valores = pd.to_datetime(df[coluna.campo], errors="coerce")
+            df[coluna.campo] = valores.apply(
+                lambda v: v.isoformat() if pd.notna(v) else None
+            )
+    return df
+
+
 def renderizar_grid(
     dados: list[dict] | pd.DataFrame,
     *,
@@ -157,7 +172,7 @@ def renderizar_grid(
     `chave` precisa ser unica na pagina — e o que mantem o estado do grid entre
     reruns (ordenacao, filtro, pagina atual).
     """
-    df = _normalizar_numericas(_para_dataframe(dados, colunas), colunas)
+    df = _normalizar_datas(_normalizar_numericas(_para_dataframe(dados, colunas), colunas), colunas)
 
     if df.empty:
         st.caption(mensagem_vazio)

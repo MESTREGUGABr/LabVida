@@ -103,10 +103,6 @@ def _render_listar_glosas() -> None:
         st.metric("Valor Total Glosado", f"R$ {total_glosado:.2f}")
 
 
-if __name__ == "__main__":
-    main()
-
-
 _COLUNAS_ITEM = [
     ColunaGrid("codigo_lote", "Lote", largura=130),
     ColunaGrid("convenio_nome", "Convenio"),
@@ -190,3 +186,7 @@ def _selecionar_item_para_glosar(itens: list[dict]) -> None:
 
 def _listar_itens_para_glosa(itens: list[dict]) -> None:
     _selecionar_item_para_glosar(itens)
+
+
+if __name__ == "__main__":
+    main()

@@ -91,7 +91,10 @@ def main() -> None:
             f"as demais serão aceitas."
         )
     else:
-        st.caption(f"{ICONE_OK} Todas as amostras serão aceitas como íntegras.")
+        st.caption(
+            f"{ICONE_OK} Todas as amostras serão aceitas como íntegras.",
+            unsafe_allow_html=True,
+        )
 
     observacao = st.text_area(
         "Observações da recepção (opcional)",
