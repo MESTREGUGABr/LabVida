@@ -109,6 +109,7 @@ def _gerar_codigo_barras(session: Session) -> str:
 
 def _processar_consumo_estoque(session: Session, ordem) -> None:
     from collections import defaultdict
+    from datetime import datetime, timezone
     from decimal import Decimal
     from sqlalchemy import select
     from src.atendimento.amostra.errors import EstoqueInsuficienteError
@@ -119,43 +120,51 @@ def _processar_consumo_estoque(session: Session, ordem) -> None:
     from src.compras.insumo.models import EstoqueMovimento, InsumoMaterial
 
     itens = os_repository.listar_itens(session, ordem.id)
-    itens_ativos = [i for i in itens if i.status != StatusOsItem.CANCELADO]
-    if not itens_ativos:
+    # So os itens que ainda nao tiveram o insumo debitado -- sem isso, uma
+    # segunda coleta na mesma OS (tela orienta "uma coleta por tipo de
+    # material") reprocessava TODOS os itens de novo e debitava duas vezes.
+    itens_pendentes = [
+        i for i in itens
+        if i.status != StatusOsItem.CANCELADO and i.insumo_consumido_em is None
+    ]
+    if not itens_pendentes:
         return
 
     insumos_necessarios: dict[UUID, Decimal] = defaultdict(Decimal)
 
-    for item in itens_ativos:
+    for item in itens_pendentes:
         links = session.scalars(
             select(ProcedimentoInsumo).where(ProcedimentoInsumo.procedimento_id == item.procedimento_id)
         ).all()
         for link in links:
             insumos_necessarios[link.insumo_material_id] += link.quantidade_necessaria
 
-    if not insumos_necessarios:
-        return
+    if insumos_necessarios:
+        insumos_objs: dict[UUID, InsumoMaterial] = {}
+        for insumo_id, qtd_nec in insumos_necessarios.items():
+            insumo = session.get(InsumoMaterial, insumo_id)
+            if insumo is not None:
+                insumos_objs[insumo_id] = insumo
+                if Decimal(str(insumo.quantidade_estoque)) < qtd_nec:
+                    raise EstoqueInsuficienteError(
+                        f"Estoque insuficiente para o insumo '{insumo.nome}': necessário {qtd_nec}, disponível {insumo.quantidade_estoque}"
+                    )
 
-    insumos_objs: dict[UUID, InsumoMaterial] = {}
-    for insumo_id, qtd_nec in insumos_necessarios.items():
-        insumo = session.get(InsumoMaterial, insumo_id)
-        if insumo is not None:
-            insumos_objs[insumo_id] = insumo
-            if Decimal(str(insumo.quantidade_estoque)) < qtd_nec:
-                raise EstoqueInsuficienteError(
-                    f"Estoque insuficiente para o insumo '{insumo.nome}': necessário {qtd_nec}, disponível {insumo.quantidade_estoque}"
+        for insumo_id, qtd_nec in insumos_necessarios.items():
+            insumo = insumos_objs.get(insumo_id)
+            if insumo is not None:
+                novo_estoque = Decimal(str(insumo.quantidade_estoque)) - qtd_nec
+                insumo.quantidade_estoque = float(novo_estoque)
+                session.add(
+                    EstoqueMovimento(
+                        insumo_material_id=insumo.id,
+                        tipo=TipoMovimentoEstoque.SAIDA,
+                        quantidade=qtd_nec,
+                        observacao=f"Consumo automático - Coleta OS {ordem.codigo_os}",
+                    )
                 )
 
-    for insumo_id, qtd_nec in insumos_necessarios.items():
-        insumo = insumos_objs.get(insumo_id)
-        if insumo is not None:
-            novo_estoque = Decimal(str(insumo.quantidade_estoque)) - qtd_nec
-            insumo.quantidade_estoque = float(novo_estoque)
-            session.add(
-                EstoqueMovimento(
-                    insumo_material_id=insumo.id,
-                    tipo=TipoMovimentoEstoque.SAIDA,
-                    quantidade=qtd_nec,
-                    observacao=f"Consumo automático - Coleta OS {ordem.codigo_os}",
-                )
-            )
+    agora = datetime.now(timezone.utc)
+    for item in itens_pendentes:
+        item.insumo_consumido_em = agora
 

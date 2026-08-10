@@ -339,22 +339,17 @@ Bugs e inconsistências que **não** estavam na auditoria anterior (que se decla
 - `LoteFaturamento` sem `unidade_id` → glosa tem unidade, faturamento não; cruzar os dois exige 5 joins.
 - Dark mode (`ui_css.py:605-621`) existe e **nunca é chamado** por nenhuma página.
 
-### 7.5 Estoque — alerta implementado, consumo real fica para depois
+### 7.5 Estoque — consumo real e bloqueio implementados (F16)
 
-Compras roda em paralelo ao fluxo assistencial (decisão já registrada em `arquitetura.md` §4.7): o ciclo fornecedor → solicitação → aprovação → recebimento → título a pagar → entrada de estoque é real, mas **nenhum código em `atendimento/`, `laboratorial/` ou `logistica/` debita insumo por exame executado** — as únicas saídas de estoque hoje vêm do seeder (`_seed_consumo`), simulando consumo sem vínculo com nenhuma coleta real.
+Até 10/08/2026 de manhã, Compras rodava em paralelo ao fluxo assistencial: o ciclo fornecedor → solicitação → aprovação → recebimento → título a pagar → entrada de estoque era real, mas nenhum código em `atendimento/`, `laboratorial/` ou `logistica/` debitava insumo por exame executado. A decisão registrada aqui então foi implementar só a versão leve — `insumos_materiais.estoque_minimo` (`0020_estoque_minimo`) e um alerta visual na tela de Estoque.
 
-Depois de confirmar isso com o usuário (10/08/2026), a decisão foi implementar só a versão leve — `insumos_materiais.estoque_minimo` (migration `0020_estoque_minimo`) e um alerta visual na tela de Estoque quando `quantidade_estoque < estoque_minimo` — sem ligar consumo a procedimento nem bloquear nada.
+No mesmo dia, outro integrante da equipe implementou a versão completa em paralelo (commit `769251a`, sem conhecimento dessa decisão): tabela `procedimentos_insumos` (receita padrão por procedimento, `0021_procedimento_insumo`), débito automático de estoque em `registrar_coleta`, e bloqueio duro via `EstoqueInsuficienteError` quando o saldo não cobre a receita. Ficou definido manter essa versão (é estritamente mais completa que a leve) — a tela de Estoque continua mostrando o alerta de mínimo, e agora também bloqueia a coleta por saldo insuficiente.
 
-**Desenho da versão completa (F16 candidata, não implementada, ver `docs/roadmap-execucao.md`):**
+**Bug encontrado e corrigido na revisão final (10/08/2026):** `_processar_consumo_estoque` reprocessava **todos os itens ativos da OS inteira** a cada chamada de `registrar_coleta`, sem nenhuma marca de "já processado". Como a tela de coleta orienta registrar uma coleta por tipo de material (`pages/atendimento_coleta.py:88-90`), qualquer OS com mais de um tipo de exame dispara `registrar_coleta` várias vezes — e cada chamada debitava o mesmo insumo de novo. Corrigido com `os_itens.insumo_consumido_em` (`0022_os_item_insumo_consumido`): cada item da OS só é considerado para consumo uma vez, independente de quantas coletas a OS tiver. Teste de regressão: `tests/atendimento/test_estoque_coleta.py::test_segunda_coleta_na_mesma_os_nao_consome_insumo_novamente`.
 
-| # | O que falta | Onde entraria |
-|---|---|---|
-| E1 | Tabela `procedimento_insumo` (receita padrão: quantidade de cada insumo por procedimento) | novo módulo, FK para `procedimentos` e `insumos_materiais` |
-| E2 | Débito automático de estoque ao confirmar a coleta, somando a receita de todos os `OsItem` da OS | `src/atendimento/amostra/service.py::registrar_coleta` |
-| E3 | Decisão de martelo: bloqueio duro (nunca deixa coletar sem insumo) vs. aviso com opção de forçar | decisão de negócio, não só técnica |
-| E4 | Se bloqueio duro: rota de reposição urgente/override por admin, para não travar o atendimento por um insumo secundário | `pages/compras_estoque.py` ou `atendimento_coleta.py` |
-
-Risco de implementar isso junto com outra fase: `registrar_coleta` é um dos fluxos mais usados e testados do sistema — qualquer regressão ali afeta o atendimento inteiro, não só o estoque. Por isso ficou fora desta rodada.
+**O que ainda não existe** (não bloqueante pra entrega, mas vale registrar):
+- `Procedimento.tipo_material` (coluna existente desde a F3) nunca é populado em lugar nenhum do código — o consumo por procedimento não distingue qual material está sendo coletado, só olha a OS como um todo.
+- Sem rota de reposição urgente/override por admin: se faltar insumo, a coleta fica bloqueada até alguém dar entrada de estoque manualmente (não há bypass).
 
 ---
 

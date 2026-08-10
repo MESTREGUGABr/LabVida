@@ -140,7 +140,7 @@ FINANCEIRO         título a receber → baixa → movimento de caixa
 BI                 ETL → star schema → 4 dashboards
 ```
 
-**Compras** roda em paralelo: solicitação → aprovação → título a pagar → recebimento → estoque.
+**Compras** roda majoritariamente em paralelo: solicitação → aprovação → título a pagar → recebimento → estoque. A única costura real com o fluxo assistencial é a coleta (Stack A): se o procedimento tem receita cadastrada (`procedimentos_insumos`), `registrar_coleta` debita o insumo do estoque automaticamente e bloqueia a coleta se o saldo não cobrir a receita (F16).
 
 ### 3.1 Máquina de estados da OS
 
@@ -196,7 +196,7 @@ Lote particular (`convenio_id IS NULL`) aparece nas telas de glosa, rotulado "Pa
 
 ### 4.7 Compras
 
-[compras_fornecedores.py](../pages/compras_fornecedores.py), [compras_pedidos.py](../pages/compras_pedidos.py), [compras_estoque.py](../pages/compras_estoque.py). Segregação de funções: solicitante, aprovador e almoxarife são permissões distintas. Aprovação gera título a pagar; recebimento movimenta estoque.
+[compras_fornecedores.py](../pages/compras_fornecedores.py), [compras_pedidos.py](../pages/compras_pedidos.py), [compras_estoque.py](../pages/compras_estoque.py), [cadastro_procedimentos.py](../pages/cadastro_procedimentos.py) (aba "Ficha Técnica"). Segregação de funções: solicitante, aprovador e almoxarife são permissões distintas. Aprovação gera título a pagar; recebimento movimenta estoque; a coleta debita estoque pela receita do procedimento e bloqueia por saldo insuficiente (F16, `EstoqueInsuficienteError`).
 
 ---
 
