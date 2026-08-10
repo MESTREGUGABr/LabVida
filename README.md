@@ -62,9 +62,11 @@ docker compose up --build -d
 
 Acesse **<http://localhost:8501>**. Na tela de login, use a aba **"Criar conta"** (qualquer conta criada já entra como admin) ou entre com um usuário do seeder — ver [seção 12](#12-usuários-e-senhas-de-acesso-ao-sistema).
 
-> **Não é preciso criar `venv`, instalar dependências nem rodar `make migrate` para usar o sistema via Docker.** O próprio container executa `alembic upgrade head` (migrações) e `python -m src.seeder` (dados de exemplo) no boot — o banco já sobe estruturado e populado.
+> ⏳ **Nota sobre a inicialização:** A primeira subida do container pode levar de **30 a 60 segundos** para liberar o acesso na porta 8501. Isso ocorre porque o boot executa automaticamente o build/instalação das dependências, as migrações do banco (`alembic upgrade head`) e a geração da base de dados de demonstração (`python -m src.seeder`), simulando ~3 meses de operação real do laboratório.
+>
+> **Não é preciso criar `venv`, instalar dependências nem rodar `make migrate` para usar o sistema via Docker.**
 
-Acompanhar o boot: `docker compose logs -f app` · Encerrar: `docker compose down`
+Acompanhar o boot em tempo real: `docker compose logs -f app` · Encerrar: `docker compose down`
 
 As seções [7](#7-como-instalar-as-dependências) (venv) e [9](#9-como-importar-os-scripts-sql--migrations-alembic) (migrações manuais) são necessárias apenas para execução **sem Docker** ou para rodar a suíte de testes na máquina local.
 
@@ -498,7 +500,7 @@ LGPD_ENCRYPTION_KEY=Q22r1OivohTtSBRaMi-hjLxXxrQ3SwEdOumlaNDfvw8=
 docker compose up -d
 ```
 
-Acesse no navegador: `http://localhost:8501`
+Acesse no navegador: `http://localhost:8501` *(Nota: na primeira execução, o container leva de 30 a 60 segundos para concluir as migrações e o seeder de dados inicial antes da aplicação responder).*
 
 ### Opção B — Desenvolvimento Local
 
