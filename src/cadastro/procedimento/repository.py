@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from src.cadastro.procedimento.models import Procedimento, ProcedimentoValor
+from src.cadastro.procedimento.models import Procedimento, ProcedimentoInsumo, ProcedimentoValor
 
 
 def obter_por_id(session: Session, procedimento_id: UUID) -> Procedimento | None:
@@ -74,3 +74,35 @@ def obter_vigencia_aberta(
         .order_by(ProcedimentoValor.vigencia_inicio.desc())
         .limit(1)
     )
+
+
+def vincular_insumo(
+    session: Session, procedimento_id: UUID, insumo_material_id: UUID, quantidade_necessaria: float = 1.0
+) -> ProcedimentoInsumo:
+    from decimal import Decimal
+
+    pi = session.scalar(
+        select(ProcedimentoInsumo).where(
+            ProcedimentoInsumo.procedimento_id == procedimento_id,
+            ProcedimentoInsumo.insumo_material_id == insumo_material_id,
+        )
+    )
+    if pi is None:
+        pi = ProcedimentoInsumo(
+            procedimento_id=procedimento_id,
+            insumo_material_id=insumo_material_id,
+            quantidade_necessaria=Decimal(str(quantidade_necessaria)),
+        )
+        session.add(pi)
+    else:
+        pi.quantidade_necessaria = Decimal(str(quantidade_necessaria))
+    return pi
+
+
+def listar_insumos_do_procedimento(session: Session, procedimento_id: UUID) -> list[ProcedimentoInsumo]:
+    return list(
+        session.scalars(
+            select(ProcedimentoInsumo).where(ProcedimentoInsumo.procedimento_id == procedimento_id)
+        )
+    )
+

@@ -95,3 +95,11 @@ def obter_valor_vigente(
         session, procedimento_id, convenio_id, na_data or date.today()
     )
     return valor.valor if valor else None
+
+
+def vincular_insumo_procedimento(
+    session: Session, procedimento_id: UUID, insumo_material_id: UUID, quantidade_necessaria: float = 1.0
+) -> None:
+    repository.vincular_insumo(session, procedimento_id, insumo_material_id, quantidade_necessaria)
+    session.commit()
+

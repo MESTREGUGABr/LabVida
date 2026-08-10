@@ -48,3 +48,19 @@ class ProcedimentoValor(Base):
     # NULL = vigente por prazo indeterminado. O EXCLUDE no banco garante que
     # nao existem duas faixas sobrepostas para o mesmo procedimento/convenio.
     vigencia_fim: Mapped[date | None] = mapped_column(Date, nullable=True)
+
+
+class ProcedimentoInsumo(Base):
+    __tablename__ = "procedimentos_insumos"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    procedimento_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("procedimentos.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    insumo_material_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("insumos_materiais.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    quantidade_necessaria: Mapped[Decimal] = mapped_column(
+        Numeric(12, 3), nullable=False, default=Decimal("1.000")
+    )
+

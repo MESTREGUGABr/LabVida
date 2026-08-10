@@ -12,7 +12,10 @@ from src.cadastro.procedimento.service import (
     definir_valor,
     listar_procedimentos_ativos,
     obter_valor_vigente,
+    vincular_insumo_procedimento,
 )
+from src.cadastro.procedimento.repository import listar_insumos_do_procedimento
+from src.compras.insumo.service import listar_insumos
 from src.cadastro.convenio.errors import ConvenioNaoEncontrado
 from src.db import session_scope
 from src.ui import renderizar_menu, shell, usuario_id_logado
@@ -35,14 +38,15 @@ def main() -> None:
         icone=ICONE_PROCEDIMENTO,
     )
 
-    tab_nomes = ["Procedimentos", "Valores por convênio"]
+    tab_nomes = ["Procedimentos", "Valores por convênio", "Insumos (Ficha Técnica)"]
     aba = st.radio("Seção", tab_nomes, horizontal=True, key="tab_proc", label_visibility="collapsed")
 
     if aba == tab_nomes[0]:
         _render_procedimentos()
-
     elif aba == tab_nomes[1]:
         _render_valores()
+    elif aba == tab_nomes[2]:
+        _render_insumos_procedimento()
 
 
 def _render_procedimentos() -> None:
@@ -182,6 +186,60 @@ def _mensagem(error: Exception) -> str:
     if isinstance(error, ValidationError):
         return str(error.errors()[0]["msg"]).replace("Value error, ", "")
     return str(error)
+
+
+def _render_insumos_procedimento() -> None:
+    procedimentos = _procedimentos()
+    with session_scope() as session:
+        insumos = listar_insumos(session)
+
+    if not procedimentos or not insumos:
+        st.info("Cadastre procedimentos e insumos para configurar a ficha técnica.")
+        return
+
+    procedimentos_opcoes = {f"{p.codigo_tuss} - {p.nome}": p for p in procedimentos}
+    insumos_opcoes = {i.nome: i.id for i in insumos}
+
+    proc_label = st.selectbox("Selecione o Procedimento", options=list(procedimentos_opcoes.keys()))
+    procedimento_sel = procedimentos_opcoes[proc_label]
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        renderizar_secao(titulo=f"Insumos vinculados a {procedimento_sel.nome}")
+        with session_scope() as session:
+            links = listar_insumos_do_procedimento(session, procedimento_sel.id)
+            insumo_nomes = {i.id: i.nome for i in insumos}
+
+        if links:
+            renderizar_grid(
+                [
+                    {
+                        "insumo": insumo_nomes.get(l.insumo_material_id, "Desconhecido"),
+                        "quantidade": l.quantidade_necessaria,
+                    }
+                    for l in links
+                ],
+                colunas=[
+                    ColunaGrid("insumo", "Insumo Material"),
+                    ColunaGrid("quantidade", "Qtd Necessária por Exame", tipo="numero", largura=200),
+                ],
+                chave="grid_proc_insumos",
+                altura=250,
+            )
+        else:
+            st.info("Nenhum insumo vinculado a este procedimento.")
+
+    with col2:
+        renderizar_secao(titulo="Vincular Novo Insumo")
+        insumo_nome = st.selectbox("Insumo", options=list(insumos_opcoes.keys()))
+        qtd_nec = st.number_input("Quantidade necessária", min_value=0.1, value=1.0, step=0.5)
+        if st.button("Salvar Vínculo", type="primary"):
+            insumo_id = insumos_opcoes[insumo_nome]
+            with session_scope() as session:
+                vincular_insumo_procedimento(session, procedimento_sel.id, insumo_id, qtd_nec)
+            st.success("Insumo vinculado com sucesso!")
+            st.rerun()
 
 
 if __name__ == "__main__":

@@ -4,9 +4,9 @@ import pytest
 from sqlalchemy.orm import Session
 
 from src.db import session_scope
-from tests._tabelas import AUDITORIA, NUCLEO, RBAC, limpar
+from tests._tabelas import AUDITORIA, COMPRAS, NUCLEO, RBAC, limpar
 
-_TABELAS = AUDITORIA + NUCLEO + RBAC
+_TABELAS = AUDITORIA + NUCLEO + RBAC + COMPRAS
 
 
 @pytest.fixture()

@@ -31,6 +31,7 @@ NUCLEO = (
     "ordens_servico",
     "procedimento_valores",
     "medicos",
+    "procedimentos_insumos",
     "procedimentos",
     "convenios",
     "setores",
