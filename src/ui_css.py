@@ -95,6 +95,20 @@ table, th, td, tr, li, ul, ol {{
     font-family: unset;
 }}
 
+/* A regra global de tipografia acima sobrescreve a fonte de icone
+   (Material Symbols Rounded, ja auto-hospedada pelo Streamlit — nao e
+   dependencia de rede) que o proprio Streamlit aplica via CSS-in-JS sem
+   `!important` em varios componentes nativos. Sem essa excecao, o
+   navegador cai no fallback de ligature e mostra o nome cru do icone
+   ("visibility", "keyboard_double_arrow_left" etc.) em vez do glifo.
+   `stTextInputIcon` e o botao de mostrar/ocultar senha; `stIconMaterial` e
+   o testid generico que cobre praticamente todo o resto (colapsar sidebar,
+   dataframe, paginacao, menu, feedback, file uploader...). */
+[data-testid="stTextInputIcon"],
+[data-testid="stIconMaterial"] {{
+    font-family: "Material Symbols Rounded" !important;
+}}
+
 /* ===== RESET & BASE ===== */
 .stApp {{
     background-color: var(--lv-bg-page);
@@ -117,27 +131,13 @@ section[data-testid="stSidebar"]::before {{
     z-index: 10;
 }}
 
-[data-testid="stSidebarNav"],
-[data-testid="stSidebarNavContainer"],
-[data-testid="stSidebarNavItems"],
-[data-testid="collapsedControl"],
-[data-testid="stSidebarCollapseButton"] {{
-    display: none !important;
-}}
-
-section[data-testid="stSidebar"] ul,
-section[data-testid="stSidebar"] nav,
-section[data-testid="stSidebar"] > div:first-child > div:first-child {{
-    display: none !important;
-}}
-
-section[data-testid="stSidebar"] > div > div:first-child:has(ul) {{
-    display: none !important;
-}}
-
-[data-testid="stSidebarCollapseButton"] {{
-    display: none !important;
-}}
+/* O menu lateral e desenhado a mao em src/ui.py (HTML/CSS + SVG) em vez de
+   `st.navigation` — os icones nativos (`:material/...:`) sao ligature de
+   fonte e ficam sensiveis a conflito de CSS (ver acima). A navegacao
+   automatica do Streamlit fica desligada do lado do servidor via
+   `client.showSidebarNavigation = false` em `.streamlit/config.toml`, nao
+   por CSS — o servidor nunca manda esse elemento, entao nao ha nada pra
+   esconder aqui nem pra "piscar" antes de ser escondido. */
 
 section[data-testid="stSidebar"] > div:first-child {{
     padding-top: 6px;

@@ -8,8 +8,9 @@ Princípios de segurança aplicados:
 
 Popula 11 perfis e 34 permissões com vínculos N:N, mais a equipe operacional
 (um usuário por função, com o perfil correspondente).
-Idempotente: perfis só entram se a tabela permissoes estiver vazia; usuários
-são conferidos por e-mail.
+Idempotente **linha a linha**: permissão, perfil e vínculo são conferidos um a um,
+então uma base já semeada recebe o que for adicionado depois; usuários são
+conferidos por e-mail.
 """
 
 from src.db import session_scope
@@ -47,6 +48,7 @@ _PERMISSOES = [
     ("faturamento:visualizar_lotes", "Visualizar lotes e guias TISS"),
     ("faturamento:gerenciar_lotes", "Criar e fechar lotes de faturamento"),
     ("faturamento:registrar_glosa", "Registrar glosa em guia"),
+    ("faturamento:valor_excecao", "Cobrar valor diferente da tabela de precos"),
     # --- Financeiro ---
     ("financeiro:visualizar_titulos", "Visualizar títulos a receber e pagar"),
     ("financeiro:baixar_titulo", "Baixar títulos a receber e a pagar"),
@@ -75,6 +77,7 @@ _ADMIN = [
     "logistica:visualizar_malotes", "logistica:despachar_malote", "logistica:receber_malote",
     "laboratorial:registrar_resultado", "laboratorial:liberar_laudo",
     "faturamento:visualizar_lotes", "faturamento:gerenciar_lotes", "faturamento:registrar_glosa",
+    "faturamento:valor_excecao",
     "financeiro:visualizar_titulos", "financeiro:baixar_titulo", "financeiro:conciliar",
     "compras:visualizar_estoque", "compras:solicitar", "compras:aprovar", "compras:receber",
     "compras:gerenciar_fornecedores",
@@ -114,6 +117,7 @@ _PERFIS = {
     "faturista": [
         "cadastro:pacientes:ler", "cadastro:convenios:ler", "cadastro:procedimentos:ler",
         "faturamento:visualizar_lotes", "faturamento:gerenciar_lotes", "faturamento:registrar_glosa",
+        "faturamento:valor_excecao",
         "financeiro:visualizar_titulos",
     ],
 
@@ -157,27 +161,54 @@ def executar_seeder_rbac() -> dict[str, int]:
 
 
 def _seed_perfis(session) -> tuple[int, int]:
-    if repository.listar_permissoes(session):
-        return 0, 0
+    """Upsert linha a linha de permissões, perfis e vínculos.
 
+    Antes havia um early-return (`if listar_permissoes(session): return 0, 0`) que
+    congelava toda base já semeada na primeira versão do RBAC: permissão nova
+    nunca chegava, e a tela que dependesse dela ficava inacessível para todo mundo
+    — inclusive admin. Como as fases seguintes acrescentam 8 permissões, isso
+    precisava cair antes.
+
+    Retorna quantos perfis e permissões foram **criados nesta execução** (0 e 0
+    quando a base já está em dia).
+    """
+    permissoes_criadas = 0
     permissoes_map: dict[str, Permissao] = {}
+
     for codigo, descricao in _PERMISSOES:
-        permissao = Permissao(codigo=codigo, descricao=descricao)
-        repository.salvar_permissao(session, permissao)
+        permissao = repository.obter_permissao_por_codigo(session, codigo)
+        if permissao is None:
+            permissao = Permissao(codigo=codigo, descricao=descricao)
+            repository.salvar_permissao(session, permissao)
+            permissoes_criadas += 1
+        elif permissao.descricao != descricao:
+            permissao.descricao = descricao
         permissoes_map[codigo] = permissao
 
-    for nome_perfil, codigos_permissoes in _PERFIS.items():
-        perfil = Perfil(nome=nome_perfil, descricao=f"Perfil {nome_perfil}")
-        repository.salvar_perfil(session, perfil)
-        session.flush()
+    session.flush()
 
+    perfis_criados = 0
+    for nome_perfil, codigos_permissoes in _PERFIS.items():
+        perfil = repository.obter_perfil_por_nome(session, nome_perfil)
+        if perfil is None:
+            perfil = Perfil(nome=nome_perfil, descricao=f"Perfil {nome_perfil}")
+            repository.salvar_perfil(session, perfil)
+            perfis_criados += 1
+            session.flush()
+
+        ja_vinculadas = {
+            p.codigo for p in repository.listar_permissoes_por_perfil(session, perfil.id)
+        }
         for codigo in codigos_permissoes:
-            permissao = permissoes_map[codigo]
-            vinculo = PerfilPermissao(perfil_id=perfil.id, permissao_id=permissao.id)
-            repository.vincular_permissao(session, vinculo)
+            if codigo in ja_vinculadas:
+                continue
+            repository.vincular_permissao(
+                session,
+                PerfilPermissao(perfil_id=perfil.id, permissao_id=permissoes_map[codigo].id),
+            )
 
     session.commit()
-    return len(_PERFIS), len(_PERMISSOES)
+    return perfis_criados, permissoes_criadas
 
 
 def _seed_usuarios(session) -> int:
@@ -185,16 +216,40 @@ def _seed_usuarios(session) -> int:
 
     O resto do seeder depende disso: coleta, compras e baixa de título passam
     pelo gate de RBAC e só funcionam com um usuário que tenha a permissão.
+
+    F15: cada usuário de demo recebe uma senha real (`SENHA_PADRAO_SEED`), não
+    só o admin — dá pra logar com a conta de qualquer um deles. O hash é
+    calculado uma única vez fora do loop (bcrypt custa ~250ms por chamada) e
+    reaplicado a todos. Curativo: usuário já existente sem `senha_hash` (criado
+    antes desta fase) recebe a senha padrão também, sem precisar de `make clean`.
     """
+    from datetime import datetime, timezone
+
+    from src.config import get_senha_padrao_seed
     from src.usuario.models import Usuario
+    from src.usuario.senha import hash_senha
+
+    senha_hash_padrao = hash_senha(get_senha_padrao_seed())
+    agora = datetime.now(timezone.utc)
 
     criados = 0
     for email, nome, nome_perfil in USUARIOS:
-        if usuario_repository.obter_por_email(session, email) is not None:
+        existente = usuario_repository.obter_por_email(session, email)
+        if existente is not None:
+            if existente.senha_hash is None:
+                existente.senha_hash = senha_hash_padrao
+                existente.senha_definida_em = agora
             continue
         perfil = repository.obter_perfil_por_nome(session, nome_perfil)
         session.add(
-            Usuario(email=email, nome=nome, ativo=True, perfil_id=perfil.id if perfil else None)
+            Usuario(
+                email=email,
+                nome=nome,
+                ativo=True,
+                perfil_id=perfil.id if perfil else None,
+                senha_hash=senha_hash_padrao,
+                senha_definida_em=agora,
+            )
         )
         criados += 1
 

@@ -11,6 +11,7 @@ from src.atendimento.ordem_servico.models import OrdemServico
 from src.atendimento.ordem_servico.dtos import StatusOrdemServico
 from src.atendimento.amostra.dtos import StatusAmostra
 from src.db import session_scope
+from src.faturamento.competencia.service import competencia_corrente
 from src.faturamento.lote_faturamento.models import LoteFaturamento
 from src.laboratorial.models import Laudo, StatusLaudo
 from src.ui import formatar_brl, renderizar_menu, shell
@@ -92,12 +93,13 @@ def _renderizar_kpis() -> None:
             Laudo.status == StatusLaudo.RASCUNHO
         ).scalar() or 0
 
-        agora = datetime.now(timezone.utc)
-        inicio_mes = datetime(agora.year, agora.month, 1, tzinfo=timezone.utc)
         faturamento_mes = session.query(
             func.coalesce(func.sum(LoteFaturamento.valor_total), 0)
         ).filter(
-            LoteFaturamento.criado_em >= inicio_mes
+            # Competencia, nao `criado_em`: um lote agora fica aberto o mes
+            # inteiro (agrupamento por convenio+competencia), recebendo itens
+            # em dias diferentes -- `criado_em` so capturava o dia da abertura.
+            LoteFaturamento.competencia == competencia_corrente()
         ).scalar() or 0.0
 
     col1, col2, col3, col4 = st.columns(4)

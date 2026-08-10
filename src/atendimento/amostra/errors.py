@@ -8,3 +8,8 @@ class ColetorInvalido(Exception):
 
 class ColetaNaoPermitida(Exception):
     pass
+
+
+class EstoqueInsuficienteError(ColetaNaoPermitida):
+    pass
+

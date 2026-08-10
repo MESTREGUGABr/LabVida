@@ -46,6 +46,8 @@ def registrar_coleta(session: Session, dto: ColetaCreate) -> AmostraRead:
         if not usuario_tem_permissao(session, coletor.id, "atendimento:coletar"):
             raise ColetorInvalido("Coletor sem permissão para registrar coleta")
 
+    _processar_consumo_estoque(session, ordem)
+
     amostra = Amostra(
         ordem_servico_id=ordem.id,
         codigo_barras=_gerar_codigo_barras(session),
@@ -103,3 +105,57 @@ def _gerar_codigo_barras(session: Session) -> str:
         if repository.obter_por_codigo_barras(session, codigo) is None:
             return codigo
     raise RuntimeError("Não foi possível gerar um código de barras único")
+
+
+def _processar_consumo_estoque(session: Session, ordem) -> None:
+    from collections import defaultdict
+    from decimal import Decimal
+    from sqlalchemy import select
+    from src.atendimento.amostra.errors import EstoqueInsuficienteError
+    from src.atendimento.ordem_servico.dtos import StatusOsItem
+    from src.atendimento.ordem_servico import repository as os_repository
+    from src.cadastro.procedimento.models import ProcedimentoInsumo
+    from src.compras.insumo.dtos import TipoMovimentoEstoque
+    from src.compras.insumo.models import EstoqueMovimento, InsumoMaterial
+
+    itens = os_repository.listar_itens(session, ordem.id)
+    itens_ativos = [i for i in itens if i.status != StatusOsItem.CANCELADO]
+    if not itens_ativos:
+        return
+
+    insumos_necessarios: dict[UUID, Decimal] = defaultdict(Decimal)
+
+    for item in itens_ativos:
+        links = session.scalars(
+            select(ProcedimentoInsumo).where(ProcedimentoInsumo.procedimento_id == item.procedimento_id)
+        ).all()
+        for link in links:
+            insumos_necessarios[link.insumo_material_id] += link.quantidade_necessaria
+
+    if not insumos_necessarios:
+        return
+
+    insumos_objs: dict[UUID, InsumoMaterial] = {}
+    for insumo_id, qtd_nec in insumos_necessarios.items():
+        insumo = session.get(InsumoMaterial, insumo_id)
+        if insumo is not None:
+            insumos_objs[insumo_id] = insumo
+            if Decimal(str(insumo.quantidade_estoque)) < qtd_nec:
+                raise EstoqueInsuficienteError(
+                    f"Estoque insuficiente para o insumo '{insumo.nome}': necessário {qtd_nec}, disponível {insumo.quantidade_estoque}"
+                )
+
+    for insumo_id, qtd_nec in insumos_necessarios.items():
+        insumo = insumos_objs.get(insumo_id)
+        if insumo is not None:
+            novo_estoque = Decimal(str(insumo.quantidade_estoque)) - qtd_nec
+            insumo.quantidade_estoque = float(novo_estoque)
+            session.add(
+                EstoqueMovimento(
+                    insumo_material_id=insumo.id,
+                    tipo=TipoMovimentoEstoque.SAIDA,
+                    quantidade=qtd_nec,
+                    observacao=f"Consumo automático - Coleta OS {ordem.codigo_os}",
+                )
+            )
+

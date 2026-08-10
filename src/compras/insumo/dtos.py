@@ -13,6 +13,8 @@ class TipoMovimentoEstoque(StrEnum):
 class InsumoCreate(BaseModel):
     nome: str
     finalidade: str
+    quantidade_estoque: float = 0
+    estoque_minimo: float = 0
 
 
 class InsumoRead(BaseModel):
@@ -22,6 +24,7 @@ class InsumoRead(BaseModel):
     nome: str
     finalidade: str
     quantidade_estoque: float
+    estoque_minimo: float
     criado_em: datetime
 
 

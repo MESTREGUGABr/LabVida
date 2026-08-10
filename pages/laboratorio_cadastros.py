@@ -13,7 +13,7 @@ from src.laboratorial.dtos import (
 )
 from src.laboratorial.service import LaboratorialService
 from src.ui import renderizar_menu, shell
-from src.ui_components import renderizar_cabecalho, renderizar_secao
+from src.ui_components import ColunaGrid, renderizar_cabecalho, renderizar_grid, renderizar_secao
 from src.ui_icons import ICONE_RESULTADO
 
 
@@ -74,12 +74,17 @@ def _render_equipamentos() -> None:
         service = LaboratorialService(session)
         lista_eq = service.listar_equipamentos()
         if lista_eq:
-            st.dataframe(
+            renderizar_grid(
                 [
-                    {"ID": e.id, "Nome": e.nome, "Protocolo": e.protocolo.value}
+                    {"id": str(e.id), "nome": e.nome, "protocolo": e.protocolo.value}
                     for e in lista_eq
                 ],
-                width="stretch",
+                colunas=[
+                    ColunaGrid("nome", "Nome"),
+                    ColunaGrid("protocolo", "Protocolo", largura=140),
+                    ColunaGrid("id", "id", oculta=True),
+                ],
+                chave="grid_equipamentos",
             )
         else:
             st.info("Nenhum equipamento cadastrado.")
@@ -133,18 +138,25 @@ def _render_valores_referencia() -> None:
         service = LaboratorialService(session)
         lista_vr = service.listar_valores_referencia()
         if lista_vr:
-            st.dataframe(
+            renderizar_grid(
                 [
                     {
-                        "ID": vr.id,
-                        "Analito": vr.analito,
-                        "Min": vr.minimo,
-                        "Max": vr.maximo,
-                        "Texto": vr.valor_esperado_texto,
+                        "id": str(vr.id),
+                        "analito": vr.analito,
+                        "minimo": vr.minimo,
+                        "maximo": vr.maximo,
+                        "texto": vr.valor_esperado_texto or "—",
                     }
                     for vr in lista_vr
                 ],
-                width="stretch",
+                colunas=[
+                    ColunaGrid("analito", "Analito"),
+                    ColunaGrid("minimo", "Min", tipo="numero", largura=110),
+                    ColunaGrid("maximo", "Max", tipo="numero", largura=110),
+                    ColunaGrid("texto", "Texto"),
+                    ColunaGrid("id", "id", oculta=True),
+                ],
+                chave="grid_valores_referencia",
             )
         else:
             st.info("Nenhum valor de referência cadastrado.")

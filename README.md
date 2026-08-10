@@ -17,7 +17,7 @@
   <img src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL 16">
   <img src="https://img.shields.io/badge/Alembic-Migrations-red?logo=alembic&logoColor=white" alt="Alembic">
   <img src="https://img.shields.io/badge/Docker-Compose_v2-2496ED?logo=docker&logoColor=white" alt="Docker Compose">
-  <img src="https://img.shields.io/badge/Auth0-OAuth2.0-EB5424?logo=auth0&logoColor=white" alt="Auth0">
+  <img src="https://img.shields.io/badge/Auth-Local_(email%2Fsenha)-2E7D32?logo=lock&logoColor=white" alt="Autenticação local">
 </p>
 
 ---
@@ -54,15 +54,13 @@ Caminho mais curto para ter o sistema completo rodando (app + PostgreSQL + migra
 # 1. Criar o .env a partir do modelo  (Windows:  copy .env.exemplo .env)
 cp .env.exemplo .env
 
-# 2. Preencher AUTH0_DOMAIN, AUTH0_CLIENT_ID e AUTH0_CLIENT_SECRET no .env
-#    Sem isso o compose aborta com:
-#    "required variable AUTH0_DOMAIN is missing a value"
+# 2. Preencher LGPD_ENCRYPTION_KEY no .env (ver seção 10 — obrigatória)
 
 # 3. Subir tudo
 docker compose up --build -d
 ```
 
-Acesse **http://localhost:8501**.
+Acesse **<http://localhost:8501>**. Na tela de login, use a aba **"Criar conta"** (qualquer conta criada já entra como admin) ou entre com um usuário do seeder — ver [seção 12](#12-usuários-e-senhas-de-acesso-ao-sistema).
 
 > **Não é preciso criar `venv`, instalar dependências nem rodar `make migrate` para usar o sistema via Docker.** O próprio container executa `alembic upgrade head` (migrações) e `python -m src.seeder` (dados de exemplo) no boot — o banco já sobe estruturado e populado.
 
@@ -128,7 +126,7 @@ O sistema é organizado em módulos especializados que refletem os setores reais
 </p>
 
 | Módulo | Responsabilidade |
-|---|---|
+| --- | --- |
 | **Cadastro** | Pacientes, médicos, convênios, procedimentos (TUSS/TISS), unidades e setores |
 | **Atendimento e Coleta** | Abertura de OS, validação de convênio, coleta e etiquetagem de amostras |
 | **Logística de Amostras** | Cadeia de custódia, malotes, rastreamento e recebimento no laboratório central |
@@ -140,22 +138,27 @@ O sistema é organizado em módulos especializados que refletem os setores reais
 
 ### Status de implementação
 
-| Módulo | Status |
-|---|:---:|
-| Cadastro | ✅ Concluído |
-| Atendimento e Coleta | ✅ Concluído |
-| Logística de Amostras | ✅ Concluído |
-| Laboratorial | ✅ Concluído |
-| Faturamento | ✅ Concluído |
-| Financeiro | ✅ Concluído |
-| Compras | ✅ Concluído |
-| BI | ⏳ Pendente |
+> Estado detalhado, com fluxo, modelo de dados e pendências por módulo:
+> **[docs/arquitetura.md](docs/arquitetura.md)**. Próximos passos: [docs/roadmap-execucao.md](docs/roadmap-execucao.md).
+
+| Módulo | Status | Observação |
+| --- | :---: | --- |
+| Cadastro | ✅ Operacional | Falta tabela de preço particular e vigência de fim (fase F3) |
+| Atendimento e Coleta | ✅ Operacional | Fluxo completo, cancelamento coerente 100% testado |
+| Logística de Amostras | ✅ Operacional | Cadeia de custódia completa |
+| Laboratorial | ✅ Operacional | Falta catálogo de analitos ligando resultado a faixa de referência (F3) |
+| Faturamento | 🔶 Em evolução | Lote/guia/glosa funcionam; competência, guia por paciente e divergências são as fases F4–F9 |
+| Financeiro | 🔶 Em evolução | Títulos e caixa funcionam; baixa parcial é a fase F10 |
+| Compras | ✅ Operacional | Segregação de funções aplicada |
+| BI | ✅ Reconstruído | Star schema com grão e chave natural, ETL idempotente, 4 dashboards em Altair com filtro de período |
+
+**223 testes passando.** A suíte roda em Windows e Linux.
 
 ### Estrutura do repositório
 
 ```
 LabVida/
-├── app.py                         → Tela de login (Google via Auth0)
+├── app.py                         → Tela de login local (e-mail/senha) com abas Entrar/Criar conta
 ├── pages/
 │   ├── home.py                    → Home pós-login
 │   ├── cadastro_*.py              → Cadastros (Pacientes, Convênios, Médicos, Procedimentos, Unidades)
@@ -166,7 +169,6 @@ LabVida/
 │   ├── financeiro_*.py            → Contas a Receber/Pagar e Fluxo de Caixa
 │   └── compras_*.py               → Fornecedores, Pedidos e Estoque
 ├── src/
-│   ├── auth.py                    → Autenticação OAuth 2.0 / OIDC com Auth0
 │   ├── config.py                  → Carga de configuração (.env)
 │   ├── db.py                      → Engine SQLAlchemy + session_scope()
 │   ├── ui.py                      → Helpers Streamlit (exigir_login)
@@ -177,7 +179,7 @@ LabVida/
 │   ├── faturamento/               → Lotes de Faturamento, Guias TISS e Glosas
 │   ├── financeiro/                → Títulos a Receber/Pagar, Caixa e Conciliação
 │   ├── compras/                   → Fornecedores, Pedidos de Compra e Estoque
-│   ├── usuario/                   → Identidade do Auth0
+│   ├── usuario/                   → Identidade, hash de senha (bcrypt) e autenticação local
 │   ├── bi/                        → Esquema estrela e ETL de carga dos fatos
 │   └── seeder/                    → Base de demonstração (~3 meses de operação)
 │       ├── catalogo.py            → Procedimentos, convênios, insumos e equipe
@@ -203,18 +205,17 @@ LabVida/
 Para executar o LabVida localmente (via Docker ou Python nativo), os requisitos necessários são:
 
 | Requisito | Versão / Observação |
-|---|---|
+| --- | --- |
 | **Python** | `3.12+` (ver [seção 5](#5-versão-do-python-utilizada)) |
 | **PostgreSQL** | `16+` (imagem `postgres:16-alpine` no Docker; ver [seção 6](#6-versão-do-postgresql-utilizada)) |
 | **Docker + Docker Compose** | Docker `24+` / Docker Compose `v2+` (Recomendado para subir ambiente completo) |
 | **GNU Make** | Opcional, para atalhos do `Makefile` |
-| **Conta Auth0** | Plano gratuito, usada para login social via Google |
 | **Git** | Para clonar o repositório |
 
 Bibliotecas Python principais (ver [`requirements.txt`](requirements.txt) para a lista completa com versões congeladas):
 
 | Biblioteca | Finalidade |
-|---|---|
+| --- | --- |
 | **Streamlit** | Frontend e Dashboard web interativo |
 | **SQLAlchemy** | Mapeamento Objeto-Relacional (ORM) |
 | **Alembic** | Gerenciamento de migrações do banco de dados |
@@ -233,9 +234,11 @@ Python 3.12+
 A versão de desenvolvimento é gerenciada nativamente e fixada no arquivo [`mise.toml`](mise.toml). Caso utilize a ferramenta [mise](https://mise.jdx.dev/), execute `mise install` na raiz do projeto.
 
 > ⚠️ **Python 3.12 é o mínimo real, não uma recomendação.** O `requirements.txt` fixa `numpy==2.5.1`, que não publica distribuição para versões anteriores. Em Python 3.11 ou inferior o `pip install -r requirements.txt` falha com:
+>
 > ```
 > ERROR: Could not find a version that satisfies the requirement numpy==2.5.1
 > ```
+>
 > Isso vale apenas para a execução local — a imagem Docker já usa `python:3.12-slim`.
 
 ---
@@ -256,29 +259,35 @@ No ambiente Docker Compose, o serviço `postgres` utiliza a imagem oficial `post
 
 **7.1. Criar ambiente virtual Python (com 3.12+)**
 
-* **Linux / macOS:**
+- **Linux / macOS:**
+
   ```bash
   python3 --version          # precisa ser 3.12 ou superior
   python3 -m venv .venv
   ```
-* **Windows (PowerShell / CMD):** o comando `python3` **não existe no Windows** — o alias apenas abre a Microsoft Store (`Python não foi encontrado; executar sem argumentos para instalar do Microsoft Store...`). Use o *Python Launcher* (`py`) apontando explicitamente a versão:
+- **Windows (PowerShell / CMD):** o comando `python3` **não existe no Windows** — o alias apenas abre a Microsoft Store (`Python não foi encontrado; executar sem argumentos para instalar do Microsoft Store...`). Use o *Python Launcher* (`py`) apontando explicitamente a versão:
+
   ```powershell
   py -0p                     # lista as versões instaladas e seus caminhos
   py -3.12 -m venv .venv     # ou py -3.13, se for a versão instalada
   ```
+
   > Evite `python -m venv .venv` sem indicar a versão: o `python` do PATH pode ser uma versão antiga (ex.: 3.11) e o ambiente criado quebra na instalação (ver [seção 5](#5-versão-do-python-utilizada)).
 
 **7.2. Ativar o ambiente virtual**
 
-* **Linux / macOS:**
+- **Linux / macOS:**
+
   ```bash
   source .venv/bin/activate
   ```
-* **Windows (PowerShell):**
+- **Windows (PowerShell):**
+
   ```powershell
   .venv\Scripts\Activate.ps1
   ```
-* **Windows (CMD):**
+- **Windows (CMD):**
+
   ```cmd
   .venv\Scripts\activate.bat
   ```
@@ -336,27 +345,57 @@ DATABASE_URL=postgresql+psycopg://labvida:labvida@localhost:5432/labvida
 
 ## 9. Como Importar os Scripts SQL / Migrations (Alembic)
 
-O LabVida **não utiliza dumps estáticos (`.sql`) manuais** — a estrutura relacional é versionada e aplicada via **Alembic** (migrations em Python), e os dados iniciais de demonstração são gerados via **seeder automatizado**.
+O LabVida suporta a reconstrução do banco de dados tanto via **scripts SQL diretos (`schema.sql`, `dados.sql`, `banco.backup`)** quanto via **migrações automatizadas (Alembic)**.
 
-> **Por que utilizar Alembic/ORM em vez de scripts `.sql` estáticos?**
-> 1. **Alinhamento Nátivo com Python/SQLAlchemy**: Garantia de sincronização entre a camada de modelos (`src/*/models.py`) e as tabelas reais do banco.
-> 2. **Versionamento e Evolução**: Histórico completo de migrações (`alembic/versions/`), permitindo atualizações e rollbacks automatizados.
-> 3. **Execução Automática no Docker**: Ao rodar `docker compose up`, o container executa `alembic upgrade head` no boot, construindo a base inteira sem intervenção manual.
-> 4. **Dados de Demonstração (Seeder)**: Geração de registros coerentes com regras de negócio usando dados fictícios via Faker.
+### 9.1. Restauração via Scripts SQL (`schema.sql` / `dados.sql` / `banco.backup`)
 
-### 9.1. Aplicar as Migrações de Estrutura
+Para importar diretamente os arquivos SQL fornecidos na raiz do projeto:
+
+- **Restaurar Estrutura e Dados via `schema.sql` e `dados.sql`:**
+
+  ```bash
+  psql -U labvida -d labvida -f schema.sql
+  psql -U labvida -d labvida -f dados.sql
+  ```
+
+  *(Ou via Docker)*:
+
+  ```bash
+  docker compose exec -T postgres psql -U labvida -d labvida < schema.sql
+  docker compose exec -T postgres psql -U labvida -d labvida < dados.sql
+  ```
+
+- **Restaurar via Backup Completo (`banco.backup`):**
+
+  ```bash
+  pg_restore -U labvida -d labvida -c banco.backup
+  ```
+
+  *(Ou via Docker)*:
+
+  ```bash
+  docker compose exec -T postgres pg_restore -U labvida -d labvida -c < banco.backup
+  ```
+
+---
+
+### 9.2. Aplicar as Migrações de Estrutura (Alembic)
 
 > **Ao subir por Docker, as migrações já são aplicadas automaticamente** no boot do container (item 3 da caixa acima). Os comandos abaixo servem para reaplicá-las manualmente ou para uso sem Docker. Confira o resultado com `docker compose logs app | grep "Running upgrade"`.
 
-* **Via Docker:**
+- **Via Docker:**
+
   ```bash
   docker compose run --rm app alembic upgrade head
   ```
+
   Com GNU Make instalado, o atalho equivalente é `make migrate`.
-* **Localmente (sem Docker):**
+- **Localmente (sem Docker):**
+
   ```bash
   alembic upgrade head
   ```
+
   > Exige o venv da [seção 7](#7-como-instalar-as-dependências) **ativado** e `DATABASE_URL` apontando para `localhost` (ver [seção 8, Opção B](#opção-b--postgresql-local-sem-docker)).
 
 ### 9.2. Popular o Banco com Dados de Exemplo (Seed)
@@ -365,11 +404,13 @@ O LabVida **não utiliza dumps estáticos (`.sql`) manuais** — a estrutura rel
 
 O seeder não gera registros soltos: ele **simula ~3 meses de operação do laboratório**, atravessando o fluxo ponta a ponta pelos mesmos services da aplicação. Ou seja, as regras de negócio são validadas de verdade — OS de convênio só coleta com autorização, resultado só entra com amostra recebida no central, laudo só é liberado por responsável técnico com resultados revisados, lote só fecha se passar na pré-auditoria TISS.
 
-* **Via Docker:**
+- **Via Docker:**
+
   ```bash
   docker compose run --rm app python -m src.seeder
   ```
-* **Localmente (sem Docker):**
+- **Localmente (sem Docker):**
+
   ```bash
   python -m src.seeder
   ```
@@ -377,7 +418,7 @@ O seeder não gera registros soltos: ele **simula ~3 meses de operação do labo
 **O que é gerado (volume padrão):**
 
 | Módulo | Conteúdo |
-|---|---|
+| --- | --- |
 | **RBAC** | 11 perfis, 33 permissões e 16 usuários — um por função (recepção, coleta, bancada, RT, faturista, financeiro, compras, almoxarifado) |
 | **Cadastro** | 5 unidades e 15 setores, 8 convênios, 30 procedimentos com analitos e faixas de referência, 240 preços negociados, 12 médicos (5 responsáveis técnicos), 220 pacientes |
 | **Atendimento** | ~400 OS distribuídas em dias de movimento por unidade, com ~1.600 exames, em **todos os estágios**: aberta, coletada, em trânsito, em análise, concluída e cancelada |
@@ -396,7 +437,7 @@ SEED_ESCALA=3 python -m src.seeder  # 3x o volume
 ```
 
 | Variável | Padrão | Efeito |
-|---|:---:|---|
+| --- | :---: | --- |
 | `SEED_ESCALA` | `1.0` | Multiplicador de volume de todos os módulos |
 | `SEED_JANELA_DIAS` | `90` | Período de operação simulado (afeta a série temporal do BI) |
 | `SEED_SEMENTE` | `20261` | Semente do gerador aleatório |
@@ -407,18 +448,20 @@ SEED_ESCALA=3 python -m src.seeder  # 3x o volume
 
 **10.1. Criar o arquivo `.env` a partir do modelo `.env.exemplo`**
 
-* **Linux / macOS:**
+- **Linux / macOS:**
+
   ```bash
   cp .env.exemplo .env
   ```
-* **Windows:**
+- **Windows:**
+
   ```cmd
   copy .env.exemplo .env
   ```
 
 **10.2. Preencher as Variáveis de Ambiente**
 
-No arquivo `.env`, preencha os parâmetros de conexão e credenciais do Auth0:
+No arquivo `.env`, preencha os parâmetros de conexão e a chave de criptografia:
 
 ```dotenv
 DATABASE_URL=postgresql+psycopg://labvida:labvida@postgres:5432/labvida
@@ -426,20 +469,21 @@ POSTGRES_USER=labvida
 POSTGRES_PASSWORD=labvida
 POSTGRES_DB=labvida
 
-AUTH0_DOMAIN=SEU_DOMINIO.auth0.com
-AUTH0_CLIENT_ID=SEU_CLIENT_ID
-AUTH0_CLIENT_SECRET=SEU_CLIENT_SECRET
-
 APP_BASE_URL=http://localhost:8501
 PORT=8501
+
+# Login local (F15) — senha de todos os usuários do seeder de demo. Opcional,
+# default "labvida123" se ausente. Ver seção 12.
+SENHA_PADRAO_SEED=labvida123
 
 LGPD_ENCRYPTION_KEY=Q22r1OivohTtSBRaMi-hjLxXxrQ3SwEdOumlaNDfvw8=
 ```
 
-> ⚠️ **`AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET` e `LGPD_ENCRYPTION_KEY` são obrigatórios e precisam estar preenchidos antes de `docker compose up`** — o Compose interrompe a subida logo no início se algum estiver vazio:
+> ⚠️ **`LGPD_ENCRYPTION_KEY` é obrigatória e precisa estar preenchida antes de `docker compose up`** — o Compose interrompe a subida logo no início se estiver vazia:
+>
 > ```
-> error while interpolating services.app.environment.AUTH0_DOMAIN:
-> required variable AUTH0_DOMAIN is missing a value
+> error while interpolating services.app.environment.LGPD_ENCRYPTION_KEY:
+> required variable LGPD_ENCRYPTION_KEY is missing a value
 > ```
 >
 > Sobre o `DATABASE_URL`: use `@postgres:5432` para executar **via Docker** (nome do serviço na rede do Compose) e `@localhost:5432` para executar **na máquina host** (ver [seção 8, Opção B](#opção-b--postgresql-local-sem-docker)).
@@ -469,29 +513,37 @@ Acesse no navegador: `http://localhost:8501`
 **Fluxo de Autenticação / Login:**
 
 ```
-Tela de login → "Entrar com Google" → Auth0 → Google → LabVida Home
-                                                               ↓
-                                                            "Sair"
+Tela de login (abas "Entrar" / "Criar conta") → LabVida Home
+                                                       ↓
+                                                    "Sair"
 ```
 
 ---
 
 ## 12. Usuário(s) e Senha(s) de Acesso ao Sistema
 
-O LabVida utiliza autenticação via **Auth0 + Login Social do Google (OAuth 2.0 / OIDC)**.
+O LabVida usa **autenticação local por e-mail e senha** (fase F15 — correção pedida pelo professor na apresentação de 09/08/2026, substituindo o login social por Google/Auth0; ver [ADR 0010](docs/adr/0010-substituir-login-google-por-email-senha.md)). A tela de login tem duas abas, sempre visíveis:
 
-* **Ambiente com Auth0 Configurado:** Qualquer conta Google autorizada no tenant Auth0.
-* **Ambiente de Desenvolvimento Local / Testes:** Caso a aplicação seja executada sem credenciais Auth0 ativas no `.env`, o sistema permite navegação no modo de desenvolvimento para testes completos de todos os módulos.
-* **Dados de Teste:** O seeder automatizado (`python -m src.seeder`) popula ~3 meses de operação completa — ver [seção 9.2](#92-popular-o-banco-com-dados-de-exemplo-seed).
+- **Entrar** — e-mail e senha de uma conta já existente.
+- **Criar conta** — nome, e-mail e senha. **Toda conta criada aqui recebe automaticamente o perfil `admin`** — decisão aceitável só porque o projeto é acadêmico e não vai a produção real; simplifica testes, já que qualquer conta nova já administra o sistema (rebaixar para outro perfil é feito depois em *Administração → Usuários*, se quiser).
+
+**Dados de Teste:** o seeder automatizado (`python -m src.seeder`) popula ~3 meses de operação completa — ver [seção 9.2](#92-popular-o-banco-com-dados-de-exemplo-seed) — e cria toda a equipe de demonstração **já com senha definida**, pronta para logar. A senha de todos eles é a variável `SENHA_PADRAO_SEED` do `.env` (default `labvida123` se não for definida). Exemplo, com o admin de demonstração:
+
+| Campo | Valor |
+|---|---|
+| E-mail | `direcao@labvida.com.br` |
+| Senha | valor de `SENHA_PADRAO_SEED` (default `labvida123`) |
+
+Qualquer outro e-mail da lista em [`src/seeder/catalogo.py`](src/seeder/catalogo.py) (`USUARIOS`) usa a mesma senha. Trocar `SENHA_PADRAO_SEED` no `.env` só afeta usuários criados ou re-semeados **depois** da troca — não redefine a senha de quem já tem uma.
 
 ---
 
 ## 13. Observações Importantes para Execução do Projeto
 
-* **Suporte ao Makefile:** O `Makefile` é apenas um conjunto de atalhos — **nenhum comando do projeto depende dele**. Windows não traz GNU Make por padrão (`O termo 'make' não é reconhecido...`); instale-o com `winget install GnuWin32.Make` ou use diretamente o comando `docker compose` equivalente:
+- **Suporte ao Makefile:** O `Makefile` é apenas um conjunto de atalhos — **nenhum comando do projeto depende dele**. Windows não traz GNU Make por padrão (`O termo 'make' não é reconhecido...`); instale-o com `winget install GnuWin32.Make` ou use diretamente o comando `docker compose` equivalente:
 
   | Atalho Make | Comando equivalente |
-  |---|---|
+  | --- | --- |
   | `make up` | `docker compose up -d` |
   | `make down` | `docker compose down` |
   | `make build` | `docker compose build` |
@@ -501,7 +553,8 @@ O LabVida utiliza autenticação via **Auth0 + Login Social do Google (OAuth 2.0
   | `make test` | `docker compose --profile test run --rm app_test` |
   | `make clean` | `docker compose down -v` |
 
-* **Suíte de Testes Automatizados:**
+- **Suíte de Testes Automatizados:**
+
   ```bash
   make test
   # Ou via Docker, sem Make:
@@ -513,10 +566,11 @@ O LabVida utiliza autenticação via **Auth0 + Login Social do Google (OAuth 2.0
 ### 13.1. Problemas Comuns
 
 | Erro | Causa | Solução |
-|---|---|---|
+| --- | --- | --- |
 | `Python não foi encontrado; executar sem argumentos para instalar do Microsoft Store` | `python3` não existe no Windows — é um alias da Store | Use `py -3.12 -m venv .venv` ([seção 7.1](#7-como-instalar-as-dependências)) |
 | `ERROR: Could not find a version that satisfies the requirement numpy==2.5.1` | O venv foi criado com Python 3.11 ou inferior | Recrie o venv com Python 3.12+ ([seção 5](#5-versão-do-python-utilizada)) |
-| `required variable AUTH0_DOMAIN is missing a value` | `.env` ausente ou com variáveis Auth0 vazias | Preencha o `.env` antes de subir ([seção 10](#10-como-configurar-o-arquivo-env)) |
+| `required variable LGPD_ENCRYPTION_KEY is missing a value` | `.env` ausente ou com `LGPD_ENCRYPTION_KEY` vazia | Preencha o `.env` antes de subir ([seção 10](#10-como-configurar-o-arquivo-env)) |
+| `E-mail ou senha inválidos` ao logar com usuário do seeder | `SENHA_PADRAO_SEED` foi trocada depois que o seeder já tinha criado o usuário | Use a senha com a qual o usuário foi criado, ou redefina a senha dele em *Administração → Usuários* |
 | `O termo 'make' não é reconhecido...` | GNU Make não instalado (padrão no Windows) | Use o comando `docker compose` equivalente da tabela acima |
 | `failed to resolve host 'postgres'` | `DATABASE_URL` com host da rede interna do Docker sendo usado na máquina host | Use `@localhost:5432` para rodar fora do Docker ([seção 8, Opção B](#opção-b--postgresql-local-sem-docker)) |
 | `docker compose up` conclui mas a porta 8501 não responde | Migrações/seed ainda executando no boot | Acompanhe com `docker compose logs -f app` |
@@ -548,10 +602,13 @@ Traduz a arquitetura organizacional em um modelo de dados relacional (PostgreSQL
 **Diagramas** — arquivos `.mmd` ([Mermaid](https://mermaid.js.org/)), renderizam direto no GitHub ou em [mermaid.live](https://mermaid.live):
 
 | Diagrama | Descrição |
-|---|---|
-| [MER Conceitual](docs/diagramas/MER-conceitual.mmd) | Entidades e relacionamentos (alto nível) |
-| [MER Lógico](docs/diagramas/MER-logico.mmd) | Tabelas, atributos, PKs, FKs e cardinalidades |
-| [BI — Esquema Estrela](docs/diagramas/BI-esquema-estrela.mmd) | Modelo dimensional (fatos e dimensões) |
+| --- | --- |
+| [MER Conceitual](docs/Entrega%202/diagramas/MER-conceitual.mmd) | Entidades e relacionamentos (alto nível) |
+| [MER Lógico](docs/Entrega%202/diagramas/MER-logico.mmd) | Tabelas, atributos, PKs, FKs e cardinalidades |
+| [BI — Esquema Estrela](docs/Entrega%202/diagramas/BI-esquema-estrela.mmd) | Modelo dimensional **como entregue na Entrega 02** |
+
+> O esquema estrela foi reconstruído depois da Entrega 02. O modelo **em vigor** está em
+> [docs/diagramas/bi-esquema-estrela.mmd](docs/diagramas/bi-esquema-estrela.mmd).
 
 </details>
 

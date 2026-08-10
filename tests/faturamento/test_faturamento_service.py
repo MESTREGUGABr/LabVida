@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 
 import pytest
@@ -55,11 +56,74 @@ def test_fechar_lote_sem_itens_gera_erro(session: Session) -> None:
 def test_listar_lotes(session: Session) -> None:
     base = montar_base(session)
 
-    criar_lote(session, LoteFaturamentoCreate(convenio_id=base.convenio_id))
-    criar_lote(session, LoteFaturamentoCreate(convenio_id=base.convenio_id))
+    criar_lote(
+        session,
+        LoteFaturamentoCreate(convenio_id=base.convenio_id, competencia=date(2026, 1, 1)),
+    )
+    criar_lote(
+        session,
+        LoteFaturamentoCreate(convenio_id=base.convenio_id, competencia=date(2026, 2, 1)),
+    )
 
     lotes = listar_lotes(session)
     assert len(lotes) == 2
+
+
+def test_criar_lote_reaproveita_lote_aberto_do_mesmo_convenio_e_competencia(
+    session: Session,
+) -> None:
+    base = montar_base(session)
+
+    primeiro = criar_lote(session, LoteFaturamentoCreate(convenio_id=base.convenio_id))
+    segundo = criar_lote(session, LoteFaturamentoCreate(convenio_id=base.convenio_id))
+
+    assert segundo.id == primeiro.id
+
+
+def test_criar_lote_particular_reaproveita_por_competencia(session: Session) -> None:
+    primeiro = criar_lote(session, LoteFaturamentoCreate(convenio_id=None))
+    segundo = criar_lote(session, LoteFaturamentoCreate(convenio_id=None))
+
+    assert segundo.id == primeiro.id
+
+
+def test_criar_lote_competencia_diferente_gera_lote_diferente(session: Session) -> None:
+    base = montar_base(session)
+
+    lote_marco = criar_lote(
+        session,
+        LoteFaturamentoCreate(convenio_id=base.convenio_id, competencia=date(2026, 3, 1)),
+    )
+    lote_abril = criar_lote(
+        session,
+        LoteFaturamentoCreate(convenio_id=base.convenio_id, competencia=date(2026, 4, 1)),
+    )
+
+    assert lote_marco.id != lote_abril.id
+
+
+def test_criar_lote_apos_fechamento_abre_novo_lote_na_mesma_competencia(
+    session: Session,
+) -> None:
+    base = montar_base(session)
+    laudo = criar_laudo_liberado(session, base)
+
+    lote1 = criar_lote(session, LoteFaturamentoCreate(convenio_id=base.convenio_id))
+    adicionar_guia_item(
+        session,
+        lote1.id,
+        GuiaItemCreate(
+            laudo_id=laudo.id,
+            procedimento_id=base.procedimento_id,
+            valor_faturado=float(base.valor_tabela),
+        ),
+    )
+    fechar_lote(session, lote1.id, base.usuario_id)
+
+    lote2 = criar_lote(session, LoteFaturamentoCreate(convenio_id=base.convenio_id))
+
+    assert lote2.id != lote1.id
+    assert lote2.competencia == lote1.competencia
 
 
 def test_obter_lote_inexistente_gera_erro(session: Session) -> None:

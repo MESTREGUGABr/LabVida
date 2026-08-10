@@ -2,7 +2,10 @@
 
 > Documento de **planejamento**. Nada aqui foi implementado ainda.
 > Anexo técnico: [plano-faturamento-competencia.md](plano-faturamento-competencia.md).
-> Documento irmão: [revisao-final.md](revisao-final.md).
+> Estado atual do sistema: [arquitetura.md](arquitetura.md).
+>
+> ⚠️ **A §8 (Ordem de execução) foi superada por [roadmap-execucao.md](roadmap-execucao.md)**, que é o documento canônico de fases, migrations e paralelização. Este plano continua válido como **conteúdo técnico** (o *quê* e o *como*).
+> O **Eixo 4 — BI** (§5) foi expandido e corrigido em [plano-bi.md](plano-bi.md): a afirmação de §5.1 de que o bug B1 exige mudança no OLTP está incorreta, e por isso o BI deixou de ser a última fase.
 
 ## Contexto
 
@@ -14,7 +17,7 @@ O LabVida foi apresentado ao professor e voltou com uma lista de apontamentos. E
 
 **Prazo:** sem prazo curto — ordem técnica, fazer certo.
 
-`docs/revisao-final.md` já cataloga 16 bugs, 7 UX sistêmicos e 29 funcionalidades ausentes. Este plano **não duplica** aquilo; a seção 7 aqui lista só o que aquele documento **não** contém.
+Uma auditoria anterior (`docs/revisao-final.md`, removida em 02/08 — está no histórico do git) catalogava 16 bugs, 7 UX sistêmicos e 29 funcionalidades ausentes. A seção 7 aqui lista o que aquele documento **não** continha.
 
 ---
 
@@ -97,7 +100,7 @@ Alvo:
 - **`st.dialog`** para os formulários inline (baixa de título, registrar glosa, editar fornecedor) — modal de verdade, sem `session_state[f"form_{id}"]`.
 - **`st.popover`** para ações rápidas por linha.
 
-Isso apaga a classe inteira de bug U4 do `revisao-final.md` ("apenas um formulário pode estar aberto por vez; colapsam em reruns não relacionados").
+Isso apaga a classe inteira de bug U4 catalogada na auditoria anterior ("apenas um formulário pode estar aberto por vez; colapsam em reruns não relacionados").
 
 ### 2.4 Padrões unificados
 
@@ -291,7 +294,7 @@ O professor pediu "implementar essa brincadeira". Antes de escolher, o diagnóst
 
 ## 7. Achados novos
 
-Bugs e inconsistências que **não** estão em `revisao-final.md` (aquele documento se declara "9.5/10, 1 bug pendente" — está desatualizado).
+Bugs e inconsistências que **não** estavam na auditoria anterior (que se declarava "9.5/10, 1 bug pendente" — desatualizada).
 
 ### 7.1 Críticos
 
@@ -335,6 +338,23 @@ Bugs e inconsistências que **não** estão em `revisao-final.md` (aquele docume
 - `MovimentoCaixa` sem CHECK garantindo vínculo coerente → movimento órfão é permitido pelo schema.
 - `LoteFaturamento` sem `unidade_id` → glosa tem unidade, faturamento não; cruzar os dois exige 5 joins.
 - Dark mode (`ui_css.py:605-621`) existe e **nunca é chamado** por nenhuma página.
+
+### 7.5 Estoque — alerta implementado, consumo real fica para depois
+
+Compras roda em paralelo ao fluxo assistencial (decisão já registrada em `arquitetura.md` §4.7): o ciclo fornecedor → solicitação → aprovação → recebimento → título a pagar → entrada de estoque é real, mas **nenhum código em `atendimento/`, `laboratorial/` ou `logistica/` debita insumo por exame executado** — as únicas saídas de estoque hoje vêm do seeder (`_seed_consumo`), simulando consumo sem vínculo com nenhuma coleta real.
+
+Depois de confirmar isso com o usuário (10/08/2026), a decisão foi implementar só a versão leve — `insumos_materiais.estoque_minimo` (migration `0020_estoque_minimo`) e um alerta visual na tela de Estoque quando `quantidade_estoque < estoque_minimo` — sem ligar consumo a procedimento nem bloquear nada.
+
+**Desenho da versão completa (F16 candidata, não implementada, ver `docs/roadmap-execucao.md`):**
+
+| # | O que falta | Onde entraria |
+|---|---|---|
+| E1 | Tabela `procedimento_insumo` (receita padrão: quantidade de cada insumo por procedimento) | novo módulo, FK para `procedimentos` e `insumos_materiais` |
+| E2 | Débito automático de estoque ao confirmar a coleta, somando a receita de todos os `OsItem` da OS | `src/atendimento/amostra/service.py::registrar_coleta` |
+| E3 | Decisão de martelo: bloqueio duro (nunca deixa coletar sem insumo) vs. aviso com opção de forçar | decisão de negócio, não só técnica |
+| E4 | Se bloqueio duro: rota de reposição urgente/override por admin, para não travar o atendimento por um insumo secundário | `pages/compras_estoque.py` ou `atendimento_coleta.py` |
+
+Risco de implementar isso junto com outra fase: `registrar_coleta` é um dos fluxos mais usados e testados do sistema — qualquer regressão ali afeta o atendimento inteiro, não só o estoque. Por isso ficou fora desta rodada.
 
 ---
 

@@ -1,46 +1,17 @@
 from collections.abc import Iterator
 
 import pytest
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from src.db import session_scope
+from tests._tabelas import AUDITORIA, COMPRAS, NUCLEO, RBAC, limpar
 
-
-_TABELAS = (
-    "auditoria_log",
-    "protocolos_recebimento",
-    "amostras_movimentacoes",
-    "malotes_amostras",
-    "malotes",
-    "coletas",
-    "amostras",
-    "autorizacoes_convenio",
-    "os_status_historico",
-    "os_itens",
-    "ordens_servico",
-    "procedimento_valores",
-    "medicos",
-    "procedimentos",
-    "convenios",
-    "setores",
-    "unidades",
-    "usuarios",
-    "pacientes",
-    "perfil_permissao",
-    "permissoes",
-    "perfis",
-)
-
-
-def _limpar(session: Session) -> None:
-    session.execute(text("TRUNCATE " + ", ".join(_TABELAS) + " RESTART IDENTITY CASCADE"))
-    session.commit()
+_TABELAS = AUDITORIA + NUCLEO + RBAC + COMPRAS
 
 
 @pytest.fixture()
 def session() -> Iterator[Session]:
     with session_scope() as session:
-        _limpar(session)
+        limpar(session, _TABELAS)
         yield session
-        _limpar(session)
+        limpar(session, _TABELAS)

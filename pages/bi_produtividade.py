@@ -1,6 +1,9 @@
-import streamlit as st
-import pandas as pd
+"""Produtividade operacional — volume, TAT, setor e sazonalidade."""
 
+import streamlit as st
+
+from src.bi import graficos, metricas
+from src.bi.filtros import botao_atualizar, rodape_de_atualizacao, seletor_de_periodo, sem_dados
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
 from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
@@ -13,88 +16,132 @@ def main() -> None:
 
     renderizar_cabecalho(
         titulo="Produtividade Operacional",
-        subtitulo="Indicadores de atendimento e exames por unidade",
+        subtitulo="Volume de exames, tempo de atendimento e distribuicao por setor",
         icone=ICONE_PRODUTIVIDADE,
     )
 
     with session_scope() as session:
-        from sqlalchemy import text
+        periodo = seletor_de_periodo(session, chave="produtividade")
+        indicadores = metricas.kpis(session, periodo)
+        por_unidade = metricas.exames_por_unidade(session, periodo)
+        por_mes = metricas.exames_por_mes(session, periodo)
+        por_convenio = metricas.exames_por_convenio(session, periodo)
+        por_faixa = metricas.exames_por_faixa_etaria(session, periodo)
+        por_setor = metricas.exames_por_setor(session, periodo)
+        sazonalidade = metricas.sazonalidade_por_dia_da_semana(session, periodo)
+        tat_mes = metricas.tat_por_mes(session, periodo)
+        tat_setor = metricas.tat_por_setor(session, periodo)
+        rodape_de_atualizacao(session)
 
-        exames_por_unidade = pd.read_sql(
-            text(
-                "SELECT u.nome AS unidade, COUNT(*) AS exames "
-                "FROM bi_fato_atendimento f "
-                "JOIN bi_dim_unidade u ON u.sk_unidade = f.sk_unidade "
-                "GROUP BY u.nome ORDER BY exames DESC"
-            ),
-            session.get_bind(),
-        )
-
-        exames_por_mes = pd.read_sql(
-            text(
-                "SELECT t.ano::text || '-' || LPAD(t.mes::text, 2, '0') AS mes, COUNT(*) AS exames "
-                "FROM bi_fato_atendimento f "
-                "JOIN bi_dim_tempo t ON t.sk_tempo = f.sk_tempo "
-                "GROUP BY t.ano, t.mes ORDER BY t.ano, t.mes"
-            ),
-            session.get_bind(),
-        )
-
-        exames_por_convenio = pd.read_sql(
-            text(
-                "SELECT COALESCE(c.nome, 'Particular') AS convenio, COUNT(*) AS exames "
-                "FROM bi_fato_atendimento f "
-                "LEFT JOIN bi_dim_convenio c ON c.sk_convenio = f.sk_convenio "
-                "GROUP BY c.nome ORDER BY exames DESC"
-            ),
-            session.get_bind(),
-        )
-
-        faixa_etaria = pd.read_sql(
-            text(
-                "SELECT p.faixa_etaria, COUNT(*) AS pacientes "
-                "FROM bi_fato_atendimento f "
-                "JOIN bi_dim_paciente_anon p ON p.sk_paciente = f.sk_paciente "
-                "GROUP BY p.faixa_etaria ORDER BY p.faixa_etaria"
-            ),
-            session.get_bind(),
-        )
-
-    if exames_por_unidade.empty:
+    if indicadores["exames"] == 0:
         renderizar_empty_state(
             icone=ICONE_PRODUTIVIDADE,
-            titulo="Nenhum dado disponivel",
-            mensagem="Execute o ETL primeiro para popular os indicadores de produtividade.",
+            titulo="Nenhum exame no periodo",
+            mensagem="Amplie o periodo selecionado ou atualize os dados do BI.",
         )
-        if st.button("Carregar dados do BI", type="primary"):
-            from src.bi.etl import executar_etl
-            with st.spinner("Executando ETL..."):
-                executar_etl()
+        if botao_atualizar(chave="etl_produtividade_vazio"):
             st.rerun()
         return
 
-    total_exames = int(exames_por_unidade["exames"].sum()) if not exames_por_unidade.empty else 0
-    total_unidades = len(exames_por_unidade)
+    st.divider()
+    colunas = st.columns(4)
+    colunas[0].metric("Exames", f"{indicadores['exames']:,}".replace(",", "."))
+    colunas[1].metric("Unidades ativas", len(por_unidade))
+    colunas[2].metric(
+        "Media por unidade",
+        f"{indicadores['exames'] / len(por_unidade):.0f}" if len(por_unidade) else "0",
+    )
+    colunas[3].metric(
+        "TAT medio (coleta -> laudo)",
+        f"{indicadores['tat_horas']:.1f} h".replace(".", ","),
+    )
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total de Exames", total_exames)
-    col2.metric("Unidades Ativas", total_unidades)
-    col3.metric("Média por Unidade", f"{total_exames / total_unidades:.0f}" if total_unidades else "0")
+    renderizar_secao(titulo="Evolucao mensal de exames")
+    st.altair_chart(
+        graficos.linha_temporal(por_mes, tempo="mes", valor="exames", rotulo_valor="Exames"),
+        use_container_width=True,
+    )
 
-    col1, col2 = st.columns(2)
-    with col1:
-        renderizar_secao(titulo="Exames por Unidade")
-        st.bar_chart(exames_por_unidade.set_index("unidade"), use_container_width=True)
+    esquerda, direita = st.columns(2)
+    with esquerda:
+        renderizar_secao(titulo="Exames por unidade")
+        st.altair_chart(
+            graficos.barra_categorica(
+                por_unidade, categoria="unidade", valor="exames", rotulo_valor="Exames"
+            ),
+            use_container_width=True,
+        )
+    with direita:
+        renderizar_secao(titulo="Exames por convenio")
+        st.altair_chart(
+            graficos.barra_categorica(
+                por_convenio, categoria="convenio", valor="exames", rotulo_valor="Exames"
+            ),
+            use_container_width=True,
+        )
 
-    with col2:
-        renderizar_secao(titulo="Exames por Convenio")
-        st.bar_chart(exames_por_convenio.set_index("convenio"), use_container_width=True)
+    esquerda, direita = st.columns(2)
+    with esquerda:
+        renderizar_secao(titulo="Exames por setor")
+        if por_setor.empty:
+            sem_dados()
+        else:
+            st.altair_chart(
+                graficos.donut(por_setor, categoria="setor", valor="exames"),
+                use_container_width=True,
+            )
+    with direita:
+        renderizar_secao(titulo="Distribuicao por faixa etaria")
+        st.altair_chart(
+            graficos.barra_categorica(
+                por_faixa, categoria="faixa_etaria", valor="exames",
+                rotulo_categoria="Faixa etaria", rotulo_valor="Exames",
+                horizontal=False, cor_unica=graficos.COR_NEUTRA,
+            ),
+            use_container_width=True,
+        )
 
-    renderizar_secao(titulo="Evolucao Mensal")
-    st.line_chart(exames_por_mes.set_index("mes"), use_container_width=True)
+    esquerda, direita = st.columns([2, 3])
+    with esquerda:
+        renderizar_secao(titulo="Sazonalidade semanal")
+        if sazonalidade.empty:
+            sem_dados()
+        else:
+            st.altair_chart(
+                graficos.heatmap_sazonalidade(
+                    sazonalidade, dia_semana="dia_semana", valor="exames"
+                ),
+                use_container_width=True,
+            )
+    with direita:
+        renderizar_secao(titulo="Tempo medio de atendimento por setor")
+        if tat_setor.empty:
+            sem_dados("Nenhuma OS concluida no periodo.")
+        else:
+            st.altair_chart(
+                graficos.barra_categorica(
+                    tat_setor, categoria="setor", valor="horas",
+                    rotulo_valor="Horas", formato="horas",
+                    cor_unica=graficos.COR_ALERTA, altura=200,
+                ),
+                use_container_width=True,
+            )
 
-    renderizar_secao(titulo="Distribuicao por Faixa Etaria")
-    st.bar_chart(faixa_etaria.set_index("faixa_etaria"), use_container_width=True)
+    renderizar_secao(titulo="Tempo medio coleta -> laudo por mes")
+    if tat_mes.empty:
+        sem_dados("Nenhuma OS concluida no periodo.")
+    else:
+        st.altair_chart(
+            graficos.linha_temporal(
+                tat_mes, tempo="mes", valor="horas", rotulo_valor="Horas",
+                formato="horas", cor=graficos.COR_ALERTA,
+            ),
+            use_container_width=True,
+        )
+
+    st.divider()
+    if botao_atualizar(chave="etl_produtividade"):
+        st.rerun()
 
 
 if __name__ == "__main__":

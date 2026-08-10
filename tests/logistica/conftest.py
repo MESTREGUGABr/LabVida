@@ -1,42 +1,19 @@
 from collections.abc import Iterator
 
 import pytest
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from src.db import session_scope
+from tests._tabelas import NUCLEO, limpar
 
-
-_TABELAS = (
-    "protocolos_recebimento",
-    "amostras_movimentacoes",
-    "malotes_amostras",
-    "malotes",
-    "coletas",
-    "amostras",
-    "autorizacoes_convenio",
-    "os_status_historico",
-    "os_itens",
-    "ordens_servico",
-    "procedimento_valores",
-    "medicos",
-    "procedimentos",
-    "convenios",
-    "setores",
-    "unidades",
-    "usuarios",
-    "pacientes",
-)
-
-
-def _limpar(session: Session) -> None:
-    session.execute(text("TRUNCATE " + ", ".join(_TABELAS) + " RESTART IDENTITY CASCADE"))
-    session.commit()
+# Sem RBAC de proposito: `perfis` vazia poe o gate em modo bootstrap e mudaria
+# o que estes testes exercitam.
+_TABELAS = NUCLEO
 
 
 @pytest.fixture()
 def session() -> Iterator[Session]:
     with session_scope() as session:
-        _limpar(session)
+        limpar(session, _TABELAS)
         yield session
-        _limpar(session)
+        limpar(session, _TABELAS)

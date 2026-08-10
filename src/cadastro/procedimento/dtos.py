@@ -48,7 +48,8 @@ class ProcedimentoRead(BaseModel):
 
 class ProcedimentoValorCreate(BaseModel):
     procedimento_id: UUID
-    convenio_id: UUID
+    # None = tabela particular / balcao.
+    convenio_id: UUID | None = None
     valor: Decimal
     vigencia_inicio: date
 
@@ -65,6 +66,7 @@ class ProcedimentoValorRead(BaseModel):
 
     id: UUID
     procedimento_id: UUID
-    convenio_id: UUID
+    convenio_id: UUID | None = None
     valor: Decimal
     vigencia_inicio: date
+    vigencia_fim: date | None = None

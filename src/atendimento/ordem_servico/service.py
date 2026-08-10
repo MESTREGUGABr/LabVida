@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -26,6 +27,8 @@ from src.atendimento.ordem_servico.errors import (
     ProcedimentoInvalidoParaOS,
     UnidadeInvalidaParaOS,
     UsuarioNaoAutorizadoParaCancelamento,
+    ValorForaDaTabela,
+    MotivoDeExcecaoObrigatorio,
     ValorItemNaoDefinido,
 )
 from src.atendimento.ordem_servico.models import OrdemServico, OsItem, OsStatusHistorico
@@ -67,6 +70,15 @@ def abrir_os(session: Session, dto: OrdemServicoCreate, usuario_id: UUID | None 
         if convenio is None or convenio.status != StatusConvenio.ATIVO:
             raise ConvenioInvalidoParaOS("Convênio inválido ou inativo")
 
+    # Resolve o valor de TODOS os itens antes de escrever qualquer linha.
+    # Se a regra do valor recusar um item, nada foi criado — antes desta ordem,
+    # a OS e a autorizacao ja tinham sido inseridas e a excecao deixava objeto
+    # orfao pendente na sessao do chamador.
+    itens_resolvidos = [
+        _resolver_valor_do_item(session, entrada, convenio, usuario_id)
+        for entrada in dto.itens
+    ]
+
     ordem = OrdemServico(
         codigo_os=_gerar_codigo_os(session),
         paciente_id=dto.paciente_id,
@@ -86,25 +98,18 @@ def abrir_os(session: Session, dto: OrdemServicoCreate, usuario_id: UUID | None 
         )
         session.add(autorizacao)
 
-    for entrada in dto.itens:
-        procedimento = procedimento_repository.obter_por_id(session, entrada.procedimento_id)
-        if procedimento is None or not procedimento.ativo:
-            raise ProcedimentoInvalidoParaOS("Procedimento inválido ou inativo")
-
-        valor = entrada.valor_negociado
-        if valor is None and convenio is not None:
-            valor = obter_valor_vigente(session, procedimento.id, convenio.id)
-        if valor is None:
-            raise ValorItemNaoDefinido(
-                f"Valor não definido para o procedimento {procedimento.nome}"
-            )
-
+    for resolvido in itens_resolvidos:
         repository.salvar_item(
             session,
             OsItem(
                 ordem_servico_id=ordem.id,
-                procedimento_id=procedimento.id,
-                valor_negociado=valor,
+                procedimento_id=resolvido["procedimento_id"],
+                valor_negociado=resolvido["valor"],
+                # Guarda o que a TABELA dizia na data do fato, para a
+                # pre-auditoria e o BI poderem comparar depois.
+                valor_tabela=resolvido["valor_tabela"],
+                origem_valor=resolvido["origem_valor"],
+                motivo_excecao=resolvido["motivo"],
                 status=StatusOsItem.SOLICITADO,
             ),
         )
@@ -320,3 +325,80 @@ def _gerar_codigo_os(session: Session) -> str:
         if repository.obter_por_codigo(session, codigo) is None:
             return codigo
     raise RuntimeError("Não foi possível gerar um código de OS único")
+
+
+def _pode_valor_excecao(session: Session, usuario_id: UUID | None) -> bool:
+    """Permissao para cobrar valor diferente da tabela.
+
+    Mantem o mesmo bootstrap dos demais gates: com a tabela `perfis` vazia o
+    sistema ainda nao foi configurado, e travar aqui impediria abrir a primeira
+    OS num banco novo (ADR 0002).
+    """
+    if usuario_id is None:
+        return True
+    from src.rbac.models import Perfil
+    from src.rbac.repository import usuario_tem_permissao
+
+    if session.scalar(select(Perfil.id).limit(1)) is None:
+        return True
+    return usuario_tem_permissao(session, usuario_id, "faturamento:valor_excecao")
+
+
+def _resolver_valor_do_item(session: Session, entrada, convenio, usuario_id: UUID | None) -> dict:
+    """REGRA DO VALOR (F3) — a tabela de precos e a fonte da verdade.
+
+    Antes, qualquer valor digitado sobrescrevia a tabela sem checagem e sem
+    deixar rastro do que a tabela dizia. Agora ha quatro saidas:
+
+    - valor omitido        -> usa a tabela
+    - valor igual a tabela -> usa a tabela (digitar o preco certo nao e excecao)
+    - valor != tabela      -> NEGOCIADO: exige permissao e motivo
+    - sem preco em tabela  -> SEM_TABELA: passa marcado
+
+    A ultima e deliberada: bloquear a abertura da OS por cadastro de preco
+    incompleto pararia o atendimento. A divergencia e da pre-auditoria do
+    faturamento, que e onde ela custa dinheiro.
+    """
+    procedimento = procedimento_repository.obter_por_id(session, entrada.procedimento_id)
+    if procedimento is None or not procedimento.ativo:
+        raise ProcedimentoInvalidoParaOS("Procedimento inválido ou inativo")
+
+    convenio_id = convenio.id if convenio is not None else None
+    valor_tabela = obter_valor_vigente(session, procedimento.id, convenio_id)
+    valor_digitado = entrada.valor_negociado
+
+    if valor_digitado is None:
+        if valor_tabela is None:
+            raise ValorItemNaoDefinido(
+                f"Sem preco em tabela para {procedimento.nome}. "
+                "Cadastre o valor em Procedimentos ou informe um valor na abertura."
+            )
+        valor, origem_valor, motivo = valor_tabela, "TABELA", None
+    elif valor_tabela is not None and Decimal(str(valor_digitado)) == Decimal(str(valor_tabela)):
+        valor, origem_valor, motivo = valor_tabela, "TABELA", None
+    elif valor_tabela is None:
+        valor = valor_digitado
+        origem_valor = "SEM_TABELA"
+        motivo = (getattr(entrada, "motivo_excecao", None) or "").strip() or None
+    else:
+        if not _pode_valor_excecao(session, usuario_id):
+            raise ValorForaDaTabela(
+                f"Valor informado para {procedimento.nome} difere da tabela "
+                f"(tabela: {valor_tabela}). "
+                "E necessaria a permissao 'faturamento:valor_excecao'."
+            )
+        motivo = (getattr(entrada, "motivo_excecao", None) or "").strip()
+        if not motivo:
+            raise MotivoDeExcecaoObrigatorio(
+                f"Informe o motivo do valor negociado para {procedimento.nome} "
+                f"(tabela: {valor_tabela}, informado: {valor_digitado})."
+            )
+        valor, origem_valor = valor_digitado, "NEGOCIADO"
+
+    return {
+        "procedimento_id": procedimento.id,
+        "valor": valor,
+        "valor_tabela": valor_tabela,
+        "origem_valor": origem_valor,
+        "motivo": motivo,
+    }

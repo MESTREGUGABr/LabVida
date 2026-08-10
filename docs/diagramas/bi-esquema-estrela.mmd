@@ -1,0 +1,215 @@
+%% LabVida — Esquema Estrela do BI (modelo EM VIGOR, pos-fase F2)
+%% Atualizado em 02/08/2026 · migration 0014_bi_reconstrucao
+%%
+%% Regras de modelagem (ADR 0009):
+%%   1. Todo fato declara GRAO e carrega CHAVE NATURAL da linha de origem no OLTP.
+%%   2. Medida so convive com o fato que compartilha seu grao.
+%%   3. Medida derivada (ticket medio, taxa de glosa) NAO vira coluna: e calculada
+%%      em src/bi/metricas.py sobre as medidas aditivas.
+%%   4. Atributo que muda com o tempo (faixa etaria) e congelado no fato.
+%%
+%% LGPD: o paciente entra pseudonimizado (SHA-256 do UUID); so sexo e faixa etaria
+%% sao expostos, e nenhuma coluna permite join de volta a tabela `pacientes`.
+erDiagram
+
+    DIM_TEMPO {
+        int sk_tempo PK
+        date data UK "calendario DENSO, dia a dia"
+        int ano
+        int mes
+        int dia
+        varchar dia_semana
+        smallint dia_semana_num "0=segunda"
+        smallint trimestre
+        smallint semestre
+        smallint semana_iso
+        varchar nome_mes
+        varchar ano_mes "2026-03"
+        date competencia "1o dia do mes"
+        boolean dia_util
+    }
+
+    DIM_UNIDADE {
+        int sk_unidade PK
+        uuid id_origem UK
+        varchar nome
+        varchar tipo "CENTRAL | COLETA"
+    }
+
+    DIM_SETOR {
+        int sk_setor PK
+        varchar chave_natural UK "nome normalizado"
+        varchar nome
+    }
+
+    DIM_CONVENIO {
+        int sk_convenio PK
+        uuid id_origem UK
+        varchar nome
+        varchar registro_ans
+    }
+
+    DIM_PROCEDIMENTO {
+        int sk_procedimento PK
+        uuid id_origem UK
+        varchar codigo_tuss
+        varchar nome
+        varchar setor
+        int sk_setor FK
+        boolean ativo
+    }
+
+    DIM_PACIENTE_ANON {
+        int sk_paciente PK
+        varchar id_origem UK "SHA-256 do UUID"
+        varchar sexo
+    }
+
+    DIM_FAIXA_ETARIA {
+        int sk_faixa_etaria PK
+        varchar chave_natural UK
+        varchar descricao
+        smallint ordem
+    }
+
+    DIM_MOTIVO_GLOSA {
+        int sk_motivo_glosa PK
+        varchar chave_natural UK "motivo normalizado"
+        varchar descricao
+    }
+
+    FATO_ORDEM_SERVICO {
+        int sk_fato PK
+        uuid ordem_servico_id UK "CHAVE NATURAL - grao: 1 OS"
+        int sk_tempo FK
+        int sk_unidade FK
+        int sk_convenio FK
+        int sk_paciente FK
+        int sk_faixa_etaria FK
+        int qtd_itens
+        int qtd_itens_cancelados
+        numeric valor_total
+        numeric tempo_ciclo_horas "TAT coleta ate laudo"
+        numeric tempo_coleta_recebimento_horas
+        numeric tempo_recebimento_laudo_horas
+        boolean concluida
+    }
+
+    FATO_ATENDIMENTO {
+        int sk_fato PK
+        uuid os_item_id UK "CHAVE NATURAL - grao: 1 item de OS"
+        int sk_tempo FK
+        int sk_unidade FK
+        int sk_convenio FK
+        int sk_procedimento FK
+        int sk_paciente FK
+        int sk_faixa_etaria FK
+        int sk_setor FK
+        int qtd_exames
+        numeric valor_negociado
+        boolean cancelado
+        boolean laudo_liberado
+    }
+
+    FATO_FATURAMENTO {
+        int sk_fato PK
+        uuid guia_item_id UK "CHAVE NATURAL - grao: 1 item faturado"
+        int sk_tempo FK "datado pelo FECHAMENTO do lote"
+        int sk_unidade FK "unidade real da OS"
+        int sk_convenio FK
+        int sk_procedimento FK
+        int sk_paciente FK
+        int sk_setor FK
+        numeric valor_faturado
+        numeric valor_glosado
+        numeric valor_liberado
+        int qtd_itens
+    }
+
+    FATO_FINANCEIRO {
+        int sk_fato PK
+        varchar regime "PREVISTO | CAIXA"
+        varchar origem_tabela
+        uuid origem_id "CHAVE NATURAL composta com regime"
+        int sk_tempo FK
+        int sk_unidade FK
+        int sk_convenio FK
+        varchar fluxo "ENTRADA | SAIDA"
+        numeric valor_previsto
+        numeric valor_realizado
+        boolean liquidado
+    }
+
+    FATO_LOGISTICA {
+        int sk_fato PK
+        uuid amostra_id UK "CHAVE NATURAL - grao: 1 amostra"
+        int sk_tempo FK "datado pela COLETA"
+        int sk_unidade FK
+        int sk_unidade_destino FK
+        int qtd_amostras
+        numeric tempo_transito_horas "despacho ate recebimento"
+        numeric tempo_coleta_recebimento_horas
+        boolean rejeitada
+        int amostras_divergentes
+        varchar status_atual
+    }
+
+    FATO_GLOSA {
+        int sk_fato PK
+        uuid glosa_id UK "CHAVE NATURAL - grao: 1 glosa"
+        int sk_tempo FK
+        int sk_unidade FK
+        int sk_convenio FK
+        int sk_procedimento FK
+        int sk_motivo_glosa FK
+        numeric valor_glosado
+        numeric valor_faturado_item
+        int qtd_glosas
+    }
+
+    ETL_EXECUCAO {
+        uuid id PK
+        timestamptz iniciado_em
+        timestamptz finalizado_em
+        varchar status "EXECUTANDO | SUCESSO | ERRO"
+        varchar modo "FULL | INCREMENTAL"
+        jsonb linhas "contagem por fato"
+        numeric duracao_seg
+        text erro
+    }
+
+    DIM_TEMPO           ||--o{ FATO_ORDEM_SERVICO : "quando"
+    DIM_UNIDADE         ||--o{ FATO_ORDEM_SERVICO : "onde"
+    DIM_CONVENIO        ||--o{ FATO_ORDEM_SERVICO : "pagador"
+    DIM_PACIENTE_ANON   ||--o{ FATO_ORDEM_SERVICO : "quem"
+    DIM_FAIXA_ETARIA    ||--o{ FATO_ORDEM_SERVICO : "faixa congelada"
+
+    DIM_TEMPO           ||--o{ FATO_ATENDIMENTO : "quando"
+    DIM_UNIDADE         ||--o{ FATO_ATENDIMENTO : "onde"
+    DIM_CONVENIO        ||--o{ FATO_ATENDIMENTO : "pagador"
+    DIM_PROCEDIMENTO    ||--o{ FATO_ATENDIMENTO : "o que"
+    DIM_PACIENTE_ANON   ||--o{ FATO_ATENDIMENTO : "quem"
+    DIM_FAIXA_ETARIA    ||--o{ FATO_ATENDIMENTO : "faixa congelada"
+    DIM_SETOR           ||--o{ FATO_ATENDIMENTO : "setor"
+
+    DIM_TEMPO           ||--o{ FATO_FATURAMENTO : "quando"
+    DIM_UNIDADE         ||--o{ FATO_FATURAMENTO : "onde"
+    DIM_CONVENIO        ||--o{ FATO_FATURAMENTO : "pagador"
+    DIM_PROCEDIMENTO    ||--o{ FATO_FATURAMENTO : "o que"
+    DIM_PACIENTE_ANON   ||--o{ FATO_FATURAMENTO : "quem"
+    DIM_SETOR           ||--o{ FATO_FATURAMENTO : "setor"
+
+    DIM_TEMPO           ||--o{ FATO_FINANCEIRO : "quando"
+    DIM_UNIDADE         ||--o{ FATO_FINANCEIRO : "onde"
+    DIM_CONVENIO        ||--o{ FATO_FINANCEIRO : "pagador"
+
+    DIM_TEMPO           ||--o{ FATO_LOGISTICA : "quando"
+    DIM_UNIDADE         ||--o{ FATO_LOGISTICA : "origem e destino"
+
+    DIM_TEMPO           ||--o{ FATO_GLOSA : "quando"
+    DIM_UNIDADE         ||--o{ FATO_GLOSA : "onde"
+    DIM_CONVENIO        ||--o{ FATO_GLOSA : "pagador"
+    DIM_PROCEDIMENTO    ||--o{ FATO_GLOSA : "o que"
+    DIM_MOTIVO_GLOSA    ||--o{ FATO_GLOSA : "por que"
+
+    DIM_SETOR           ||--o{ DIM_PROCEDIMENTO : "classifica"

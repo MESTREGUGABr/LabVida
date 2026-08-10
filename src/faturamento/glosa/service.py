@@ -29,8 +29,19 @@ def registrar_glosa(
 
     if valor_glosado <= 0:
         raise ValueError("Valor da glosa deve ser maior que zero")
-    if valor_glosado > valor_faturado:
-        raise ValorGlosaExcedeFaturado("Valor da glosa excede o valor faturado do item")
+
+    # A validação precisa ser CUMULATIVA: comparar cada glosa isoladamente com o
+    # valor faturado permitia duas glosas de 60% glosarem 120% do item — e o item
+    # continuava FATURADO, porque nenhuma delas sozinha atingia o total.
+    glosado_anterior = repository.somar_glosas_do_guia_item(session, dto.guia_item_id)
+    glosado_acumulado = glosado_anterior + valor_glosado
+    if glosado_acumulado > valor_faturado:
+        disponivel = valor_faturado - glosado_anterior
+        raise ValorGlosaExcedeFaturado(
+            f"Glosa de R$ {valor_glosado} excede o saldo do item: "
+            f"faturado R$ {valor_faturado}, já glosado R$ {glosado_anterior}, "
+            f"disponível R$ {disponivel}"
+        )
 
     unidade_id = _unidade_do_guia_item(session, guia_item.laudo_id)
     if unidade_id is None:
@@ -44,7 +55,8 @@ def registrar_glosa(
     )
     repository.salvar_glosa(session, glosa)
 
-    if valor_glosado >= valor_faturado:
+    # GLOSADO quando o ACUMULADO fecha o item, não quando uma glosa isolada o faz.
+    if glosado_acumulado >= valor_faturado:
         guia_item.status = StatusGuiaItem.GLOSADO
 
     if usuario_id is not None:

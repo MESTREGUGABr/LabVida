@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from src.cadastro.convenio.repository import listar_ativos as listar_convenios
 from src.db import session_scope
+from src.faturamento.competencia.service import competencia_de
 from src.faturamento.glosa.dtos import GlosaCreate
 from src.faturamento.glosa.service import registrar_glosa
 from src.faturamento.lote_faturamento import repository
@@ -32,10 +33,10 @@ from src.seeder.catalogo import MOTIVOS_GLOSA
 from src.seeder.config import agora, somar_horas
 from src.usuario.models import Usuario
 
-_LAUDOS_POR_LOTE = (8, 18)
 _PROPORCAO_LOTES_FECHADOS = 0.7
 _PROPORCAO_ITENS_GLOSADOS = 0.12
 _PRAZO_PAGAMENTO_DIAS = 30
+_PROPORCAO_LAUDOS_RETIDOS_MES_ATUAL = 0.12
 
 
 def executar_seeder_faturamento() -> dict[str, int]:
@@ -55,20 +56,30 @@ def executar_seeder_faturamento() -> dict[str, int]:
                 continue
 
             laudos.sort(key=lambda item: item["liberado_em"] or agora())
-            for bloco in _blocos(laudos):
-                _faturar_bloco(session, convenio_id, bloco, faturista, contagem)
+            blocos = _blocos(laudos)
+            for indice, bloco in enumerate(blocos):
+                # O bloco mais recente (competencia corrente do convenio) fica
+                # sempre aberto e retem uma fatia dos laudos como pendente —
+                # sem isso o seeder fatura 100% dos laudos e a tela de
+                # faturamento nunca tem nada pra demonstrar no fluxo de
+                # "adicionar depois".
+                eh_bloco_atual = indice == len(blocos) - 1
+                _faturar_bloco(
+                    session, convenio_id, bloco, faturista, contagem,
+                    retem_pendentes=eh_bloco_atual,
+                )
 
     return contagem
 
 
 def _blocos(laudos: list[dict]) -> list[list[dict]]:
-    blocos = []
-    inicio = 0
-    while inicio < len(laudos):
-        tamanho = random.randint(*_LAUDOS_POR_LOTE)
-        blocos.append(laudos[inicio : inicio + tamanho])
-        inicio += tamanho
-    return blocos
+    """Um bloco por competencia do laudo — reflete o novo agrupamento mensal
+    do lote (um lote por convenio+mes, nao mais pedacos de tamanho fixo)."""
+    por_competencia: dict = {}
+    for item in laudos:
+        comp = competencia_de(item["liberado_em"] or agora())
+        por_competencia.setdefault(comp, []).append(item)
+    return list(por_competencia.values())
 
 
 def _faturar_bloco(
@@ -77,8 +88,20 @@ def _faturar_bloco(
     bloco: list[dict],
     faturista: Usuario | None,
     contagem: dict[str, int],
+    *,
+    retem_pendentes: bool = False,
 ) -> None:
-    lote = criar_lote(session, LoteFaturamentoCreate(convenio_id=convenio_id))
+    a_faturar = bloco
+    if retem_pendentes and len(bloco) > 1:
+        quantidade_retida = int(len(bloco) * _PROPORCAO_LAUDOS_RETIDOS_MES_ATUAL)
+        if quantidade_retida > 0:
+            retidos = set(random.sample(range(len(bloco)), quantidade_retida))
+            a_faturar = [item for i, item in enumerate(bloco) if i not in retidos]
+
+    competencia = competencia_de(bloco[0]["liberado_em"] or agora())
+    lote = criar_lote(
+        session, LoteFaturamentoCreate(convenio_id=convenio_id, competencia=competencia)
+    )
     adicionar_itens_ao_lote(
         session,
         lote.id,
@@ -88,17 +111,19 @@ def _faturar_bloco(
                 procedimento_id=item["procedimento_id"],
                 valor_faturado=item["valor_negociado"],
             )
-            for item in bloco
+            for item in a_faturar
         ],
     )
 
     contagem["lotes"] += 1
-    contagem["guias_itens"] += len(bloco)
+    contagem["guias_itens"] += len(a_faturar)
 
     ultimo_laudo = max((item["liberado_em"] for item in bloco if item["liberado_em"]), default=agora())
     t_criacao = somar_horas(ultimo_laudo, 2, 24)
 
-    if random.random() >= _PROPORCAO_LOTES_FECHADOS:
+    # O bloco mais recente fica sempre ABERTO, com laudos retidos pendentes —
+    # ver comentario no loop de `executar_seeder_faturamento`.
+    if retem_pendentes or random.random() >= _PROPORCAO_LOTES_FECHADOS:
         _retrodatar_lote(session, lote.id, t_criacao, None)
         return
 

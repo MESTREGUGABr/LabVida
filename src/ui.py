@@ -4,19 +4,20 @@ Shell unificado de navegacao: login gate, page config, menu lateral com RBAC.
 Substitui o guarda manual que cada pagina repetia antes da Stack D.
 """
 
-from collections.abc import Sequence
+import html
 from base64 import b64encode
 from pathlib import Path
 from uuid import UUID
 
 import streamlit as st
+from streamlit.errors import StreamlitAPIException
 
 from src.db import session_scope
 from src.rbac.gate import verificar_permissao
 from src.rbac.models import Perfil
 from src.rbac.service import listar_permissoes_do_usuario
 from src.ui_css import injetar_css_global
-from src.ui_icons import ICONES_MAPA, ICONE_HOME, ICONE_SAIR
+from src.ui_icons import ICONES_MAPA
 
 
 def formatar_brl(valor: float) -> str:
@@ -66,6 +67,7 @@ _MENU = [
     (
         "Faturamento",
         [
+            ("Competencia", "pages/faturamento_competencia.py", "faturamento:gerenciar_lotes"),
             ("Faturamento de Guias TISS", "pages/faturamento_guias.py", "faturamento:gerenciar_lotes"),
             ("Controle de Glosas", "pages/faturamento_glosas.py", "faturamento:registrar_glosa"),
         ],
@@ -95,6 +97,7 @@ _MENU = [
     (
         "BI \u2014 Indicadores",
         [
+            ("Visao Executiva", "pages/bi_visao_executiva.py", "bi:visualizar"),
             ("Produtividade", "pages/bi_produtividade.py", "bi:visualizar"),
             ("Financeiro", "pages/bi_financeiro.py", "bi:visualizar"),
             ("Logistica", "pages/bi_logistica.py", "bi:visualizar"),
@@ -135,11 +138,17 @@ def usuario_id_logado() -> UUID:
 
 def shell(page_title: str, *, layout: str = "centered", permissao: str | None = None) -> dict:
     """Shell unificado: login gate + page config + CSS global + RBAC opcional."""
-    st.set_page_config(
-        page_title=page_title,
-        page_icon="\U0001f9ea",
-        layout=layout,
-    )
+    # Sob `st.navigation`, o entrypoint (app.py) ja configurou a pagina e o
+    # Streamlit recusa uma segunda chamada. A pagina continua funcionando
+    # isolada (AppTest, execucao direta), onde esta e a primeira chamada.
+    try:
+        st.set_page_config(
+            page_title=page_title,
+            page_icon="\U0001f9ea",
+            layout=layout,
+        )
+    except StreamlitAPIException:
+        pass
 
     user = exigir_login()
     usuario_id = UUID(user["id"])
@@ -161,87 +170,95 @@ def shell(page_title: str, *, layout: str = "centered", permissao: str | None = 
     return {"user": user, "usuario_id": usuario_id}
 
 
-def renderizar_menu(usuario_id: UUID) -> None:
-    """Renderiza o menu lateral com secoes filtradas por permissao do usuario."""
-    with st.spinner("Carregando..."):
-        with session_scope() as session:
-            permissoes = {p.codigo for p in listar_permissoes_do_usuario(session, usuario_id)}
-            acesso_plano = len(permissoes) == 0 and not _existem_perfis(session)
-    user = st.session_state.get("user", {})
+def permissoes_do_usuario(usuario_id: UUID) -> tuple[set[str], bool]:
+    """Permissoes efetivas e se o sistema esta em modo bootstrap.
 
-    op_secoes = []
-    fer_secoes = []
+    Bootstrap = nenhum perfil cadastrado ainda. Nesse estado o acesso e plano,
+    senao a primeira pessoa a logar num banco novo nao conseguiria configurar
+    nada (ADR 0002).
+    """
+    with session_scope() as session:
+        permissoes = {p.codigo for p in listar_permissoes_do_usuario(session, usuario_id)}
+        bootstrap = not _existem_perfis(session)
+    return permissoes, (not permissoes and bootstrap)
+
+
+def paginas_permitidas(usuario_id: UUID) -> dict[str, list[tuple[str, str]]]:
+    """`(titulo, caminho)` por secao, filtrado por permissao.
+
+    Logica pura, separada da construcao dos `st.Page`: `StreamlitPage` so se
+    inicializa dentro de um script run, entao a regra de visibilidade nao
+    poderia ser testada se nascesse acoplada a ele.
+
+    A visibilidade usa exatamente a permissao que `shell()` exige na pagina —
+    de proposito. Mostrar um item que a propria tela vai barrar com "acesso
+    negado" e pior do que nao mostrar. Liberar leitura para perfis read-only
+    exige afrouxar tambem o gate de cada pagina, e isso e mudanca por tela.
+    """
+    permissoes, acesso_plano = permissoes_do_usuario(usuario_id)
+
+    secoes: dict[str, list[tuple[str, str]]] = {"Inicio": [("Home", "pages/home.py")]}
+
     for secao, itens in _MENU:
         visiveis = [
-            (label, path)
-            for label, path, req in itens
-            if acesso_plano or req is None or req in permissoes
+            (titulo, caminho)
+            for titulo, caminho, permissao in itens
+            if acesso_plano or permissao is None or permissao in permissoes
         ]
-        if not visiveis:
-            continue
-        if secao in _SECOES_OPERACIONAIS:
-            op_secoes.append((secao, visiveis))
-        else:
-            fer_secoes.append((secao, visiveis))
+        if visiveis:
+            secoes[secao] = visiveis
+
+    return secoes
+
+
+def renderizar_rodape_lateral(usuario_id: UUID) -> None:
+    """Cartao do usuario e logout no rodape da barra lateral."""
+    user = st.session_state.get("user", {})
+    nome = html.escape(user.get("name", "Usuario"))
+    email = html.escape(user.get("email", ""))
+    with st.sidebar:
+        st.divider()
+        # HTML proprio em vez de `st.caption`: caption passa pelo parser de
+        # markdown do Streamlit, que faz autolink de e-mail solto (vira
+        # `mailto:` clicavel sem querer). `nome`/`email` vem de input do
+        # usuario no cadastro — sem o `html.escape()` acima, isso seria XSS
+        # armazenado.
+        st.markdown(
+            f'<p style="margin:0;font-size:13px;font-weight:600;">{nome}</p>'
+            f'<p style="margin:2px 0 8px 0;font-size:12px;opacity:0.7;">{email}</p>',
+            unsafe_allow_html=True,
+        )
+        if st.button("Sair", width="stretch", key="botao_sair"):
+            # Limpar e rerodar devolve ao login: o entrypoint decide a tela pela
+            # presenca de `user` na sessao.
+            st.session_state.clear()
+            st.rerun()
+
+
+def renderizar_menu(usuario_id: UUID) -> None:
+    """Menu lateral: logo, navegacao por secao (HTML/CSS + SVG) e rodape.
+
+    Volta a ser desenhado a mao (era so o rodape desde a F1, quando a
+    navegacao passou a ser `st.navigation`) — a pedido do professor, que
+    prefere HTML/CSS nativo do Streamlit. Os SVGs vem de `src/ui_icons.py`,
+    embutidos inline, sem depender de nenhuma fonte externa.
+    """
+    _renderizar_menu_lateral(usuario_id)
+    renderizar_rodape_lateral(usuario_id)
+
+
+def _renderizar_menu_lateral(usuario_id: UUID) -> None:
+    secoes = paginas_permitidas(usuario_id)
+    inicio = secoes.pop("Inicio", [])
+
+    op_secoes = [(s, i) for s, i in secoes.items() if s in _SECOES_OPERACIONAIS]
+    fer_secoes = [(s, i) for s, i in secoes.items() if s not in _SECOES_OPERACIONAIS]
 
     with st.sidebar:
         _renderizar_logo_sidebar()
 
-        if user.get("name"):
-            nome = user.get("name", "")
-            email = user.get("email", "")
-            iniciais = "".join(p[0].upper() for p in nome.split()[:2]) if nome else "??"
-            picture = user.get("picture", "")
-            if picture:
-                avatar = (
-                    f'<img src="{picture}" style="width:36px;height:36px;'
-                    f'border-radius:50%;object-fit:cover;margin-bottom:6px;" alt="">'
-                )
-            else:
-                avatar = (
-                    f'<div style="'
-                    f'display:inline-flex;align-items:center;justify-content:center;'
-                    f'width:36px;height:36px;border-radius:50%;'
-                    f'background:linear-gradient(135deg, #1565C0, #00897B);'
-                    f'color:#fff;font-size:14px;font-weight:700;'
-                    f'margin-bottom:6px;'
-                    f'">{iniciais}</div>'
-                )
-            st.sidebar.markdown(
-                f"""
-                <div style="padding:8px 14px 12px 14px;text-align:center;
-                border-radius:8px;margin:0 8px;">
-                    {avatar}
-                    <p style="margin:0;font-size:13px;font-weight:600;color:#F1F5F9;">
-                        {nome}
-                    </p>
-                    <p style="margin:2px 0 0 0;font-size:11px;color:#94A3B8;">
-                        {email}
-                    </p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-
-        st.sidebar.markdown(
-            "<hr style='border-color:#1E3A5F;border-width:0.5px;opacity:0.4;margin:6px 14px;'>",
-            unsafe_allow_html=True,
-        )
-
-        st.sidebar.markdown(
-            f"""<a href="/home" target="_self" style="
-                display:inline-flex;align-items:center;gap:8px;
-                width:calc(100% - 28px);padding:8px 14px;margin:0 14px;
-                border-radius:8px;text-decoration:none;
-                color:#F1F5F9;font-size:13px;font-weight:500;
-                transition:all 0.2s ease;"
-                onmouseover="this.style.background='rgba(21,101,192,0.12)';"
-                onmouseout="this.style.background='transparent';">
-                <span style="display:inline-flex;width:20px;height:20px;flex-shrink:0;">{ICONE_HOME}</span>
-                Inicio
-            </a>""",
-            unsafe_allow_html=True,
-        )
+        for _titulo, caminho in inicio:
+            st.page_link(caminho, label="Inicio")
 
         st.sidebar.markdown(
             "<hr style='border-color:#1E3A5F;border-width:0.5px;opacity:0.4;margin:10px 14px;'>",
@@ -272,34 +289,6 @@ def renderizar_menu(usuario_id: UUID) -> None:
             )
             _renderizar_grupo_secoes(fer_secoes)
 
-        st.sidebar.markdown(
-            "<hr style='border-color:#1E3A5F;border-width:0.5px;opacity:0.4;margin:20px 14px 14px 14px;'>",
-            unsafe_allow_html=True,
-        )
-
-        from src.auth import build_logout_url
-        from src.config import get_auth_config
-
-        config = get_auth_config()
-        logout_url = build_logout_url(config)
-
-        st.sidebar.markdown(
-            f"""
-            <div style="padding:0 8px;">
-                <a href="{logout_url}" target="_self"
-                   style="display:inline-flex;align-items:center;justify-content:center;gap:8px;
-                   width:100%;height:40px;border-radius:8px;border:1px solid #1E3A5F;
-                   color:#F1F5F9;text-decoration:none;font-size:13px;font-weight:500;
-                   transition:all 0.2s ease;"
-                   onmouseover="this.style.background='rgba(21,101,192,0.15)';this.style.borderColor='#2196F3';this.style.color='#64B5F6';"
-                   onmouseout="this.style.background='transparent';this.style.borderColor='#1E3A5F';this.style.color='#F1F5F9';">
-                    {ICONE_SAIR} Sair
-                </a>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
 
 def _renderizar_grupo_secoes(secoes: list[tuple[str, list[tuple[str, str]]]]) -> None:
     for secao, itens in secoes:
@@ -311,8 +300,8 @@ def _renderizar_grupo_secoes(secoes: list[tuple[str, list[tuple[str, str]]]]) ->
             <span style="display:inline-flex;align-items:center;gap:6px;">{icone} {secao}</span></p>""",
             unsafe_allow_html=True,
         )
-        for label, path in itens:
-            st.page_link(path, label=label)
+        for titulo, caminho in itens:
+            st.page_link(caminho, label=titulo)
 
 
 def _renderizar_logo_sidebar() -> None:
@@ -334,3 +323,5 @@ def _logo_sidebar_html(image_path: str) -> str:
         'style="width:48px;height:auto;display:block;object-fit:contain;border-radius:10px;" />'
         '</div>'
     )
+
+

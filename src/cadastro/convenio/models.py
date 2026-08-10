@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import Boolean, String
+from sqlalchemy import Integer, SmallInteger, Boolean, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -19,4 +19,7 @@ class Convenio(Base):
     email: Mapped[str | None] = mapped_column(String(254), nullable=True)
     registro_ans: Mapped[str | None] = mapped_column(String(20), nullable=True)
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Condicoes comerciais: o vencimento do titulo era `hoje + 30` hardcoded.
+    prazo_pagamento_dias: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    dia_vencimento: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
     status: Mapped[str] = mapped_column(String(7), nullable=False, default=StatusConvenio.ATIVO)

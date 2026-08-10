@@ -10,14 +10,18 @@ from src.faturamento.lote_faturamento.service import (
     contar_laudos_pendentes,
     criar_lote,
     fechar_lote,
+    listar_itens_faturados,
     listar_laudos_pendentes_por_convenio,
     listar_lotes,
+    obter_lote_aberto_atual,
     validar_lote,
 )
 from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import (
+    ColunaGrid,
     renderizar_cabecalho,
     renderizar_empty_state,
+    renderizar_grid,
     renderizar_secao,
 )
 from src.ui_icons import (
@@ -61,8 +65,11 @@ def main() -> None:
 
 def _render_novo_lote(convenios_ativos) -> None:
     renderizar_secao(
-        titulo=f"{ICONE_AMOSTRA} Novo Lote de Faturamento",
-        descricao="Crie um lote para agrupar laudos a faturar por convenio",
+        titulo=f"{ICONE_AMOSTRA} Abrir Lote do Mês",
+        descricao=(
+            "Um lote por convenio e por mes: se ja existe um aberto para o mes "
+            "atual, o botao abaixo so reabre ele (role para ver em 'Lotes Abertos')."
+        ),
     )
 
     if not convenios_ativos:
@@ -85,19 +92,33 @@ def _render_novo_lote(convenios_ativos) -> None:
 
     with session_scope() as session:
         pendentes = contar_laudos_pendentes(session, convenio_id)
+        lote_existente = obter_lote_aberto_atual(session, convenio_id)
     with col2:
         st.markdown(
             f"<p style='color:#757575;font-size:13px;margin-top:28px;'>{pendentes} laudos pendentes</p>",
             unsafe_allow_html=True,
         )
 
+    if lote_existente is not None:
+        st.info(
+            f"Já existe o lote **{lote_existente.codigo_lote}** aberto para "
+            f"**{convenio_label}** em **{lote_existente.competencia.strftime('%m/%Y')}** — "
+            "abrir de novo so vai mostrar ele abaixo, em 'Lotes Abertos'."
+        )
+
     with col3:
-        if st.button("Criar Lote", type="primary", key="criar_lote_btn", width="stretch"):
+        rotulo_botao = "Continuar Lote do Mês" if lote_existente is not None else "Abrir Lote do Mês"
+        if st.button(rotulo_botao, type="primary", key="criar_lote_btn", width="stretch"):
             try:
                 dto = LoteFaturamentoCreate(convenio_id=convenio_id)
                 with session_scope() as session:
                     lote = criar_lote(session, dto)
-                st.toast(f"Lote {lote.codigo_lote} criado com sucesso!")
+                competencia_label = lote.competencia.strftime("%m/%Y")
+                if lote_existente is not None:
+                    st.toast(f"Lote {lote.codigo_lote} já existia — mostrando abaixo.")
+                else:
+                    st.toast(f"Lote {lote.codigo_lote} da competência {competencia_label} criado.")
+                st.session_state[f"expand_lote_{lote.id}"] = True
                 st.rerun()
             except FaturamentoError as e:
                 st.error(str(e))
@@ -140,23 +161,40 @@ def _render_lotes_abertos(lotes, todos_convenios) -> None:
                 st.session_state[toggle_key] = not aberto
                 st.rerun()
         with col_label:
+            competencia_label = lote.competencia.strftime("%m/%Y")
             st.markdown(
-                f"**{lote.codigo_lote}** \u2014 {nome_convenio} \u2014 "
+                f"**{lote.codigo_lote}** ({competencia_label}) \u2014 {nome_convenio} \u2014 "
                 f"{total_itens} itens \u2014 R$ {lote.valor_total:.2f}"
             )
 
         if aberto:
             with session_scope() as session:
                 laudos_pendentes = listar_laudos_pendentes_por_convenio(session, lote.convenio_id)
+                itens_faturados = listar_itens_faturados(session, lote.id) if total_itens > 0 else []
+
+            if itens_faturados:
+                st.markdown("**Itens já faturados neste lote:**")
+                renderizar_grid(
+                    itens_faturados,
+                    colunas=[
+                        ColunaGrid("paciente", "Paciente"),
+                        ColunaGrid("procedimento", "Procedimento"),
+                        ColunaGrid("valor", "Valor", tipo="moeda", largura=130),
+                        ColunaGrid("status", "Status", largura=110),
+                        ColunaGrid("id", "id", oculta=True),
+                    ],
+                    chave=f"grid_itens_lote_{lote.id}",
+                    altura=min(80 + 32 * len(itens_faturados), 320),
+                    paginar=False,
+                )
+                st.divider()
 
             if not laudos_pendentes:
-                st.caption("Nenhum laudo liberado pendente para este convenio.")
+                st.caption("Nenhum laudo liberado pendente para incluir neste convenio.")
                 if total_itens > 0:
                     _render_fechar_lote(lote)
-                else:
-                    st.caption(f"Itens faturados: {total_itens}")
             else:
-                st.write(f"**{len(laudos_pendentes)} laudos disponiveis para faturamento:**")
+                st.write(f"**{len(laudos_pendentes)} laudos pendentes disponiveis para incluir:**")
 
                 selecionados = {}
                 for laudo_info in laudos_pendentes:
@@ -168,7 +206,11 @@ def _render_lotes_abertos(lotes, todos_convenios) -> None:
                         st.write(f"Item OS `{str(laudo_info['os_item_id'])[:12]}...`")
                     with c3:
                         valor_key = f"vlr_{lote.id}_{laudo_id}"
-                        valor_default = float(laudo_info.get("valor_negociado", 50.0))
+                        # O repositório sempre entrega `valor_negociado` (coluna NOT NULL).
+                        # O clamp existe só para o widget: item de valor zero violaria
+                        # `min_value` e derrubaria a página. A pré-auditoria é quem barra
+                        # valor inválido no fechamento do lote.
+                        valor_default = max(float(laudo_info["valor_negociado"]), 0.01)
                         valor = st.number_input(
                             "R$", min_value=0.01, value=valor_default, step=1.0,
                             key=valor_key, label_visibility="collapsed",
@@ -180,32 +222,26 @@ def _render_lotes_abertos(lotes, todos_convenios) -> None:
                                 "valor": valor,
                             }
 
-                c_btn, c_info = st.columns([2, 3])
-                with c_btn:
-                    if selecionados and st.button(
-                        f"Adicionar {len(selecionados)} itens ao lote",
-                        type="primary",
-                        key=f"add_{lote.id}",
-                    ):
-                        dtos = [
-                            GuiaItemCreate(
-                                laudo_id=laudo_id,
-                                procedimento_id=dados["procedimento_id"],
-                                valor_faturado=dados["valor"],
-                            )
-                            for laudo_id, dados in selecionados.items()
-                        ]
-                        try:
-                            with session_scope() as session:
-                                adicionar_itens_ao_lote(session, lote.id, dtos)
-                            st.toast(f"{len(dtos)} item(ns) adicionado(s) ao lote!")
-                            st.rerun()
-                        except FaturamentoError as e:
-                            st.error(str(e))
-
-                with c_info:
-                    if total_itens > 0:
-                        st.caption(f"Ja faturados neste lote: {total_itens} itens")
+                if selecionados and st.button(
+                    f"Adicionar {len(selecionados)} itens ao lote",
+                    type="primary",
+                    key=f"add_{lote.id}",
+                ):
+                    dtos = [
+                        GuiaItemCreate(
+                            laudo_id=laudo_id,
+                            procedimento_id=dados["procedimento_id"],
+                            valor_faturado=dados["valor"],
+                        )
+                        for laudo_id, dados in selecionados.items()
+                    ]
+                    try:
+                        with session_scope() as session:
+                            adicionar_itens_ao_lote(session, lote.id, dtos)
+                        st.toast(f"{len(dtos)} item(ns) adicionado(s) ao lote!")
+                        st.rerun()
+                    except FaturamentoError as e:
+                        st.error(str(e))
 
                 if total_itens > 0:
                     st.divider()
@@ -278,6 +314,7 @@ def _render_historico(lotes, todos_convenios) -> None:
         rows.append({
             "Codigo": l.codigo_lote,
             "Convenio": todos_convenios.get(l.convenio_id, _PARTICULAR),
+            "Competência": l.competencia.strftime("%m/%Y"),
             "Status": l.status,
             "Valor Total": f"R$ {l.valor_total:.2f}",
             "Itens": total_itens,

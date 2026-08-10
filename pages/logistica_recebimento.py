@@ -32,6 +32,12 @@ def main() -> None:
         unidades_central = [u for u in unidades if u.tipo == "CENTRAL"] or unidades
 
     origem_opcoes = {u.nome: u.id for u in unidades_central}
+    if not origem_opcoes:
+        # `st.selectbox` sem opcoes devolve None, e o acesso ao dicionario
+        # estourava KeyError na cara do usuario.
+        st.warning("Nenhuma unidade ativa cadastrada. Cadastre uma unidade central antes de receber malotes.")
+        return
+
     unidade_label = st.selectbox("Unidade Central Atual", options=list(origem_opcoes.keys()))
     central_id = origem_opcoes[unidade_label]
 
@@ -85,7 +91,10 @@ def main() -> None:
             f"as demais serão aceitas."
         )
     else:
-        st.caption(f"{ICONE_OK} Todas as amostras serão aceitas como íntegras.")
+        st.caption(
+            f"{ICONE_OK} Todas as amostras serão aceitas como íntegras.",
+            unsafe_allow_html=True,
+        )
 
     observacao = st.text_area(
         "Observações da recepção (opcional)",

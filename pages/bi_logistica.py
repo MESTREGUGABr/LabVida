@@ -1,6 +1,9 @@
-import streamlit as st
-import pandas as pd
+"""Indicadores logisticos — volume, transito e divergencias da cadeia de custodia."""
 
+import streamlit as st
+
+from src.bi import graficos, metricas
+from src.bi.filtros import botao_atualizar, rodape_de_atualizacao, seletor_de_periodo, sem_dados
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
 from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
@@ -8,99 +11,102 @@ from src.ui_icons import ICONE_AMOSTRA
 
 
 def main() -> None:
-    ctx = shell("BI - Logística", layout="wide", permissao="bi:visualizar")
+    ctx = shell("BI - Logistica", layout="wide", permissao="bi:visualizar")
     renderizar_menu(ctx["usuario_id"])
 
     renderizar_cabecalho(
         titulo="Indicadores Logisticos",
-        subtitulo="Amostras, malotes e eficiencia da cadeia de custodia",
+        subtitulo="Amostras, tempo de transito e eficiencia da cadeia de custodia",
         icone=ICONE_AMOSTRA,
     )
 
     with session_scope() as session:
-        from sqlalchemy import text
+        periodo = seletor_de_periodo(session, chave="logistica")
+        indicadores = metricas.kpis(session, periodo)
+        por_unidade = metricas.amostras_por_unidade(session, periodo)
+        por_mes = metricas.amostras_por_mes(session, periodo)
+        transito = metricas.tempo_transito_por_unidade(session, periodo)
+        # Vem do fato, nao da tabela operacional `amostras` — a versao anterior
+        # consultava o OLTP direto, furando o modelo dimensional.
+        status = metricas.status_das_amostras(session, periodo)
+        rodape_de_atualizacao(session)
 
-        amostras_por_unidade = pd.read_sql(
-            text(
-                "SELECT u.nome AS unidade, SUM(f.qtd_amostras) AS amostras "
-                "FROM bi_fato_logistica f "
-                "JOIN bi_dim_unidade u ON u.sk_unidade = f.sk_unidade "
-                "GROUP BY u.nome ORDER BY amostras DESC"
-            ),
-            session.get_bind(),
-        )
-
-        divergencias = pd.read_sql(
-            text(
-                "SELECT u.nome AS unidade, SUM(f.amostras_divergentes) AS divergentes "
-                "FROM bi_fato_logistica f "
-                "JOIN bi_dim_unidade u ON u.sk_unidade = f.sk_unidade "
-                "GROUP BY u.nome ORDER BY divergentes DESC"
-            ),
-            session.get_bind(),
-        )
-
-        totais_log = pd.read_sql(
-            text(
-                "SELECT SUM(qtd_amostras) AS total_amostras, "
-                "SUM(amostras_divergentes) AS total_divergentes "
-                "FROM bi_fato_logistica"
-            ),
-            session.get_bind(),
-        )
-
-        pendencias = pd.read_sql(
-            text(
-                "SELECT a.status, COUNT(*) AS quantidade "
-                "FROM amostras a "
-                "WHERE a.status NOT IN ('CONCLUIDA', 'CANCELADA') "
-                "GROUP BY a.status ORDER BY quantidade DESC"
-            ),
-            session.get_bind(),
-        )
-
-    if amostras_por_unidade.empty and pendencias.empty:
+    if indicadores["amostras"] == 0:
         renderizar_empty_state(
             icone=ICONE_AMOSTRA,
-            titulo="Nenhum dado logistico",
-            mensagem="Execute o ETL primeiro para popular os indicadores logisticos.",
+            titulo="Nenhuma amostra no periodo",
+            mensagem="Amplie o periodo selecionado ou atualize os dados do BI.",
         )
-        if st.button("Carregar dados do BI", type="primary"):
-            from src.bi.etl import executar_etl
-            with st.spinner("Executando ETL..."):
-                executar_etl()
+        if botao_atualizar(chave="etl_logistica_vazio"):
             st.rerun()
         return
 
-    raw_amostras = totais_log["total_amostras"].iloc[0] if not totais_log.empty else 0
-    raw_divergentes = totais_log["total_divergentes"].iloc[0] if not totais_log.empty else 0
-    total_amostras = int(raw_amostras) if raw_amostras is not None else 0
-    total_divergentes = int(raw_divergentes) if raw_divergentes is not None else 0
-    taxa_divergencia = (total_divergentes / total_amostras * 100) if total_amostras else 0
+    media_transito = float(transito["horas"].mean()) if not transito.empty else 0.0
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total de Amostras", total_amostras)
-    col2.metric("Divergências", total_divergentes)
-    col3.metric("Taxa de Divergência", f"{taxa_divergencia:.1f}%")
+    st.divider()
+    colunas = st.columns(4)
+    colunas[0].metric("Amostras", f"{indicadores['amostras']:,}".replace(",", "."))
+    colunas[1].metric(
+        "Taxa de rejeicao", f"{indicadores['taxa_rejeicao']:.1f}%".replace(".", ",")
+    )
+    colunas[2].metric("Transito medio", f"{media_transito:.1f} h".replace(".", ","))
+    colunas[3].metric("Unidades de origem", len(por_unidade))
 
-    col1, col2 = st.columns(2)
-    with col1:
-        if not amostras_por_unidade.empty:
-            renderizar_secao(titulo="Amostras por Unidade")
-            st.bar_chart(amostras_por_unidade.set_index("unidade"), width="stretch")
+    renderizar_secao(titulo="Amostras coletadas por mes")
+    st.altair_chart(
+        graficos.linha_temporal(por_mes, tempo="mes", valor="amostras", rotulo_valor="Amostras"),
+        use_container_width=True,
+    )
 
-    with col2:
-        if not divergencias.empty:
-            renderizar_secao(titulo="Divergencias por Unidade")
-            st.bar_chart(divergencias.set_index("unidade"), width="stretch")
-
-    if not pendencias.empty:
-        renderizar_secao(titulo="Status Atual das Amostras")
-        st.dataframe(
-            pendencias.rename(columns={"status": "Status", "quantidade": "Quantidade"}),
-            hide_index=True,
-            width="stretch",
+    esquerda, direita = st.columns(2)
+    with esquerda:
+        renderizar_secao(titulo="Amostras por unidade de origem")
+        st.altair_chart(
+            graficos.barra_categorica(
+                por_unidade, categoria="unidade", valor="amostras", rotulo_valor="Amostras"
+            ),
+            use_container_width=True,
         )
+    with direita:
+        renderizar_secao(titulo="Tempo medio de transito")
+        if transito.empty:
+            sem_dados("Nenhum malote com despacho e recebimento registrados.")
+        else:
+            st.altair_chart(
+                graficos.barra_categorica(
+                    transito, categoria="unidade", valor="horas",
+                    rotulo_valor="Horas", formato="horas", cor_unica=graficos.COR_ALERTA,
+                ),
+                use_container_width=True,
+            )
+
+    esquerda, direita = st.columns(2)
+    with esquerda:
+        renderizar_secao(titulo="Amostras rejeitadas por unidade")
+        rejeitadas = por_unidade[por_unidade["rejeitadas"] > 0]
+        if rejeitadas.empty:
+            sem_dados("Nenhuma amostra rejeitada no periodo.")
+        else:
+            st.altair_chart(
+                graficos.barra_categorica(
+                    rejeitadas, categoria="unidade", valor="rejeitadas",
+                    rotulo_valor="Rejeitadas", cor_unica=graficos.COR_NEGATIVA,
+                ),
+                use_container_width=True,
+            )
+    with direita:
+        renderizar_secao(titulo="Situacao atual das amostras")
+        if status.empty:
+            sem_dados()
+        else:
+            st.altair_chart(
+                graficos.donut(status, categoria="status", valor="quantidade"),
+                use_container_width=True,
+            )
+
+    st.divider()
+    if botao_atualizar(chave="etl_logistica"):
+        st.rerun()
 
 
 if __name__ == "__main__":

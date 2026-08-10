@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -45,10 +45,30 @@ def listar_procedimentos_ativos(session: Session) -> list[ProcedimentoRead]:
 
 
 def definir_valor(session: Session, dto: ProcedimentoValorCreate, usuario_id: UUID | None = None) -> ProcedimentoValorRead:
+    """Define o preco vigente a partir de uma data.
+
+    `convenio_id=None` cadastra na **tabela particular**.
+
+    Antes de inserir, ENCERRA a vigencia em aberto do mesmo par
+    (procedimento, convenio) no dia anterior. Sem isso o `EXCLUDE` do banco
+    rejeita a insercao — e e proposital: duas faixas de vigencia sobrepostas
+    significariam dois precos validos na mesma data.
+    """
     if repository.obter_por_id(session, dto.procedimento_id) is None:
         raise ProcedimentoNaoEncontrado("Procedimento não encontrado")
-    if convenio_repository.obter_por_id(session, dto.convenio_id) is None:
+    if dto.convenio_id is not None and convenio_repository.obter_por_id(session, dto.convenio_id) is None:
         raise ConvenioNaoEncontrado("Convênio não encontrado")
+
+    anterior = repository.obter_vigencia_aberta(session, dto.procedimento_id, dto.convenio_id)
+    if anterior is not None:
+        if anterior.vigencia_inicio >= dto.vigencia_inicio:
+            raise ValueError(
+                "Ja existe preco vigente a partir de "
+                f"{anterior.vigencia_inicio.strftime('%d/%m/%Y')}. "
+                "O novo preco precisa comecar depois dessa data."
+            )
+        anterior.vigencia_fim = dto.vigencia_inicio - timedelta(days=1)
+        session.flush()
 
     valor = ProcedimentoValor(
         procedimento_id=dto.procedimento_id,
@@ -69,9 +89,17 @@ def definir_valor(session: Session, dto: ProcedimentoValorCreate, usuario_id: UU
 
 
 def obter_valor_vigente(
-    session: Session, procedimento_id: UUID, convenio_id: UUID, na_data: date | None = None
+    session: Session, procedimento_id: UUID, convenio_id: UUID | None, na_data: date | None = None
 ) -> Decimal | None:
     valor = repository.obter_valor_vigente(
         session, procedimento_id, convenio_id, na_data or date.today()
     )
     return valor.valor if valor else None
+
+
+def vincular_insumo_procedimento(
+    session: Session, procedimento_id: UUID, insumo_material_id: UUID, quantidade_necessaria: float = 1.0
+) -> None:
+    repository.vincular_insumo(session, procedimento_id, insumo_material_id, quantidade_necessaria)
+    session.commit()
+

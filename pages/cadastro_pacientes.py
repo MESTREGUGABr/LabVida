@@ -16,8 +16,10 @@ from src.cadastro.service import (
 from src.db import session_scope
 from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import (
+    ColunaGrid,
     renderizar_cabecalho,
     renderizar_empty_state,
+    renderizar_grid,
     renderizar_secao,
 )
 from src.ui_icons import ICONE_USUARIO
@@ -144,19 +146,30 @@ def _render_lista() -> None:
         f"· pagina {pagina}/{total_paginas}"
     )
 
-    st.dataframe(
+    renderizar_grid(
         [
             {
-                "Nome": paciente.nome,
-                "CPF do Paciente": paciente.cpf_mascarado,
-                "Data de nascimento": paciente.data_nascimento.isoformat(),
-                "Telefone do Paciente": paciente.telefone,
-                "Sexo": _formatar_sexo(paciente.sexo),
+                "nome": paciente.nome,
+                # Sempre mascarado: o grid nao e excecao a LGPD.
+                "cpf": paciente.cpf_mascarado,
+                "data_nascimento": paciente.data_nascimento,
+                "telefone": paciente.telefone,
+                "sexo": _formatar_sexo(paciente.sexo),
             }
             for paciente in exibidos
         ],
-        hide_index=True,
-        width="stretch",
+        colunas=[
+            ColunaGrid("nome", "Nome"),
+            ColunaGrid("cpf", "CPF", largura=150),
+            ColunaGrid("data_nascimento", "Nascimento", tipo="data", largura=130),
+            ColunaGrid("telefone", "Telefone", largura=140),
+            ColunaGrid("sexo", "Sexo", largura=110),
+        ],
+        chave="grid_pacientes",
+        altura=400,
+        # A paginacao ja e server-side, feita acima: paginar de novo no grid
+        # daria duas paginacoes concorrentes sobre o mesmo conjunto.
+        paginar=False,
     )
 
 

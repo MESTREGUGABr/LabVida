@@ -1,6 +1,7 @@
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.atendimento.ordem_servico.models import OrdemServico, OsItem
@@ -31,6 +32,14 @@ def listar_glosas_por_guia_item(session: Session, guia_item_id: UUID) -> list[Gl
     return list(session.scalars(stmt).all())
 
 
+def somar_glosas_do_guia_item(session: Session, guia_item_id: UUID) -> Decimal:
+    """Total já glosado no item. Base da validação cumulativa em `registrar_glosa`."""
+    stmt = select(func.coalesce(func.sum(Glosa.valor_glosado), 0)).where(
+        Glosa.guia_item_id == guia_item_id
+    )
+    return Decimal(str(session.execute(stmt).scalar_one()))
+
+
 def listar_guias_itens_faturados(session: Session) -> list[dict]:
     stmt = (
         select(
@@ -46,7 +55,9 @@ def listar_guias_itens_faturados(session: Session) -> list[dict]:
         )
         .join(GuiaTiss, GuiaItem.guia_tiss_id == GuiaTiss.id)
         .join(LoteFaturamento, GuiaTiss.lote_faturamento_id == LoteFaturamento.id)
-        .join(Convenio, LoteFaturamento.convenio_id == Convenio.id)
+        # LEFT JOIN: lote particular tem convenio_id NULL — com INNER JOIN ele
+        # sumia por completo das telas de glosa.
+        .outerjoin(Convenio, LoteFaturamento.convenio_id == Convenio.id)
         .join(Procedimento, GuiaItem.procedimento_id == Procedimento.id)
         .join(Laudo, GuiaItem.laudo_id == Laudo.id)
         .join(OsItem, Laudo.os_item_id == OsItem.id)
@@ -62,7 +73,9 @@ def listar_guias_itens_faturados(session: Session) -> list[dict]:
             "valor_faturado": r.valor_faturado,
             "codigo_lote": r.codigo_lote,
             "convenio_id": r.convenio_id,
-            "convenio_nome": r.convenio_nome,
+            # Lote particular não tem convênio: rotula igual ao resto do sistema
+            # (o BI já usa COALESCE(c.nome, 'Particular')).
+            "convenio_nome": r.convenio_nome or "Particular",
             "procedimento_nome": r.procedimento_nome,
             "unidade_id": r.unidade_id,
             "unidade_nome": r.unidade_nome,
@@ -88,7 +101,9 @@ def listar_glosas_com_contexto(session: Session) -> list[dict]:
         .join(GuiaItem, Glosa.guia_item_id == GuiaItem.id)
         .join(GuiaTiss, GuiaItem.guia_tiss_id == GuiaTiss.id)
         .join(LoteFaturamento, GuiaTiss.lote_faturamento_id == LoteFaturamento.id)
-        .join(Convenio, LoteFaturamento.convenio_id == Convenio.id)
+        # LEFT JOIN: lote particular tem convenio_id NULL — com INNER JOIN ele
+        # sumia por completo das telas de glosa.
+        .outerjoin(Convenio, LoteFaturamento.convenio_id == Convenio.id)
         .join(Procedimento, GuiaItem.procedimento_id == Procedimento.id)
         .join(Laudo, GuiaItem.laudo_id == Laudo.id)
         .join(OsItem, Laudo.os_item_id == OsItem.id)
@@ -106,7 +121,9 @@ def listar_glosas_com_contexto(session: Session) -> list[dict]:
             "criado_em": r.criado_em,
             "valor_faturado": r.valor_faturado,
             "codigo_lote": r.codigo_lote,
-            "convenio_nome": r.convenio_nome,
+            # Lote particular não tem convênio: rotula igual ao resto do sistema
+            # (o BI já usa COALESCE(c.nome, 'Particular')).
+            "convenio_nome": r.convenio_nome or "Particular",
             "procedimento_nome": r.procedimento_nome,
             "unidade_nome": r.unidade_nome,
         }

@@ -3,6 +3,14 @@
 > **Anexo tecnico** do [Plano de Evolucao para ERP de Verdade](plano-evolucao-erp.md), secao 3.
 > Detalha o DDL, as migrations com backfill e as assinaturas de servico da remodelagem
 > de Faturamento e Financeiro. Documento de planejamento — nada aqui foi implementado ainda.
+>
+> ⚠️ **A §5 (Ordem de execucao) e a numeracao de migrations da §2 foram superadas por [roadmap-execucao.md](roadmap-execucao.md).**
+> A migration `0014` passou a ser a reconstrucao do BI (tabelas `bi_*` apenas), para evitar duas heads do Alembic
+> quando as trilhas rodarem em paralelo. **Some 1 em todo numero de migration citado neste documento**
+> (`0014` → `0015`, `0015` → `0016`, ... `0022` → `0023`). O conteudo de cada migration esta correto; so o numero mudou.
+>
+> Duas pendencias deste documento ja foram decididas no roadmap §3: o **drop de `guias_itens.laudo_id`** (§6 item 5) fica
+> confirmado, e o backfill de `movimentos_caixa.competencia` — ausente na §2 e necessario para o `SET NOT NULL` nao falhar — foi adicionado.
 
 # Remodelagem de Faturamento e Financeiro — LabVida
 

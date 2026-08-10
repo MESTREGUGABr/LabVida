@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from enum import StrEnum
 from uuid import UUID
 
@@ -24,6 +24,7 @@ class StatusGuiaItem(StrEnum):
 
 class LoteFaturamentoCreate(BaseModel):
     convenio_id: UUID | None = None
+    competencia: date | None = None  # None = competencia corrente
 
 
 class GuiaTissCreate(BaseModel):
@@ -68,6 +69,7 @@ class LoteFaturamentoRead(BaseModel):
     convenio_id: UUID | None = None
     status: StatusLote
     valor_total: float
+    competencia: date
     criado_em: datetime
     fechado_em: datetime | None = None
     guias: list[GuiaTissRead] = Field(default_factory=list)

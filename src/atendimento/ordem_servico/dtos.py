@@ -26,6 +26,8 @@ class StatusOsItem(StrEnum):
 class OsItemInput(BaseModel):
     procedimento_id: UUID
     valor_negociado: Decimal | None = None
+    # Obrigatorio quando o valor digitado diverge da tabela (regra do valor, F3).
+    motivo_excecao: str | None = None
 
 
 class OrdemServicoCreate(BaseModel):

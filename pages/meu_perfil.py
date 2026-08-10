@@ -8,7 +8,9 @@ from src.ui import renderizar_menu, shell, usuario_id_logado
 from src.ui_components import renderizar_cabecalho, renderizar_secao, renderizar_status_badge
 from src.ui_icons import ICONE_USUARIO
 from src.usuario import repository as usuario_repo
-from src.ui_theme import NEUTRAL_200, NEUTRAL_50, WHITE
+from src.usuario.errors import CredenciaisInvalidas, SenhaFraca
+from src.usuario.service import alterar_propria_senha
+from src.ui_theme import NEUTRAL_200, WHITE
 
 
 def main() -> None:
@@ -103,17 +105,30 @@ def main() -> None:
     st.markdown("<br>", unsafe_allow_html=True)
 
     # Seguranca
-    renderizar_secao(titulo="Seguranca")
-    st.markdown(
-        f"""
-        <div style="background:{NEUTRAL_50};border:1px solid {NEUTRAL_200};
-        border-radius:8px;padding:16px 20px;font-size:13px;color:#607D8B;">
-        A senha e gerenciada pelo provedor de autenticacao (Google).
-        Para alterar sua senha, acesse as configuracoes da sua conta Google.
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    renderizar_secao(titulo="Seguranca", descricao="Altere a senha da sua conta")
+    with st.form("form_alterar_senha"):
+        senha_atual = st.text_input("Senha atual", type="password")
+        nova_senha = st.text_input(
+            "Nova senha", type="password", help="Minimo de 8 caracteres."
+        )
+        confirmar_senha = st.text_input("Confirmar nova senha", type="password")
+        alterar = st.form_submit_button("Alterar senha", type="primary")
+
+    if alterar:
+        if not senha_atual or not nova_senha:
+            st.error("Preencha a senha atual e a nova senha.")
+        elif nova_senha != confirmar_senha:
+            st.error("As senhas nao coincidem.")
+        else:
+            try:
+                with session_scope() as session:
+                    alterar_propria_senha(session, usuario_id, senha_atual, nova_senha)
+            except CredenciaisInvalidas:
+                st.error("Senha atual incorreta.")
+            except SenhaFraca as e:
+                st.error(str(e))
+            else:
+                st.toast("Senha alterada!", icon="✅")
 
 
 if __name__ == "__main__":

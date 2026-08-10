@@ -1,10 +1,10 @@
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from src.cadastro.procedimento.models import Procedimento, ProcedimentoValor
+from src.cadastro.procedimento.models import Procedimento, ProcedimentoInsumo, ProcedimentoValor
 
 
 def obter_por_id(session: Session, procedimento_id: UUID) -> Procedimento | None:
@@ -32,15 +32,77 @@ def salvar_valor(session: Session, valor: ProcedimentoValor) -> None:
 
 
 def obter_valor_vigente(
-    session: Session, procedimento_id: UUID, convenio_id: UUID, na_data: date
+    session: Session, procedimento_id: UUID, convenio_id: UUID | None, na_data: date
 ) -> ProcedimentoValor | None:
+    """Preco vigente NA DATA informada.
+
+    `convenio_id=None` significa tabela particular, e a comparacao usa
+    `IS NOT DISTINCT FROM` porque em SQL `NULL = NULL` e nulo, nao verdadeiro —
+    com `==` o preco particular nunca seria encontrado.
+
+    O filtro de `vigencia_fim` e o que impede um preco encerrado de continuar
+    respondendo por consultas de datas posteriores.
+    """
     return session.scalar(
         select(ProcedimentoValor)
         .where(
             ProcedimentoValor.procedimento_id == procedimento_id,
-            ProcedimentoValor.convenio_id == convenio_id,
+            ProcedimentoValor.convenio_id.is_not_distinct_from(convenio_id),
             ProcedimentoValor.vigencia_inicio <= na_data,
+            or_(
+                ProcedimentoValor.vigencia_fim.is_(None),
+                ProcedimentoValor.vigencia_fim >= na_data,
+            ),
         )
         .order_by(ProcedimentoValor.vigencia_inicio.desc())
         .limit(1)
     )
+
+
+def obter_vigencia_aberta(
+    session: Session, procedimento_id: UUID, convenio_id: UUID | None
+) -> ProcedimentoValor | None:
+    """Preco em aberto (sem `vigencia_fim`) — o que `definir_valor` precisa
+    encerrar antes de inserir o novo, senao o EXCLUDE do banco rejeita."""
+    return session.scalar(
+        select(ProcedimentoValor)
+        .where(
+            ProcedimentoValor.procedimento_id == procedimento_id,
+            ProcedimentoValor.convenio_id.is_not_distinct_from(convenio_id),
+            ProcedimentoValor.vigencia_fim.is_(None),
+        )
+        .order_by(ProcedimentoValor.vigencia_inicio.desc())
+        .limit(1)
+    )
+
+
+def vincular_insumo(
+    session: Session, procedimento_id: UUID, insumo_material_id: UUID, quantidade_necessaria: float = 1.0
+) -> ProcedimentoInsumo:
+    from decimal import Decimal
+
+    pi = session.scalar(
+        select(ProcedimentoInsumo).where(
+            ProcedimentoInsumo.procedimento_id == procedimento_id,
+            ProcedimentoInsumo.insumo_material_id == insumo_material_id,
+        )
+    )
+    if pi is None:
+        pi = ProcedimentoInsumo(
+            procedimento_id=procedimento_id,
+            insumo_material_id=insumo_material_id,
+            quantidade_necessaria=Decimal(str(quantidade_necessaria)),
+        )
+        session.add(pi)
+    else:
+        pi.quantidade_necessaria = Decimal(str(quantidade_necessaria))
+    return pi
+
+
+def listar_insumos_do_procedimento(session: Session, procedimento_id: UUID) -> list[ProcedimentoInsumo]:
+    return list(
+        session.scalars(
+            select(ProcedimentoInsumo).where(ProcedimentoInsumo.procedimento_id == procedimento_id)
+        )
+    )
+

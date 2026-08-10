@@ -9,7 +9,13 @@ from src.compras.insumo.service import (
 )
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
-from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
+from src.ui_components import (
+    ColunaGrid,
+    renderizar_cabecalho,
+    renderizar_empty_state,
+    renderizar_grid,
+    renderizar_secao,
+)
 from src.ui_icons import ICONE_ESTOQUE
 
 
@@ -38,9 +44,16 @@ def _render_insumos() -> None:
         renderizar_secao(titulo="Novo Insumo")
         nome = st.text_input("Nome")
         finalidade = st.text_input("Finalidade")
+        estoque_inicial = st.number_input("Estoque inicial", min_value=0.0, value=0.0, step=1.0)
+        estoque_minimo = st.number_input("Estoque mínimo (alerta)", min_value=0.0, value=0.0, step=1.0)
         if st.button("Cadastrar", type="primary"):
             try:
-                dto = InsumoCreate(nome=nome, finalidade=finalidade)
+                dto = InsumoCreate(
+                    nome=nome,
+                    finalidade=finalidade,
+                    quantidade_estoque=estoque_inicial,
+                    estoque_minimo=estoque_minimo,
+                )
                 with session_scope() as session:
                     criar_insumo(session, dto)
                 st.toast(f"Insumo {nome} cadastrado!")
@@ -57,14 +70,35 @@ def _render_insumos() -> None:
             st.info("Nenhum insumo cadastrado.")
             return
 
-        rows = []
-        for i in insumos:
-            rows.append({
-                "Insumo": i.nome,
-                "Finalidade": i.finalidade,
-                "Qtd Estoque": f"{i.quantidade_estoque:.3f}",
-            })
-        st.dataframe(rows, hide_index=True, width="stretch")
+        baixos = [i for i in insumos if i.estoque_minimo > 0 and i.quantidade_estoque < i.estoque_minimo]
+        if baixos:
+            nomes = ", ".join(i.nome for i in baixos)
+            st.warning(f"⚠️ {len(baixos)} insumo(s) com estoque abaixo do mínimo: {nomes}")
+
+        renderizar_grid(
+            [
+                {
+                    "nome": i.nome,
+                    "finalidade": i.finalidade,
+                    "quantidade_estoque": i.quantidade_estoque,
+                    "estoque_minimo": i.estoque_minimo,
+                    "situacao": (
+                        "Baixo" if i.estoque_minimo > 0 and i.quantidade_estoque < i.estoque_minimo
+                        else "OK"
+                    ),
+                }
+                for i in insumos
+            ],
+            colunas=[
+                ColunaGrid("nome", "Insumo"),
+                ColunaGrid("finalidade", "Finalidade"),
+                ColunaGrid("quantidade_estoque", "Qtd em estoque", tipo="numero", largura=160),
+                ColunaGrid("estoque_minimo", "Mínimo", tipo="numero", largura=120),
+                ColunaGrid("situacao", "Situação", largura=100),
+            ],
+            chave="grid_insumos",
+            altura=360,
+        )
 
 
 def _render_movimentacoes() -> None:
@@ -79,17 +113,27 @@ def _render_movimentacoes() -> None:
         st.info("Nenhuma movimentação de estoque registrada.")
         return
 
-    rows = []
-    for m in movs:
-        tipo = "+ Entrada" if m.tipo == "ENTRADA" else "- Saída"
-        rows.append({
-            "Data": m.ocorrido_em.strftime("%d/%m/%Y %H:%M"),
-            "Insumo": insumo_nomes.get(m.insumo_material_id, "Desconhecido"),
-            "Tipo": tipo,
-            "Qtd": f"{m.quantidade:.3f}",
-            "Observação": m.observacao or "—",
-        })
-    st.dataframe(rows, hide_index=True, width="stretch")
+    renderizar_grid(
+        [
+            {
+                "ocorrido_em": m.ocorrido_em,
+                "insumo": insumo_nomes.get(m.insumo_material_id, "Desconhecido"),
+                "tipo": "Entrada" if m.tipo == "ENTRADA" else "Saida",
+                "quantidade": m.quantidade,
+                "observacao": m.observacao or "—",
+            }
+            for m in movs
+        ],
+        colunas=[
+            ColunaGrid("ocorrido_em", "Data", tipo="data_hora", largura=160),
+            ColunaGrid("insumo", "Insumo"),
+            ColunaGrid("tipo", "Tipo", largura=110),
+            ColunaGrid("quantidade", "Qtd", tipo="numero", largura=110),
+            ColunaGrid("observacao", "Observacao"),
+        ],
+        chave="grid_movimentos_estoque",
+        altura=380,
+    )
 
 
 if __name__ == "__main__":

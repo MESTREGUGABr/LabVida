@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy import Date, DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -22,6 +22,13 @@ class LoteFaturamento(Base):
     )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="ABERTO")
     valor_total: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
+    # A unicidade (convenio_id, competencia) entre lotes ABERTO vive no indice
+    # `uq_lote_aberto_convenio_competencia` (NULLS NOT DISTINCT, PG15+, cobre o
+    # particular), criado na migration 0019 -- e parcial (WHERE status=
+    # 'ABERTO'), o SQLAlchemy nao expressa isso em UniqueConstraint.
+    competencia: Mapped[date] = mapped_column(
+        Date, ForeignKey("competencias.competencia"), nullable=False, index=True
+    )
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=_agora)
     fechado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

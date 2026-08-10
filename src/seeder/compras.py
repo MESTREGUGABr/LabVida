@@ -38,7 +38,7 @@ from src.seeder.documentos import gerar_cnpj
 from src.usuario.models import Usuario
 from src.usuario.repository import obter_por_email as obter_usuario
 
-PEDIDOS_PADRAO = 18
+PEDIDOS_PADRAO = 28
 
 # Situação dos pedidos ao final do período (soma 1.0).
 _PESOS_STATUS = {
@@ -48,7 +48,12 @@ _PESOS_STATUS = {
     "cancelado": 0.08,
 }
 _PRAZO_PAGAMENTO_DIAS = 30
-_CONSUMOS_POR_INSUMO = (2, 6)
+_CONSUMOS_POR_INSUMO = (4, 10)
+# Estoque inicial generoso (multiplo do pedido tipico) e minimo bem mais baixo
+# — margem grande o suficiente pra sobreviver ao consumo simulado sem disparar
+# o alerta de estoque baixo por acaso (ver pages/compras_estoque.py).
+_ESTOQUE_INICIAL_FATOR = (4.0, 8.0)
+_ESTOQUE_MINIMO_FATOR = (0.3, 0.6)
 
 
 def executar_seeder_compras() -> dict[str, int]:
@@ -85,13 +90,50 @@ def _seed_fornecedores(session: Session) -> int:
 
 def _seed_insumos(session: Session) -> int:
     if insumo_repository.listar_insumos(session):
+        _seed_procedimento_insumos(session)
         return 0
 
     itens = INSUMOS[: qtd(len(INSUMOS))]
-    for nome, finalidade, _valor, _quantidade in itens:
-        criar_insumo(session, InsumoCreate(nome=nome, finalidade=finalidade))
+    for nome, finalidade, _valor, quantidade_tipica in itens:
+        criar_insumo(
+            session,
+            InsumoCreate(
+                nome=nome,
+                finalidade=finalidade,
+                quantidade_estoque=round(quantidade_tipica * random.uniform(*_ESTOQUE_INICIAL_FATOR), 3),
+                estoque_minimo=round(quantidade_tipica * random.uniform(*_ESTOQUE_MINIMO_FATOR), 3),
+            ),
+        )
     session.flush()
+    _seed_procedimento_insumos(session)
     return len(itens)
+
+
+def _seed_procedimento_insumos(session: Session) -> None:
+    from src.cadastro.procedimento.repository import listar_ativos as listar_procedimentos, vincular_insumo
+    from src.compras.insumo.repository import listar_insumos
+
+    procedimentos = listar_procedimentos(session)
+    insumos = {i.nome: i.id for i in listar_insumos(session)}
+    if not procedimentos or not insumos:
+        return
+
+    mapeamento = [
+        ("Tubo Coleta de Sangue a Vácuo EDTA 4mL", ["Hemograma", "Glicemia", "Colesterol", "Triglicerídeos"]),
+        ("Seringa Descartável 5mL", ["Hemograma", "Glicemia"]),
+        ("Frasco Coletor Estéril para Urocultura", ["Urina", "Urocultura"]),
+        ("Fita Reagente Urinálise", ["Urina"]),
+        ("Swab Estéril", ["Cultura", "Parasitológico"]),
+    ]
+
+    for insumo_nome, proc_nomes in mapeamento:
+        insumo_id = insumos.get(insumo_nome)
+        if not insumo_id:
+            continue
+        for proc in procedimentos:
+            if any(p_nome.lower() in proc.nome.lower() for p_nome in proc_nomes):
+                vincular_insumo(session, proc.id, insumo_id, 1.0)
+
 
 
 def _seed_pedidos(session: Session) -> tuple[int, int]:

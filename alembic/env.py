@@ -17,6 +17,7 @@ from src.logistica.malote import models as malote_models  # noqa: F401
 from src.logistica.recebimento import models as recebimento_models  # noqa: F401
 from src.faturamento.lote_faturamento import models as fat_lote_models  # noqa: F401
 from src.faturamento.glosa import models as fat_glosa_models  # noqa: F401
+from src.faturamento.competencia import models as fat_competencia_models  # noqa: F401
 from src.financeiro.titulo_receber import models as fin_receber_models  # noqa: F401
 from src.financeiro.titulo_pagar import models as fin_pagar_models  # noqa: F401
 from src.financeiro.movimento_caixa import models as fin_caixa_models  # noqa: F401

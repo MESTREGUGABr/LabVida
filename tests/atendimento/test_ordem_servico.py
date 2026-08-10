@@ -49,7 +49,12 @@ def test_listar_os_paginado_e_busca(session: Session) -> None:
                 paciente_id=base.paciente_id,
                 unidade_id=base.unidade_id,
                 convenio_id=None,
-                itens=[OsItemInput(procedimento_id=base.procedimento_id, valor_negociado=Decimal("50"))],
+                # Valor divergente da tabela: a regra do valor (F3) exige motivo.
+            itens=[OsItemInput(
+                procedimento_id=base.procedimento_id,
+                valor_negociado=Decimal("50"),
+                motivo_excecao="Acordo comercial do teste",
+            )],
             ),
             base.usuario_id,
         )
@@ -366,7 +371,12 @@ def test_abrir_os_com_convenio_cria_autorizacao_pendente(session: Session) -> No
             paciente_id=base.paciente_id,
             unidade_id=base.unidade_id,
             convenio_id=base.convenio_id,
-            itens=[OsItemInput(procedimento_id=base.procedimento_id, valor_negociado=Decimal("50"))],
+            # Valor divergente da tabela: a regra do valor (F3) exige motivo.
+            itens=[OsItemInput(
+                procedimento_id=base.procedimento_id,
+                valor_negociado=Decimal("50"),
+                motivo_excecao="Acordo comercial do teste",
+            )],
         ),
         base.usuario_id,
     )

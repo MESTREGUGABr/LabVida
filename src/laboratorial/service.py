@@ -20,6 +20,11 @@ from src.laboratorial.dtos import (
     ValorReferenciaCreate,
     ValorReferenciaUpdate,
 )
+from src.laboratorial.analito_service import (
+    obter_ou_criar_analito,
+    para_numero,
+    vincular_ao_procedimento,
+)
 from src.laboratorial.models import (
     Equipamento,
     Laudo,
@@ -34,6 +39,7 @@ from src.laboratorial.repository import LaboratorialRepository
 
 class LaboratorialService:
     def __init__(self, session: Session) -> None:
+        self.session = session
         self.repository = LaboratorialRepository(session)
 
     # --- Equipamento ---
@@ -75,9 +81,18 @@ class LaboratorialService:
         if dto.minimo is None and dto.maximo is None and dto.valor_esperado_texto is None:
             raise ValueError("Deve ser fornecido pelo menos um valor de referência (min, max ou texto)")
             
+        # Liga a faixa ao CATALOGO de analitos e monta o painel do exame.
+        # Sem isso o dado nasce orfao: o backfill da migration 0016 so alcanca o
+        # que ja existia, e a faixa volta a ser inaplicavel.
+        analito = obter_ou_criar_analito(
+            self.session, dto.analito, unidade_medida=dto.unidade_medida
+        )
+        vincular_ao_procedimento(self.session, dto.procedimento_id, analito.id)
+
         valor_ref = ValorReferencia(
             procedimento_id=dto.procedimento_id,
             analito=dto.analito,
+            analito_id=analito.id,
             minimo=dto.minimo,
             maximo=dto.maximo,
             valor_esperado_texto=dto.valor_esperado_texto,
@@ -122,11 +137,19 @@ class LaboratorialService:
     def registrar_resultado(self, dto: ResultadoCreate) -> Resultado:
         self._validar_amostra_recebida(dto.os_item_id)
 
+        # Mesma razao: o resultado precisa apontar para o catalogo, senao a
+        # bancada continua sem saber qual e a faixa do que acabou de digitar.
+        analito = obter_ou_criar_analito(self.session, dto.analito)
+
         resultado = Resultado(
             os_item_id=dto.os_item_id,
             equipamento_id=dto.equipamento_id,
             analito=dto.analito,
+            analito_id=analito.id,
             valor=dto.valor,
+            # Valor comparavel com a faixa. Fica NULL em exame qualitativo
+            # ("Nao Reagente"), que e o correto.
+            valor_numerico=para_numero(dto.valor),
             status=dto.status,
         )
         resultado = self.repository.save_resultado(resultado)
