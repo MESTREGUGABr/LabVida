@@ -11,6 +11,7 @@ Uso:
     python -m src.seeder                 # carga padrão
     python -m src.seeder --escala 0.2    # carga reduzida
     SEED_ESCALA=2 python -m src.seeder   # carga dobrada
+    SEED_INICIO=2022-01-01 python -m src.seeder   # série histórica desde 2022
 """
 
 import argparse

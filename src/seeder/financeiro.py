@@ -24,6 +24,7 @@ from src.financeiro.titulo_pagar.models import TituloPagar
 from src.financeiro.titulo_pagar.service import baixar_titulo as baixar_titulo_pagar
 from src.financeiro.titulo_receber import repository as tr_repository
 from src.financeiro.titulo_receber.service import baixar_titulo as baixar_titulo_receber
+from src.seeder.catalogo import INICIO_OPERACAO_UNIDADES
 from src.seeder.config import JANELA_DIAS, agora, qtd
 from src.usuario.models import Usuario
 
@@ -37,6 +38,18 @@ _DESPESAS_FIXAS = (
     ("Coleta de resíduos de serviço de saúde", 190.00),
     ("Internet e telefonia", 150.00),
 )
+
+# Cada unidade de coleta inaugurada durante a série adiciona custo fixo
+# próprio — a estrutura de custos cresce junto com a rede.
+_DESPESAS_POR_UNIDADE = (
+    ("Aluguel da unidade de coleta", 900.00),
+    ("Energia elétrica da unidade de coleta", 260.00),
+)
+
+# Reajuste anual dos contratos de despesa fixa (~6% ao ano). Os valores da
+# tabela são os de HOJE; meses mais antigos saem mais baratos.
+_INFLACAO_ANUAL = 1.06
+
 _PROPORCAO_RECEBER_BAIXADOS = 0.62
 _PROPORCAO_PAGAR_BAIXADOS = 0.58
 _PROPORCAO_PAGAMENTO_DIVERGENTE = 0.25
@@ -67,6 +80,8 @@ def _seed_despesas_fixas(session: Session) -> int:
 
     A tabela de título a pagar ainda não guarda descrição; o rótulo de
     `_DESPESAS_FIXAS` serve para dar ordem de grandeza realista a cada valor.
+    A conta mensal cresce com a empresa: inflação anual sobre os valores e
+    custos fixos adicionais quando uma unidade de coleta é inaugurada.
     """
     meses = max(1, qtd(JANELA_DIAS // 30))
     hoje = date.today()
@@ -74,11 +89,17 @@ def _seed_despesas_fixas(session: Session) -> int:
 
     for indice in range(meses):
         vencimento = (hoje - timedelta(days=30 * indice)).replace(day=10)
-        for _rotulo, valor in _DESPESAS_FIXAS:
+        idade_empresa = (meses - 1 - indice) / 12  # 0 no primeiro mês da série
+        inflacao = _INFLACAO_ANUAL ** idade_empresa
+        unidades_extras = sum(
+            1 for inicio in INICIO_OPERACAO_UNIDADES.values() if inicio <= vencimento
+        )
+        despesas = _DESPESAS_FIXAS + _DESPESAS_POR_UNIDADE * unidades_extras
+        for _rotulo, valor in despesas:
             session.add(
                 TituloPagar(
                     pedido_compra_id=None,
-                    valor=round(valor * random.uniform(0.9, 1.12), 2),
+                    valor=round(valor * inflacao * random.uniform(0.9, 1.12), 2),
                     vencimento=vencimento,
                     status="PENDENTE",
                 )

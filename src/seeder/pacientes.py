@@ -15,10 +15,14 @@ from src.cadastro.dtos import PacienteCreate, SexoPaciente
 from src.cadastro.models import Paciente
 from src.cadastro.service import criar_paciente
 from src.db import session_scope
-from src.seeder.config import fake, qtd
+from src.seeder.config import JANELA_DIAS, fake, qtd
 from src.seeder.documentos import gerar_cpf, gerar_telefone
 
-PACIENTES_PADRAO = 220
+# Densidade da base de referência: 220 pacientes na janela de 90 dias. Com a
+# janela ampliada (ex.: SEED_INICIO=2022-01-01), o total cresce na mesma
+# proporção para dar variedade à série histórica (nome, faixa etária, sexo).
+_DENSIDADE_PACIENTES_DIA = 220 / 90
+PACIENTES_PADRAO = max(1, round(_DENSIDADE_PACIENTES_DIA * JANELA_DIAS))
 
 
 @dataclass

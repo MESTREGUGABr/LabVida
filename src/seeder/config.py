@@ -6,19 +6,42 @@ de forma proporcional — é o que permite os testes exercitarem exatamente o
 mesmo código com uma fração dos dados.
 
 Variáveis de ambiente:
+    SEED_INICIO       data ISO (ex.: 2022-01-01) de início da operação simulada;
+                      tem precedência sobre SEED_JANELA_DIAS e vira a janela
+                      inteira (da data até hoje)
+    SEED_JANELA_DIAS  período de operação simulado, em dias (padrão 90)
     SEED_ESCALA       multiplicador de volume (padrão 1.0)
-    SEED_JANELA_DIAS  período de operação simulado, em dias (padrão 180)
     SEED_SEMENTE      semente do RNG; fixa deixa a base reproduzível
 """
 
 import os
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from faker import Faker
 
 SEMENTE = int(os.environ.get("SEED_SEMENTE", "20261"))
-JANELA_DIAS = int(os.environ.get("SEED_JANELA_DIAS", "90"))
+
+
+def _resolver_janela_dias() -> int:
+    """Janela de operação simulada, em dias, contados a partir de hoje.
+
+    Uma data em `SEED_INICIO` define a janela inteira — o que permite estender
+    a série temporal do BI para anos (ex.: base de 2022 até hoje). O fallback
+    continua sendo `SEED_JANELA_DIAS`.
+    """
+    inicio = os.environ.get("SEED_INICIO", "").strip()
+    if inicio:
+        try:
+            dias = (date.today() - date.fromisoformat(inicio)).days
+            if dias > 0:
+                return dias
+        except ValueError:
+            pass
+    return int(os.environ.get("SEED_JANELA_DIAS", "90"))
+
+
+JANELA_DIAS = _resolver_janela_dias()
 
 fake = Faker("pt_BR")
 

@@ -35,10 +35,15 @@ from src.financeiro.titulo_pagar.models import TituloPagar
 from src.seeder.catalogo import FORNECEDORES, INSUMOS
 from src.seeder.config import JANELA_DIAS, momento, qtd
 from src.seeder.documentos import gerar_cnpj
+from src.seeder.trajetoria import sortear_dias_atras
 from src.usuario.models import Usuario
 from src.usuario.repository import obter_por_email as obter_usuario
 
-PEDIDOS_PADRAO = 28
+# Densidade da base de referência: 28 pedidos na janela de 90 dias. Com a
+# janela ampliada (ex.: SEED_INICIO=2022-01-01), o total cresce na mesma
+# proporção para não ficar um pedido a cada dois meses.
+_DENSIDADE_PEDIDOS_DIA = 28 / 90
+PEDIDOS_PADRAO = max(1, round(_DENSIDADE_PEDIDOS_DIA * JANELA_DIAS))
 
 # Situação dos pedidos ao final do período (soma 1.0).
 _PESOS_STATUS = {
@@ -151,7 +156,7 @@ def _seed_pedidos(session: Session) -> tuple[int, int]:
     recebidos = 0
 
     for _ in range(qtd(PEDIDOS_PADRAO)):
-        t_pedido = momento(random.uniform(2, JANELA_DIAS))
+        t_pedido = momento(sortear_dias_atras(2, JANELA_DIAS))
         itens = random.sample(insumos, k=min(len(insumos), random.randint(1, 3)))
 
         pedido = criar_solicitacao(
@@ -217,7 +222,7 @@ def _seed_consumo(session: Session) -> int:
                     insumo_material_id=insumo.id,
                     tipo=TipoMovimentoEstoque.SAIDA,
                     quantidade=quantidade,
-                    ocorrido_em=momento(random.uniform(1, JANELA_DIAS / 2)),
+                    ocorrido_em=momento(sortear_dias_atras(1, JANELA_DIAS / 2)),
                     observacao="Consumo na bancada",
                 )
             )

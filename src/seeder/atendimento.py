@@ -12,7 +12,7 @@ histórico de meses (o que o BI precisa para ter série temporal).
 
 import random
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -43,11 +43,26 @@ from src.logistica.malote.service import (
 from src.logistica.recebimento.dtos import ProtocoloRecebimentoCreate
 from src.logistica.recebimento.models import AmostraMovimentacao, ProtocoloRecebimento
 from src.logistica.recebimento.service import receber_malote
-from src.seeder.catalogo import MOTIVOS_REJEICAO, PROCEDIMENTOS
+from src.seeder.catalogo import (
+    ANTES_DA_SERIE,
+    INICIO_CONTRATO_CONVENIOS,
+    INICIO_OPERACAO_UNIDADES,
+    MOTIVOS_REJEICAO,
+    PROCEDIMENTOS,
+)
 from src.seeder.config import JANELA_DIAS, agora, momento, qtd, somar_horas
+from src.seeder.trajetoria import (
+    anos_de_operacao,
+    proporcao_particular,
+    sortear_dias_atras,
+)
 from src.usuario.models import Usuario
 
-ORDENS_PADRAO = 400
+# Densidade da base de referência: 400 OS na janela de 90 dias (~4,4 OS/dia).
+# Com a janela ampliada (ex.: SEED_INICIO=2022-01-01), o total cresce na mesma
+# proporção, mantendo a série temporal do BI com densidade constante por mês.
+_DENSIDADE_ORDENS_DIA = 400 / 90
+ORDENS_PADRAO = max(1, round(_DENSIDADE_ORDENS_DIA * JANELA_DIAS))
 _ATENDIMENTOS_POR_JORNADA = (2, 6)
 _EXAMES_POR_OS = (2, 6)
 
@@ -55,7 +70,10 @@ _EXAMES_POR_OS = (2, 6)
 # histórico do período. É o que dá volume às telas de pendência sem inventar
 # malote parado em trânsito desde o começo do ano.
 _DIAS_OPERACAO_CORRENTE = 10
-_PROPORCAO_OPERACAO_CORRENTE = 0.30
+# Quota FIXA de OS na operação corrente, independente do tamanho da janela —
+# sem isso, uma janela de anos concentraria milhares de OS nos últimos dias e
+# as telas de pendência perderiam o realismo.
+_OPERACAO_CORRENTE_PADRAO = 120
 
 # Estágio do fluxo por idade da OS (cada dicionário soma 1.0).
 _PESOS_ESTAGIO_CORRENTE = {
@@ -71,9 +89,21 @@ _PESOS_ESTAGIO_HISTORICO = {
 
 # Boa parte das OS que travam na autorização acaba cancelada pela recepção.
 _PROPORCAO_ABERTAS_CANCELADAS = 0.45
-_PROPORCAO_REJEITADAS = 0.06
-_PROPORCAO_PARTICULAR = 0.18
 _CAPACIDADE_MALOTE = (4, 9)
+
+# Participação de cada convênio na carteira da rede (soma 1.0): a operadora
+# regional domina e os contratos assinados ao longo da série entram com peso
+# próprio — o mix de faturamento muda de ano para ano.
+_PESO_CONVENIO = {
+    "Unimed": 0.32,
+    "Bradesco Saúde": 0.16,
+    "Hapvida": 0.14,
+    "Amil": 0.13,
+    "SulAmérica Saúde": 0.09,
+    "NotreDame Intermédica": 0.07,
+    "Cassi": 0.05,
+    "Golden Cross": 0.04,
+}
 
 
 @dataclass
@@ -174,16 +204,26 @@ def executar_seeder_atendimento() -> dict[str, int]:
 
 
 def _planejar_jornadas(contexto: _Contexto, total: int) -> list[_Jornada]:
-    """Distribui os atendimentos em dias de movimento por unidade."""
+    """Distribui os atendimentos em dias de movimento por unidade.
+
+    O sorteio de dias segue a trajetória da empresa (crescimento + sazonalidade)
+    e cada unidade só recebe movimento a partir da sua inauguração.
+    """
     jornadas: list[_Jornada] = []
     emitidos = 0
+    limite_corrente = qtd(_OPERACAO_CORRENTE_PADRAO)
 
     while emitidos < total:
-        dias_atras = _sortear_dias_atras()
+        if emitidos < limite_corrente:
+            dias_atras = sortear_dias_atras(0.2, _DIAS_OPERACAO_CORRENTE)
+        else:
+            dias_atras = sortear_dias_atras(_DIAS_OPERACAO_CORRENTE, JANELA_DIAS)
+        data_ = (agora() - timedelta(days=dias_atras)).date()
+        unidades = _unidades_ativas_em(contexto.unidades_coleta, data_)
         quantidade = min(random.randint(*_ATENDIMENTOS_POR_JORNADA), total - emitidos)
         jornadas.append(
             _Jornada(
-                unidade=random.choice(contexto.unidades_coleta),
+                unidade=random.choice(unidades),
                 instantes=sorted(momento(dias_atras) for _ in range(quantidade)),
             )
         )
@@ -193,11 +233,9 @@ def _planejar_jornadas(contexto: _Contexto, total: int) -> list[_Jornada]:
     return jornadas
 
 
-def _sortear_dias_atras() -> float:
-    """Concentra parte do movimento nos últimos dias e espalha o resto no período."""
-    if random.random() < _PROPORCAO_OPERACAO_CORRENTE:
-        return random.uniform(0.2, _DIAS_OPERACAO_CORRENTE)
-    return random.uniform(_DIAS_OPERACAO_CORRENTE, JANELA_DIAS)
+def _unidades_ativas_em(unidades: list, data_: date) -> list:
+    """Unidades de coleta que já operavam na data dada."""
+    return [u for u in unidades if INICIO_OPERACAO_UNIDADES.get(u.nome, ANTES_DA_SERIE) <= data_]
 
 
 def _sortear_estagio(t_abertura: datetime) -> str:
@@ -258,7 +296,9 @@ def _criar_ordem(
     t_abertura: datetime,
     unidade,
 ) -> tuple[UUID, str] | None:
-    convenio = None if random.random() < _PROPORCAO_PARTICULAR else _escolher(contexto.convenios)
+    convenio = (
+        None if random.random() < proporcao_particular(t_abertura) else _escolher_convenio(contexto, t_abertura)
+    )
     medico = _escolher(contexto.medicos) if random.random() < 0.85 else None
     itens = random.sample(
         contexto.procedimentos,
@@ -304,6 +344,24 @@ def _criar_ordem(
 
     _retrodatar_ordem(session, ordem.id, t_abertura)
     return ordem.id, estagio
+
+
+def _escolher_convenio(contexto: _Contexto, t_abertura: datetime):
+    """Convênio com contrato vigente na data, ponderado pela carteira."""
+    elegiveis = [
+        c
+        for c in contexto.convenios
+        if INICIO_CONTRATO_CONVENIOS.get(c.nome, ANTES_DA_SERIE) <= t_abertura.date()
+    ]
+    if not elegiveis:
+        return None
+    pesos = [_PESO_CONVENIO.get(c.nome, 1.0) for c in elegiveis]
+    return random.choices(elegiveis, weights=pesos, k=1)[0]
+
+
+def _proporcao_rejeitadas(instante: datetime) -> float:
+    """Qualidade melhora com o tempo: rejeição cai de ~8% para ~4%."""
+    return max(0.04, 0.08 - 0.01 * anos_de_operacao(instante))
 
 
 def _coletar(
@@ -353,7 +411,9 @@ def _fechar_malote(
     if modo != "recebida":
         return
 
-    rejeitadas = {a for a in bucket.amostras if random.random() < _PROPORCAO_REJEITADAS}
+    rejeitadas = {
+        a for a in bucket.amostras if random.random() < _proporcao_rejeitadas(max(bucket.instantes))
+    }
     recebedor = _escolher(contexto.recebedores) or contexto.admin
     t_recebimento = somar_horas(t_despacho, 1, 5)
 

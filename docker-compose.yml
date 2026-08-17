@@ -10,6 +10,9 @@ services:
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8501}
       LGPD_ENCRYPTION_KEY: ${LGPD_ENCRYPTION_KEY:?LGPD_ENCRYPTION_KEY is required}
       SENHA_PADRAO_SEED: ${SENHA_PADRAO_SEED:-labvida123}
+      SEED_INICIO: ${SEED_INICIO:-}
+      SEED_JANELA_DIAS: ${SEED_JANELA_DIAS:-}
+      SEED_ESCALA: ${SEED_ESCALA:-}
     ports:
       - "8501:8501"
     volumes:
