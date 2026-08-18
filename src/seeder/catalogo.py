@@ -7,6 +7,7 @@ plausíveis e popular a tela de valores de referência.
 """
 
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 
 from src.atendimento.amostra.dtos import TipoMaterial
@@ -43,6 +44,28 @@ UNIDADES: tuple[tuple[str, TipoUnidade, tuple[str, ...]], ...] = (
     ("Unidade de Coleta São José", TipoUnidade.COLETA, ("Recepção", "Coleta")),
     ("Unidade de Coleta Boa Vista", TipoUnidade.COLETA, ("Recepção", "Coleta")),
 )
+
+
+# A rede não nasceu pronta: cada unidade tem a data em que começou a operar.
+# Unidades fora do mapa operam desde antes de qualquer série possível — com a
+# janela padrão (90 dias) todas estão abertas, e a série longa mostra a expansão.
+ANTES_DA_SERIE = date(2000, 1, 1)
+
+INICIO_OPERACAO_UNIDADES: dict[str, date] = {
+    "Unidade de Coleta São José": date(2023, 7, 1),
+    "Unidade de Coleta Boa Vista": date(2024, 2, 1),
+}
+
+# Contratos de convênio assinados ao longo da série; os demais já operavam
+# antes do início. Uma OS antiga nunca sai faturada para convênio que ainda
+# não existia na carteira.
+INICIO_CONTRATO_CONVENIOS: dict[str, date] = {
+    "Hapvida": date(2023, 9, 1),
+    "SulAmérica Saúde": date(2024, 4, 1),
+    "NotreDame Intermédica": date(2024, 10, 1),
+    "Cassi": date(2025, 3, 1),
+    "Golden Cross": date(2025, 11, 1),
+}
 
 
 # --- Convênios (nome, registro ANS) ---

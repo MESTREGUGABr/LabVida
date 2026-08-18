@@ -35,6 +35,7 @@ from src.laboratorial.service import LaboratorialService
 from src.logistica.recebimento.models import AmostraMovimentacao
 from src.seeder.catalogo import EQUIPAMENTOS, PROCEDIMENTOS
 from src.seeder.config import somar_horas
+from src.seeder.trajetoria import anos_de_operacao
 from src.usuario.models import Usuario
 
 # Situação da bancada por OS recebida (soma 1.0).
@@ -44,6 +45,7 @@ _PESOS_BANCADA = {
     "aguardando": 0.18, # resultado digitado, ainda sem revisão
 }
 _PROPORCAO_FORA_DA_FAIXA = 0.22
+_COMMIT_A_CADA = 25
 
 
 def executar_seeder_laboratorial() -> dict[str, int]:
@@ -71,7 +73,9 @@ def executar_seeder_laboratorial() -> dict[str, int]:
             select(Usuario).where(Usuario.email == "bancada.hematologia@labvida.com.br")
         ) or session.scalar(select(Usuario).limit(1))
 
-        for ordem_id, recebido_em in _ordens_recebidas(session):
+        # Commit em lotes: com a janela longa (SEED_INICIO) o seeder processa
+        # milhares de OS e um commit por OS dominaria o tempo de execução.
+        for indice, (ordem_id, recebido_em) in enumerate(_ordens_recebidas(session)):
             _processar_ordem(
                 session,
                 servico,
@@ -84,6 +88,8 @@ def executar_seeder_laboratorial() -> dict[str, int]:
                 tecnico,
                 contagem,
             )
+            if (indice + 1) % _COMMIT_A_CADA == 0:
+                session.commit()
 
         session.commit()
 
@@ -181,8 +187,7 @@ def _processar_ordem(
 
     situacao = random.choices(list(_PESOS_BANCADA), weights=list(_PESOS_BANCADA.values()))[0]
     base = recebido_em or _agora_fallback()
-    t_resultado = somar_horas(base, 1, 10)
-    t_laudo = somar_horas(t_resultado, 1, 14)
+    t_resultado, t_laudo = _atrasos_da_bancada(base)
     revisado = situacao != "aguardando"
 
     for indice, item in enumerate(itens):
@@ -230,7 +235,19 @@ def _processar_ordem(
         contagem["laudos_liberados"] += 1
 
     _retrodatar_conclusao(session, ordem_id, t_laudo)
-    session.commit()
+
+
+def _atrasos_da_bancada(recebido_em: datetime) -> tuple[datetime, datetime]:
+    """Resultado e laudo saem mais rápido conforme o processo amadurece.
+
+    No começo da série a bancada demora mais (processo novo); com os anos o
+    laboratório automatiza e o TAT melhora até ~55% do atraso inicial — o que
+    aparece no BI como ganho real de tempo de atendimento.
+    """
+    fator = max(0.55, 1.0 - 0.12 * anos_de_operacao(recebido_em))
+    t_resultado = somar_horas(recebido_em, 1 * fator, 10 * fator)
+    t_laudo = somar_horas(t_resultado, 1 * fator, 14 * fator)
+    return t_resultado, t_laudo
 
 
 def _retrodatar_conclusao(session: Session, ordem_id: UUID, instante: datetime) -> None:

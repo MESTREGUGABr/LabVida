@@ -442,7 +442,34 @@ SEED_ESCALA=3 python -m src.seeder  # 3x o volume
 | --- | :---: | --- |
 | `SEED_ESCALA` | `1.0` | Multiplicador de volume de todos os módulos |
 | `SEED_JANELA_DIAS` | `90` | Período de operação simulado (afeta a série temporal do BI) |
+| `SEED_INICIO` | — | Data ISO de início da operação simulada (ex.: `2022-01-01`); tem precedência sobre `SEED_JANELA_DIAS` |
 | `SEED_SEMENTE` | `20261` | Semente do gerador aleatório |
+
+**Estender a série temporal (ex.: operação de 2022 até hoje):** a janela inteira sai da data definida em `SEED_INICIO`, e os volumes padrão (OS, pacientes, pedidos) crescem proporcionalmente para manter a densidade por mês — com `2022-01-01` a base fica com ~7.5k OS e ~56 competências.
+
+A série não é uniforme: `src/seeder/trajetoria.py` molda a **evolução real da empresa** — crescimento ~2%/mês (≈27% ao ano), sazonalidade local (pico de inverno, vales em dez-jan, domingo residual), e o catálogo define o ciclo de vida da rede: a Unidade São José abre em jul/2023 e a Boa Vista em fev/2024, os convênios Hapvida, SulAmérica, NotreDame, Cassi e Golden Cross entram na carteira ao longo dos anos, o mix particular cai de ~30% para ~12%, o TAT da bancada melhora e a rejeição de amostras cai de ~8% para ~4%. O resultado no BI: faturamento, volume de exames e custos fixos crescem juntos, mês a mês.
+
+Como cada módulo do seeder é idempotente, a base atual precisa ser recriada antes:
+
+```bash
+# 1. Apaga o volume do Postgres (perde os dados atuais — tudo dummy)
+docker compose down -v
+
+# 2. Sobe com a janela longa definida (o boot aplica migrations e roda o seeder)
+SEED_INICIO=2022-01-01 docker compose up -d
+```
+
+> Deixe `SEED_INICIO=2022-01-01` no `.env` se quiser que a base longa vire o padrão do projeto (o compose repassa a variável ao container).
+
+> ⏳ O seed com a janela de 2022 até hoje gera ~7.5k OS e pode levar de **20 a 60 minutos** na primeira subida; o app só responde na porta 8501 depois do seeder concluir. Acompanhe com `docker compose logs -f app`. Alternativamente, suba só o banco e rode o seeder à parte:
+>
+> ```bash
+> docker compose up -d postgres
+> SEED_INICIO=2022-01-01 docker compose run --rm app python -m src.seeder
+> docker compose up -d
+> ```
+>
+> (A segunda subida do `app` reusa os dados já semeados: os módulos detectam as tabelas cheias e não duplicam nada.)
 
 ---
 
