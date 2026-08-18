@@ -20,9 +20,10 @@ from src.ui_css import injetar_css_global
 from src.ui_icons import ICONES_MAPA
 
 
-def formatar_brl(valor: float) -> str:
-    """Formata valor como moeda brasileira: R$ 1.234,56."""
-    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+def formatar_brl(valor: float, markdown: bool = False) -> str:
+    """Formata valor como moeda brasileira: R$ 1.234,56 (ou R\\$ se markdown=True)."""
+    prefixo = r"R\$" if markdown else "R$"
+    return f"{prefixo} {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def _existem_perfis(session) -> bool:

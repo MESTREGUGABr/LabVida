@@ -59,9 +59,9 @@ def main() -> None:
 
                     partes = []
                     if not receber.empty:
-                        partes.append(f"{len(receber)} a receber ({formatar_brl(total_rec)})")
+                        partes.append(f"{len(receber)} a receber ({formatar_brl(total_rec, markdown=True)})")
                     if not pagar.empty:
-                        partes.append(f"{len(pagar)} a pagar ({formatar_brl(total_pag)})")
+                        partes.append(f"{len(pagar)} a pagar ({formatar_brl(total_pag, markdown=True)})")
 
                     st.warning(f"Titulos vencidos: {', '.join(partes)}.")
                     with st.expander("Ver detalhes"):

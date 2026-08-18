@@ -227,7 +227,7 @@ _COLUNAS_PAGAR = [
 def _dialogo_baixa_receber(titulo: dict) -> None:
     """Baixa com dialogo no lugar do formulario inline por linha (bug U4)."""
     valor_total = float(titulo["valor"])
-    st.write(f"Titulo de **{formatar_brl(valor_total)}**")
+    st.write(f"Titulo de **{formatar_brl(valor_total, markdown=True)}**")
     st.caption(f"{titulo['referencia']} · vence em {titulo['vencimento'].strftime('%d/%m/%Y')}")
 
     valor_pago = st.number_input(
@@ -237,7 +237,7 @@ def _dialogo_baixa_receber(titulo: dict) -> None:
 
     if valor_pago < valor_total:
         st.warning(
-            f"Recebimento menor que o titulo em {formatar_brl(valor_total - valor_pago)}. "
+            f"Recebimento menor que o titulo em {formatar_brl(valor_total - valor_pago, markdown=True)}. "
             "A divergenca fica registrada na aba Conciliacoes."
         )
 
@@ -259,7 +259,7 @@ def _dialogo_baixa_receber(titulo: dict) -> None:
 
 @st.dialog("Confirmar pagamento")
 def _dialogo_baixa_pagar(titulo: dict) -> None:
-    st.write(f"Titulo de **{formatar_brl(float(titulo['valor']))}**")
+    st.write(f"Titulo de **{formatar_brl(float(titulo['valor']), markdown=True)}**")
     st.caption(f"{titulo['referencia']} · vence em {titulo['vencimento'].strftime('%d/%m/%Y')}")
     observacao = st.text_input("Observacao")
 
