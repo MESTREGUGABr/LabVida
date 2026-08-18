@@ -101,6 +101,8 @@ _MENU = [
             ("Produtividade", "pages/bi_produtividade.py", "bi:visualizar"),
             ("Financeiro", "pages/bi_financeiro.py", "bi:visualizar"),
             ("Logistica", "pages/bi_logistica.py", "bi:visualizar"),
+            ("Estoque", "pages/bi_estoque.py", "bi:visualizar"),
+            ("Auditoria", "pages/bi_auditoria.py", "admin:visualizar_auditoria"),
         ],
     ),
 ]

@@ -23,6 +23,7 @@ def main() -> None:
     with session_scope() as session:
         periodo = seletor_de_periodo(session, chave="logistica")
         indicadores = metricas.kpis(session, periodo)
+        anteriores = metricas.kpis(session, periodo.anterior())
         por_unidade = metricas.amostras_por_unidade(session, periodo)
         por_mes = metricas.amostras_por_mes(session, periodo)
         transito = metricas.tempo_transito_por_unidade(session, periodo)
@@ -43,66 +44,83 @@ def main() -> None:
 
     media_transito = float(transito["horas"].mean()) if not transito.empty else 0.0
 
+    def variacao(chave: str) -> str | None:
+        antes = anteriores.get(chave) or 0
+        agora = indicadores.get(chave) or 0
+        if not antes:
+            return None
+        return f"{(agora - antes) / antes * 100:+.1f}%"
+
     st.divider()
     colunas = st.columns(4)
-    colunas[0].metric("Amostras", f"{indicadores['amostras']:,}".replace(",", "."))
+    colunas[0].metric(
+        "Amostras", f"{indicadores['amostras']:,}".replace(",", "."), variacao("amostras")
+    )
     colunas[1].metric(
-        "Taxa de rejeicao", f"{indicadores['taxa_rejeicao']:.1f}%".replace(".", ",")
+        "Taxa de rejeicao", f"{indicadores['taxa_rejeicao']:.1f}%".replace(".", ","),
+        delta=variacao("taxa_rejeicao"), delta_color="inverse",
     )
     colunas[2].metric("Transito medio", f"{media_transito:.1f} h".replace(".", ","))
     colunas[3].metric("Unidades de origem", len(por_unidade))
 
-    renderizar_secao(titulo="Amostras coletadas por mes")
-    st.altair_chart(
-        graficos.linha_temporal(por_mes, tempo="mes", valor="amostras", rotulo_valor="Amostras"),
-        use_container_width=True,
-    )
-
-    esquerda, direita = st.columns(2)
-    with esquerda:
-        renderizar_secao(titulo="Amostras por unidade de origem")
+    with st.container(border=True):
+        renderizar_secao(titulo="Amostras coletadas por mes")
         st.altair_chart(
-            graficos.barra_categorica(
-                por_unidade, categoria="unidade", valor="amostras", rotulo_valor="Amostras"
-            ),
+            graficos.linha_temporal(por_mes, tempo="mes", valor="amostras", rotulo_valor="Amostras"),
             use_container_width=True,
         )
-    with direita:
-        renderizar_secao(titulo="Tempo medio de transito")
-        if transito.empty:
-            sem_dados("Nenhum malote com despacho e recebimento registrados.")
-        else:
-            st.altair_chart(
-                graficos.barra_categorica(
-                    transito, categoria="unidade", valor="horas",
-                    rotulo_valor="Horas", formato="horas", cor_unica=graficos.COR_ALERTA,
-                ),
-                use_container_width=True,
-            )
 
+    st.write("")
     esquerda, direita = st.columns(2)
     with esquerda:
-        renderizar_secao(titulo="Amostras rejeitadas por unidade")
-        rejeitadas = por_unidade[por_unidade["rejeitadas"] > 0]
-        if rejeitadas.empty:
-            sem_dados("Nenhuma amostra rejeitada no periodo.")
-        else:
+        with st.container(border=True):
+            renderizar_secao(titulo="Amostras por unidade de origem")
             st.altair_chart(
                 graficos.barra_categorica(
-                    rejeitadas, categoria="unidade", valor="rejeitadas",
-                    rotulo_valor="Rejeitadas", cor_unica=graficos.COR_NEGATIVA,
+                    por_unidade, categoria="unidade", valor="amostras", rotulo_valor="Amostras"
                 ),
                 use_container_width=True,
             )
     with direita:
-        renderizar_secao(titulo="Situacao atual das amostras")
-        if status.empty:
-            sem_dados()
-        else:
-            st.altair_chart(
-                graficos.donut(status, categoria="status", valor="quantidade"),
-                use_container_width=True,
-            )
+        with st.container(border=True):
+            renderizar_secao(titulo="Tempo medio de transito")
+            if transito.empty:
+                sem_dados("Nenhum malote com despacho e recebimento registrados.")
+            else:
+                st.altair_chart(
+                    graficos.barra_categorica(
+                        transito, categoria="unidade", valor="horas",
+                        rotulo_valor="Horas", formato="horas", cor_unica=graficos.COR_ALERTA,
+                    ),
+                    use_container_width=True,
+                )
+
+    st.write("")
+    esquerda, direita = st.columns(2)
+    with esquerda:
+        with st.container(border=True):
+            renderizar_secao(titulo="Amostras rejeitadas por unidade")
+            rejeitadas = por_unidade[por_unidade["rejeitadas"] > 0]
+            if rejeitadas.empty:
+                sem_dados("Nenhuma amostra rejeitada no periodo.")
+            else:
+                st.altair_chart(
+                    graficos.barra_categorica(
+                        rejeitadas, categoria="unidade", valor="rejeitadas",
+                        rotulo_valor="Rejeitadas", cor_unica=graficos.COR_NEGATIVA,
+                    ),
+                    use_container_width=True,
+                )
+    with direita:
+        with st.container(border=True):
+            renderizar_secao(titulo="Situacao atual das amostras")
+            if status.empty:
+                sem_dados()
+            else:
+                st.altair_chart(
+                    graficos.donut(status, categoria="status", valor="quantidade"),
+                    use_container_width=True,
+                )
 
     st.divider()
     if botao_atualizar(chave="etl_logistica"):

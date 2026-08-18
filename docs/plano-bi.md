@@ -257,7 +257,7 @@ def waterfall_dre(df, *, categoria, valor) -> alt.Chart
 
 Tema único em `src/bi/tema_altair.py`: paleta consistente entre as 4 páginas, `tooltip` com rótulos em pt-BR, eixo monetário com separador brasileiro (`R$ 1.234,56`), tipografia alinhada ao `ui_css.py` existente.
 
-**Drill-down:** `alt.selection_point()` + `st.altair_chart(..., on_select="rerun")` — clicar num convênio no gráfico filtra os demais gráficos da página. É o drill-down catalogado como ausente desde a primeira auditoria.
+**Drill-down: avaliado e descartado por ora (2026-08-17).** Chegou a existir um parâmetro `selecao` em `barra_categorica` preparando um `alt.selection_point()`, mas nenhuma página o usava nem lia a seleção via `on_select` — era código morto. Um cross-filter de verdade (clicar num convênio filtra os demais gráficos da página) é esforço médio-alto e toca várias páginas; decisão da equipe foi não implementar nesta entrega. Ver `docs/revisao-bi-final.md`.
 
 **Zero dependência nova:** `altair==6.2.2` já está em [requirements.txt](../requirements.txt).
 

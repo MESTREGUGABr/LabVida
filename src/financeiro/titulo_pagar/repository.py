@@ -1,3 +1,4 @@
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import select
@@ -25,6 +26,15 @@ def listar_pendentes(session: Session) -> list[TituloPagar]:
     stmt = (
         select(TituloPagar)
         .where(TituloPagar.status == StatusTitulo.PENDENTE)
+        .order_by(TituloPagar.vencimento)
+    )
+    return list(session.scalars(stmt).all())
+
+
+def listar_vencidos(session: Session) -> list[TituloPagar]:
+    stmt = (
+        select(TituloPagar)
+        .where(TituloPagar.status == StatusTitulo.PENDENTE, TituloPagar.vencimento < date.today())
         .order_by(TituloPagar.vencimento)
     )
     return list(session.scalars(stmt).all())

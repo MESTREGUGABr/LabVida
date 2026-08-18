@@ -305,6 +305,10 @@ div[data-testid="stMetric"] {{
     border-radius: {BORDER_RADIUS};
     padding: 20px;
     box-shadow: {SHADOW_CARD};
+    /* Habilita `cqw` no valor/rotulo abaixo: a fonte passa a reagir a
+    largura real do card (definida pelo numero de st.columns), nao a
+    largura da janela — um vw fixo nao diferencia 4 de 5 colunas. */
+    container-type: inline-size;
 }}
 
 div[data-testid="stMetric"] label {{
@@ -315,10 +319,34 @@ div[data-testid="stMetric"] label {{
     letter-spacing: 0.6px;
 }}
 
-div[data-testid="stMetric"] div[data-testid="stMetricValue"] {{
-    font-size: 32px;
+/* Rotulo pode ser longo (ex: "TAT medio (coleta -> laudo)") — quebra em vez
+de cortar com reticencia, que e o padrao do Streamlit. O Streamlit aplica o
+truncamento via CSS-in-JS (sem `!important`) num elemento interno, entao a
+sobrescrita so vence com `!important` e mirando `*` dentro do container. */
+div[data-testid="stMetricLabel"],
+div[data-testid="stMetricLabel"] * {{
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+}}
+
+div[data-testid="stMetric"] div[data-testid="stMetricValue"],
+div[data-testid="stMetric"] div[data-testid="stMetricValue"] * {{
+    /* `cqw` responsivo pela largura do card: encolhe pra caber sem cortar.
+    Nao existe "shrink-to-fit" so por CSS que reaja ao COMPRIMENTO do texto
+    (ex: "R$ 9.096,74" vs "R$ 1.234.567,89") sem JS — por isso a rede de
+    seguranca abaixo permite quebrar em 2 linhas em vez de vazar pra fora
+    do card quando o numero for grande demais mesmo na fonte minima. */
+    font-size: clamp(16px, 11cqw, 32px) !important;
     font-weight: 700;
     color: {NEUTRAL_900};
+    overflow: visible !important;
+    text-overflow: clip !important;
+    white-space: normal !important;
+    overflow-wrap: break-word !important;
+    line-height: 1.15;
+    max-width: none !important;
 }}
 
 /* ===== FORMS ===== */
@@ -481,7 +509,6 @@ div[data-testid="stDataFrame"] {{
     h2 {{ font-size: 18px; }}
     h3 {{ font-size: 16px; }}
     div[data-testid="stForm"] {{ padding: 20px; }}
-    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {{ font-size: 24px; }}
     button[kind="primary"],
     button[kind="secondary"] {{
         padding: 8px 16px;
