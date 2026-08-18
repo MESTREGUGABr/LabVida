@@ -56,104 +56,117 @@ def main() -> None:
     colunas[3].metric("Recebido (caixa)", formatar_brl(indicadores["recebido"]))
     colunas[4].metric("Taxa de glosa", f"{indicadores['taxa_glosa']:.1f}%".replace(".", ","))
 
-    renderizar_secao(titulo="Faturado x glosado por mes")
-    if por_mes.empty:
-        sem_dados()
-    else:
-        st.altair_chart(
-            graficos.series_comparadas(
-                por_mes, tempo="mes", series=["faturado", "glosado"],
-                rotulo_valor="Valor", formato="moeda",
-                cores=[graficos.COR_NEUTRA, graficos.COR_NEGATIVA],
-            ),
-            use_container_width=True,
-        )
-
-    esquerda, direita = st.columns(2)
-    with esquerda:
-        renderizar_secao(titulo="Receita por convenio")
-        st.altair_chart(
-            graficos.barra_categorica(
-                por_convenio, categoria="convenio", valor="liberado",
-                rotulo_categoria="Convenio", rotulo_valor="Liberado", formato="moeda",
-            ),
-            use_container_width=True,
-        )
-    with direita:
-        renderizar_secao(titulo="Ticket medio por convenio")
-        if ticket_convenio.empty:
+    with st.container(border=True):
+        renderizar_secao(titulo="Faturado x glosado por mes")
+        if por_mes.empty:
             sem_dados()
         else:
             st.altair_chart(
-                graficos.barra_categorica(
-                    ticket_convenio, categoria="convenio", valor="ticket_medio",
-                    rotulo_categoria="Convenio", rotulo_valor="Ticket medio",
-                    formato="moeda", cor_unica=graficos.COR_POSITIVA,
+                graficos.series_comparadas(
+                    por_mes, tempo="mes", series=["faturado", "glosado"],
+                    rotulo_valor="Valor", formato="moeda",
+                    cores=[graficos.COR_NEUTRA, graficos.COR_NEGATIVA],
                 ),
                 use_container_width=True,
             )
 
-    renderizar_secao(titulo="Curva ABC de procedimentos")
-    if abc.empty:
-        sem_dados()
-    else:
-        st.altair_chart(graficos.curva_abc(abc), use_container_width=True)
-
+    st.write("")
     esquerda, direita = st.columns(2)
     with esquerda:
-        renderizar_secao(titulo="Glosa por motivo")
-        if glosa_motivo.empty:
-            sem_dados("Nenhuma glosa no periodo.")
-        else:
+        with st.container(border=True):
+            renderizar_secao(titulo="Receita por convenio")
             st.altair_chart(
                 graficos.barra_categorica(
-                    glosa_motivo, categoria="motivo", valor="glosado",
-                    rotulo_categoria="Motivo", rotulo_valor="Glosado",
-                    formato="moeda", cor_unica=graficos.COR_NEGATIVA,
+                    por_convenio, categoria="convenio", valor="liberado",
+                    rotulo_categoria="Convenio", rotulo_valor="Liberado", formato="moeda",
                 ),
                 use_container_width=True,
             )
     with direita:
-        renderizar_secao(titulo="Taxa de glosa por convenio")
-        if taxa_glosa.empty:
+        with st.container(border=True):
+            renderizar_secao(titulo="Ticket medio por convenio")
+            if ticket_convenio.empty:
+                sem_dados()
+            else:
+                st.altair_chart(
+                    graficos.barra_categorica(
+                        ticket_convenio, categoria="convenio", valor="ticket_medio",
+                        rotulo_categoria="Convenio", rotulo_valor="Ticket medio",
+                        formato="moeda", cor_unica=graficos.COR_POSITIVA,
+                    ),
+                    use_container_width=True,
+                )
+
+    st.write("")
+    with st.container(border=True):
+        renderizar_secao(titulo="Curva ABC de procedimentos")
+        if abc.empty:
             sem_dados()
         else:
+            st.altair_chart(graficos.curva_abc(abc), use_container_width=True)
+
+    st.write("")
+    esquerda, direita = st.columns(2)
+    with esquerda:
+        with st.container(border=True):
+            renderizar_secao(titulo="Glosa por motivo")
+            if glosa_motivo.empty:
+                sem_dados("Nenhuma glosa no periodo.")
+            else:
+                st.altair_chart(
+                    graficos.barra_categorica(
+                        glosa_motivo, categoria="motivo", valor="glosado",
+                        rotulo_categoria="Motivo", rotulo_valor="Glosado",
+                        formato="moeda", cor_unica=graficos.COR_NEGATIVA,
+                    ),
+                    use_container_width=True,
+                )
+    with direita:
+        with st.container(border=True):
+            renderizar_secao(titulo="Taxa de glosa por convenio")
+            if taxa_glosa.empty:
+                sem_dados()
+            else:
+                st.altair_chart(
+                    graficos.barra_categorica(
+                        taxa_glosa, categoria="convenio", valor="taxa_glosa",
+                        rotulo_categoria="Convenio", rotulo_valor="Taxa de glosa",
+                        formato="percentual", cor_unica=graficos.COR_ALERTA,
+                    ),
+                    use_container_width=True,
+                )
+
+    st.write("")
+    with st.container(border=True):
+        renderizar_secao(titulo="Fluxo de caixa realizado")
+        if caixa.empty:
+            sem_dados("Nenhum movimento de caixa no periodo.")
+        else:
             st.altair_chart(
-                graficos.barra_categorica(
-                    taxa_glosa, categoria="convenio", valor="taxa_glosa",
-                    rotulo_categoria="Convenio", rotulo_valor="Taxa de glosa",
-                    formato="percentual", cor_unica=graficos.COR_ALERTA,
+                graficos.series_comparadas(
+                    caixa, tempo="mes", series=["entradas", "saidas"],
+                    rotulo_valor="Valor", formato="moeda",
+                    cores=[graficos.COR_POSITIVA, graficos.COR_NEGATIVA],
                 ),
                 use_container_width=True,
             )
-
-    renderizar_secao(titulo="Fluxo de caixa realizado")
-    if caixa.empty:
-        sem_dados("Nenhum movimento de caixa no periodo.")
-    else:
-        st.altair_chart(
-            graficos.series_comparadas(
-                caixa, tempo="mes", series=["entradas", "saidas"],
-                rotulo_valor="Valor", formato="moeda",
-                cores=[graficos.COR_POSITIVA, graficos.COR_NEGATIVA],
-            ),
-            use_container_width=True,
-        )
 
     if not ticket_procedimento.empty:
-        renderizar_secao(titulo="Maiores tickets medios por procedimento")
-        st.dataframe(
-            ticket_procedimento.rename(
-                columns={
-                    "procedimento": "Procedimento",
-                    "ticket_medio": "Ticket medio",
-                    "exames": "Exames",
-                }
-            ),
-            hide_index=True,
-            width="stretch",
-            column_config={"Ticket medio": st.column_config.NumberColumn(format="R$ %.2f")},
-        )
+        st.write("")
+        with st.container(border=True):
+            renderizar_secao(titulo="Maiores tickets medios por procedimento")
+            st.dataframe(
+                ticket_procedimento.rename(
+                    columns={
+                        "procedimento": "Procedimento",
+                        "ticket_medio": "Ticket medio",
+                        "exames": "Exames",
+                    }
+                ),
+                hide_index=True,
+                width="stretch",
+                column_config={"Ticket medio": st.column_config.NumberColumn(format="R$ %.2f")},
+            )
 
     st.divider()
     if botao_atualizar(chave="etl_financeiro"):

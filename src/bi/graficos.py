@@ -28,6 +28,7 @@ COR_NEUTRA = "#2563eb"
 COR_ALERTA = "#ea580c"
 
 _ALTURA_PADRAO = 300
+TAMANHO_BARRA_DRE_AGING = 34
 
 
 def _tema(grafico: alt.Chart) -> alt.Chart:
@@ -72,6 +73,7 @@ def barra_categorica(
     cor_unica: str | None = None,
     altura: int = _ALTURA_PADRAO,
     selecao: str | None = None,
+    tamanho_barra: int | None = None,
 ) -> alt.Chart:
     """Ranking por categoria. Horizontal por padrao: nome de convenio nao cabe
     em rotulo de eixo X vertical sem virar diagonal ilegivel."""
@@ -80,8 +82,12 @@ def barra_categorica(
     rotulo_valor = rotulo_valor or valor.replace("_", " ").capitalize()
 
     quantitativo = _eixo_quantitativo(valor, rotulo_valor, formato)
+    # `labelAngle=0` no eixo vertical: sem isso o Vega roda o rotulo na
+    # diagonal quando acha que a categoria nao cabe na banda, o que muda a
+    # altura total do card e desalinha com um grafico vizinho na mesma linha
+    # (ex: DRE gerencial, que ja fixa o mesmo angulo).
     nominal = alt.Y(f"{categoria}:N", title=rotulo_categoria, sort="-x") if horizontal else alt.X(
-        f"{categoria}:N", title=rotulo_categoria, sort="-y"
+        f"{categoria}:N", title=rotulo_categoria, sort="-y", axis=alt.Axis(labelAngle=0)
     )
 
     codificacao = (
@@ -93,9 +99,13 @@ def barra_categorica(
     else:
         cor = alt.Color(f"{categoria}:N", scale=alt.Scale(range=PALETA), legend=None)
 
+    opcoes_barra: dict = {"cornerRadius": 3}
+    if tamanho_barra is not None:
+        opcoes_barra["size"] = tamanho_barra
+
     grafico = (
         alt.Chart(dados)
-        .mark_bar(cornerRadius=3)
+        .mark_bar(**opcoes_barra)
         .encode(
             **codificacao,
             color=cor,
@@ -252,7 +262,12 @@ def barras_dre(dados: pd.DataFrame, *, titulo: str = "", altura: int = 240) -> a
 
     grafico = (
         alt.Chart(copia)
-        .mark_bar(cornerRadius=3)
+        # `size` fixo (nao proporcional a largura do card / n de categorias):
+        # este grafico fica lado a lado com "Carteira a receber por faixa de
+        # atraso" (numero de faixas variavel) em `bi_visao_executiva.py` — sem
+        # um tamanho fixo compartilhado, a espessura das barras dos dois
+        # graficos diverge visivelmente conforme o periodo selecionado.
+        .mark_bar(cornerRadius=3, size=TAMANHO_BARRA_DRE_AGING)
         .encode(
             x=alt.X("linha:N", title="", sort=None, axis=alt.Axis(labelAngle=0)),
             y=alt.Y("valor:Q", title="Valor (R$)", axis=alt.Axis(format="~s")),

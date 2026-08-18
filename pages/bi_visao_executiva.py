@@ -70,64 +70,72 @@ def main() -> None:
     esquerda, direita = st.columns(2)
 
     with esquerda:
-        renderizar_secao(titulo="Receita faturada por mes")
-        if receita_mes.empty:
-            sem_dados()
-        else:
-            st.altair_chart(
-                graficos.linha_temporal(
-                    receita_mes, tempo="mes", valor="faturado",
-                    rotulo_valor="Faturado", formato="moeda",
-                ),
-                use_container_width=True,
-            )
+        with st.container(border=True):
+            renderizar_secao(titulo="Receita faturada por mes")
+            if receita_mes.empty:
+                sem_dados()
+            else:
+                st.altair_chart(
+                    graficos.linha_temporal(
+                        receita_mes, tempo="mes", valor="faturado",
+                        rotulo_valor="Faturado", formato="moeda",
+                    ),
+                    use_container_width=True,
+                )
 
     with direita:
-        renderizar_secao(titulo="Previsto x recebido")
-        if previsto_realizado.empty:
-            sem_dados()
-        else:
-            st.altair_chart(
-                graficos.series_comparadas(
-                    previsto_realizado, tempo="mes", series=["previsto", "realizado"],
-                    rotulo_valor="Valor", formato="moeda",
-                    cores=[graficos.COR_NEUTRA, graficos.COR_POSITIVA],
-                ),
-                use_container_width=True,
-            )
+        with st.container(border=True):
+            renderizar_secao(titulo="Previsto x recebido")
+            if previsto_realizado.empty:
+                sem_dados()
+            else:
+                st.altair_chart(
+                    graficos.series_comparadas(
+                        previsto_realizado, tempo="mes", series=["previsto", "realizado"],
+                        rotulo_valor="Valor", formato="moeda",
+                        cores=[graficos.COR_NEUTRA, graficos.COR_POSITIVA],
+                    ),
+                    use_container_width=True,
+                )
 
+    st.write("")
     esquerda, direita = st.columns(2)
 
     with esquerda:
-        renderizar_secao(titulo="DRE gerencial (regime de caixa)")
-        st.altair_chart(graficos.barras_dre(dre), use_container_width=True)
+        with st.container(border=True):
+            renderizar_secao(titulo="DRE gerencial (regime de caixa)")
+            st.altair_chart(graficos.barras_dre(dre), use_container_width=True)
 
     with direita:
-        renderizar_secao(titulo="Carteira a receber por faixa de atraso")
-        if aging.empty:
-            sem_dados("Nenhum titulo em aberto.")
+        with st.container(border=True):
+            renderizar_secao(titulo="Carteira a receber por faixa de atraso")
+            if aging.empty:
+                sem_dados("Nenhum titulo em aberto.")
+            else:
+                st.altair_chart(
+                    graficos.barra_categorica(
+                        aging, categoria="faixa", valor="valor",
+                        rotulo_categoria="Faixa", rotulo_valor="Valor",
+                        formato="moeda", horizontal=False, altura=240,
+                        tamanho_barra=graficos.TAMANHO_BARRA_DRE_AGING,
+                    ),
+                    use_container_width=True,
+                )
+
+    st.write("")
+    with st.container(border=True):
+        renderizar_secao(titulo="Taxa de glosa por convenio")
+        if taxa_glosa.empty:
+            sem_dados()
         else:
             st.altair_chart(
                 graficos.barra_categorica(
-                    aging, categoria="faixa", valor="valor",
-                    rotulo_categoria="Faixa", rotulo_valor="Valor",
-                    formato="moeda", horizontal=False,
+                    taxa_glosa, categoria="convenio", valor="taxa_glosa",
+                    rotulo_categoria="Convenio", rotulo_valor="Taxa de glosa",
+                    formato="percentual", cor_unica=graficos.COR_NEGATIVA, altura=260,
                 ),
                 use_container_width=True,
             )
-
-    renderizar_secao(titulo="Taxa de glosa por convenio")
-    if taxa_glosa.empty:
-        sem_dados()
-    else:
-        st.altair_chart(
-            graficos.barra_categorica(
-                taxa_glosa, categoria="convenio", valor="taxa_glosa",
-                rotulo_categoria="Convenio", rotulo_valor="Taxa de glosa",
-                formato="percentual", cor_unica=graficos.COR_NEGATIVA, altura=260,
-            ),
-            use_container_width=True,
-        )
 
     st.divider()
     if botao_atualizar(chave="etl_executiva"):

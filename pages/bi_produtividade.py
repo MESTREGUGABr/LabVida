@@ -52,92 +52,104 @@ def main() -> None:
         f"{indicadores['exames'] / len(por_unidade):.0f}" if len(por_unidade) else "0",
     )
     colunas[3].metric(
-        "TAT medio (coleta -> laudo)",
+        "TAT (coleta -> laudo)",
         f"{indicadores['tat_horas']:.1f} h".replace(".", ","),
     )
 
-    renderizar_secao(titulo="Evolucao mensal de exames")
-    st.altair_chart(
-        graficos.linha_temporal(por_mes, tempo="mes", valor="exames", rotulo_valor="Exames"),
-        use_container_width=True,
-    )
+    with st.container(border=True):
+        renderizar_secao(titulo="Evolucao mensal de exames")
+        st.altair_chart(
+            graficos.linha_temporal(por_mes, tempo="mes", valor="exames", rotulo_valor="Exames"),
+            use_container_width=True,
+        )
 
+    st.write("")
     esquerda, direita = st.columns(2)
     with esquerda:
-        renderizar_secao(titulo="Exames por unidade")
-        st.altair_chart(
-            graficos.barra_categorica(
-                por_unidade, categoria="unidade", valor="exames", rotulo_valor="Exames"
-            ),
-            use_container_width=True,
-        )
-    with direita:
-        renderizar_secao(titulo="Exames por convenio")
-        st.altair_chart(
-            graficos.barra_categorica(
-                por_convenio, categoria="convenio", valor="exames", rotulo_valor="Exames"
-            ),
-            use_container_width=True,
-        )
-
-    esquerda, direita = st.columns(2)
-    with esquerda:
-        renderizar_secao(titulo="Exames por setor")
-        if por_setor.empty:
-            sem_dados()
-        else:
+        with st.container(border=True):
+            renderizar_secao(titulo="Exames por unidade")
             st.altair_chart(
-                graficos.donut(por_setor, categoria="setor", valor="exames"),
-                use_container_width=True,
-            )
-    with direita:
-        renderizar_secao(titulo="Distribuicao por faixa etaria")
-        st.altair_chart(
-            graficos.barra_categorica(
-                por_faixa, categoria="faixa_etaria", valor="exames",
-                rotulo_categoria="Faixa etaria", rotulo_valor="Exames",
-                horizontal=False, cor_unica=graficos.COR_NEUTRA,
-            ),
-            use_container_width=True,
-        )
-
-    esquerda, direita = st.columns([2, 3])
-    with esquerda:
-        renderizar_secao(titulo="Sazonalidade semanal")
-        if sazonalidade.empty:
-            sem_dados()
-        else:
-            st.altair_chart(
-                graficos.heatmap_sazonalidade(
-                    sazonalidade, dia_semana="dia_semana", valor="exames"
+                graficos.barra_categorica(
+                    por_unidade, categoria="unidade", valor="exames", rotulo_valor="Exames"
                 ),
                 use_container_width=True,
             )
     with direita:
-        renderizar_secao(titulo="Tempo medio de atendimento por setor")
-        if tat_setor.empty:
+        with st.container(border=True):
+            renderizar_secao(titulo="Exames por convenio")
+            st.altair_chart(
+                graficos.barra_categorica(
+                    por_convenio, categoria="convenio", valor="exames", rotulo_valor="Exames"
+                ),
+                use_container_width=True,
+            )
+
+    st.write("")
+    esquerda, direita = st.columns(2)
+    with esquerda:
+        with st.container(border=True):
+            renderizar_secao(titulo="Exames por setor")
+            if por_setor.empty:
+                sem_dados()
+            else:
+                st.altair_chart(
+                    graficos.donut(por_setor, categoria="setor", valor="exames"),
+                    use_container_width=True,
+                )
+    with direita:
+        with st.container(border=True):
+            renderizar_secao(titulo="Distribuicao por faixa etaria")
+            st.altair_chart(
+                graficos.barra_categorica(
+                    por_faixa, categoria="faixa_etaria", valor="exames",
+                    rotulo_categoria="Faixa etaria", rotulo_valor="Exames",
+                    horizontal=False, cor_unica=graficos.COR_NEUTRA,
+                ),
+                use_container_width=True,
+            )
+
+    st.write("")
+    esquerda, direita = st.columns([2, 3])
+    with esquerda:
+        with st.container(border=True):
+            renderizar_secao(titulo="Sazonalidade semanal")
+            if sazonalidade.empty:
+                sem_dados()
+            else:
+                st.altair_chart(
+                    graficos.heatmap_sazonalidade(
+                        sazonalidade, dia_semana="dia_semana", valor="exames", altura=200,
+                    ),
+                    use_container_width=True,
+                )
+    with direita:
+        with st.container(border=True):
+            renderizar_secao(titulo="Tempo medio de atendimento por setor")
+            if tat_setor.empty:
+                sem_dados("Nenhuma OS concluida no periodo.")
+            else:
+                st.altair_chart(
+                    graficos.barra_categorica(
+                        tat_setor, categoria="setor", valor="horas",
+                        rotulo_valor="Horas", formato="horas",
+                        cor_unica=graficos.COR_ALERTA, altura=200,
+                    ),
+                    use_container_width=True,
+                )
+
+    st.write("")
+    with st.container(border=True):
+        renderizar_secao(titulo="Tempo medio coleta -> laudo por mes")
+        if tat_mes.empty:
             sem_dados("Nenhuma OS concluida no periodo.")
         else:
             st.altair_chart(
-                graficos.barra_categorica(
-                    tat_setor, categoria="setor", valor="horas",
-                    rotulo_valor="Horas", formato="horas",
-                    cor_unica=graficos.COR_ALERTA, altura=200,
+                graficos.linha_temporal(
+                    tat_mes, tempo="mes", valor="horas", rotulo_valor="Horas",
+                    formato="horas", cor=graficos.COR_ALERTA,
                 ),
                 use_container_width=True,
             )
-
-    renderizar_secao(titulo="Tempo medio coleta -> laudo por mes")
-    if tat_mes.empty:
-        sem_dados("Nenhuma OS concluida no periodo.")
-    else:
-        st.altair_chart(
-            graficos.linha_temporal(
-                tat_mes, tempo="mes", valor="horas", rotulo_valor="Horas",
-                formato="horas", cor=graficos.COR_ALERTA,
-            ),
-            use_container_width=True,
-        )
 
     st.divider()
     if botao_atualizar(chave="etl_produtividade"):
