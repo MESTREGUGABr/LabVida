@@ -52,11 +52,18 @@ def main() -> None:
                 if titulos_vencidos.empty:
                     st.success("Nenhum titulo vencido.")
                 else:
-                    total = titulos_vencidos["valor"].sum()
-                    st.warning(
-                        f"{len(titulos_vencidos)} titulo(s) vencido(s), "
-                        f"totalizando {formatar_brl(total)}."
-                    )
+                    receber = titulos_vencidos[titulos_vencidos["tipo"] == "A receber"]
+                    pagar = titulos_vencidos[titulos_vencidos["tipo"] == "A pagar"]
+                    total_rec = receber["valor"].sum() if not receber.empty else 0.0
+                    total_pag = pagar["valor"].sum() if not pagar.empty else 0.0
+
+                    partes = []
+                    if not receber.empty:
+                        partes.append(f"{len(receber)} a receber ({formatar_brl(total_rec)})")
+                    if not pagar.empty:
+                        partes.append(f"{len(pagar)} a pagar ({formatar_brl(total_pag)})")
+
+                    st.warning(f"Titulos vencidos: {', '.join(partes)}.")
                     with st.expander("Ver detalhes"):
                         renderizar_grid(
                             titulos_vencidos,
