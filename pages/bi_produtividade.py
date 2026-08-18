@@ -23,6 +23,7 @@ def main() -> None:
     with session_scope() as session:
         periodo = seletor_de_periodo(session, chave="produtividade")
         indicadores = metricas.kpis(session, periodo)
+        anteriores = metricas.kpis(session, periodo.anterior())
         por_unidade = metricas.exames_por_unidade(session, periodo)
         por_mes = metricas.exames_por_mes(session, periodo)
         por_convenio = metricas.exames_por_convenio(session, periodo)
@@ -43,9 +44,18 @@ def main() -> None:
             st.rerun()
         return
 
+    def variacao(chave: str) -> str | None:
+        antes = anteriores.get(chave) or 0
+        agora = indicadores.get(chave) or 0
+        if not antes:
+            return None
+        return f"{(agora - antes) / antes * 100:+.1f}%"
+
     st.divider()
     colunas = st.columns(4)
-    colunas[0].metric("Exames", f"{indicadores['exames']:,}".replace(",", "."))
+    colunas[0].metric(
+        "Exames", f"{indicadores['exames']:,}".replace(",", "."), variacao("exames")
+    )
     colunas[1].metric("Unidades ativas", len(por_unidade))
     colunas[2].metric(
         "Media por unidade",
@@ -54,6 +64,7 @@ def main() -> None:
     colunas[3].metric(
         "TAT (coleta -> laudo)",
         f"{indicadores['tat_horas']:.1f} h".replace(".", ","),
+        delta=variacao("tat_horas"), delta_color="inverse",
     )
 
     with st.container(border=True):

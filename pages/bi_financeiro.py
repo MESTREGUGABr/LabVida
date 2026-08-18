@@ -28,6 +28,7 @@ def main() -> None:
     with session_scope() as session:
         periodo = seletor_de_periodo(session, chave="financeiro")
         indicadores = metricas.kpis(session, periodo)
+        anteriores = metricas.kpis(session, periodo.anterior())
         por_convenio = metricas.receita_por_convenio(session, periodo)
         por_mes = metricas.receita_por_mes(session, periodo)
         ticket_convenio = metricas.ticket_medio_por_convenio(session, periodo)
@@ -48,13 +49,26 @@ def main() -> None:
             st.rerun()
         return
 
+    def variacao(chave: str) -> str | None:
+        antes = anteriores.get(chave) or 0
+        agora = indicadores.get(chave) or 0
+        if not antes:
+            return None
+        return f"{(agora - antes) / antes * 100:+.1f}%"
+
     st.divider()
     colunas = st.columns(5)
-    colunas[0].metric("Faturado", formatar_brl(indicadores["faturado"]))
-    colunas[1].metric("Glosado", formatar_brl(indicadores["glosado"]))
-    colunas[2].metric("Liberado", formatar_brl(indicadores["liberado"]))
-    colunas[3].metric("Recebido (caixa)", formatar_brl(indicadores["recebido"]))
-    colunas[4].metric("Taxa de glosa", f"{indicadores['taxa_glosa']:.1f}%".replace(".", ","))
+    colunas[0].metric("Faturado", formatar_brl(indicadores["faturado"]), variacao("faturado"))
+    colunas[1].metric(
+        "Glosado", formatar_brl(indicadores["glosado"]),
+        delta=variacao("glosado"), delta_color="inverse",
+    )
+    colunas[2].metric("Liberado", formatar_brl(indicadores["liberado"]), variacao("liberado"))
+    colunas[3].metric("Recebido (caixa)", formatar_brl(indicadores["recebido"]), variacao("recebido"))
+    colunas[4].metric(
+        "Taxa de glosa", f"{indicadores['taxa_glosa']:.1f}%".replace(".", ","),
+        delta=variacao("taxa_glosa"), delta_color="inverse",
+    )
 
     with st.container(border=True):
         renderizar_secao(titulo="Faturado x glosado por mes")

@@ -231,6 +231,8 @@ Pré-requisitos no modelo de preço:
 
 ## 5. Eixo 4 — BI por período
 
+> **Seção superada.** O diagnóstico abaixo (§5.1-5.3) é **pré-reconstrução** do BI e foi mantido aqui só como registro histórico — todos os bugs listados já foram corrigidos pela reconstrução completa do módulo ("Onda 1", fase F2 do roadmap, concluída em 02/08/2026), documentada em `docs/plano-bi.md`. Para o estado atual do BI e achados vigentes, ver `docs/revisao-bi-final.md`.
+
 ### 5.1 Três bugs que fazem o BI mentir hoje
 
 | # | Bug | Onde | Efeito |
@@ -303,8 +305,8 @@ Bugs e inconsistências que **não** estavam na auditoria anterior (que se decla
 | N1 | **`StatusOsItem.FATURADO` nunca é atribuído em produção** | `ordem_servico/dtos.py:22` — só um teste o atribui, na mão | `repository.item_faturado` (`ordem_servico/repository.py:92`), o guarda que impede cancelar item faturado, depende dele. Funciona só pelo ramo de `GuiaItem` — e como item 100% glosado vira `GLOSADO`, ele **volta a ser cancelável** |
 | N2 | **Item 100% glosado = receita perdida para sempre** | `guias_itens.laudo_id` UNIQUE + `repository.py:69,84` | Reapresentação é **estruturalmente impossível** sem alterar o schema |
 | N3 | **Glosas cumulativas podem exceder 100%** | `glosa/service.py:32` compara cada glosa isolada | Duas glosas de 60% glosam R$120 de um item de R$100, e o item permanece `FATURADO` |
-| N4 | **BI de logística inteiro colapsa em "hoje"** | `bi/etl.py:196` | Ver §5.1 |
-| N5 | **ETL não é idempotente** | `bi/etl.py:174,196` + faixa etária congelada na 1ª carga (`etl.py:89-108`) | Mesmos dados de origem, números diferentes por dia de execução |
+| N4 | **BI de logística inteiro colapsa em "hoje"** | `bi/etl.py:196` | Ver §5.1 — ✅ corrigido pela reconstrução do BI (`plano-bi.md`, Onda 1, 02/08/2026) |
+| N5 | **ETL não é idempotente** | `bi/etl.py:174,196` + faixa etária congelada na 1ª carga (`etl.py:89-108`) | Mesmos dados de origem, números diferentes por dia de execução — ✅ corrigido pela reconstrução do BI (`plano-bi.md`, Onda 1, 02/08/2026) |
 | N6 | **Baixa parcial não existe** | `titulo_receber/service.py:61` | Receber R$1 de R$1000 marca **PAGO** e gera conciliação de R$999 |
 
 ### 7.2 Médios

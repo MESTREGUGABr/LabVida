@@ -19,12 +19,14 @@ Não foram encontrados bugs de cálculo (divisão por zero, JOIN duplicando linh
 
 ## 2. Achados de UX
 
-| Achado | Onde | Causa | Sugestão |
-|---|---|---|---|
-| `st.metric` corta valor/rótulo com "..." | `src/ui_css.py:301-322` (fonte do valor fixa em 32px) + `bi_visao_executiva.py:58` e `bi_financeiro.py:52` (`st.columns(5)`) | Fonte grande + muitas colunas estreitas lado a lado + nenhuma regra de quebra de linha para telas médias (só existe breakpoint para celular) | Reduzir para 3-4 métricas por linha, ou fonte responsiva por breakpoint, ou `white-space: normal; overflow-wrap: break-word` no rótulo |
-| Rótulo mais longo do sistema estoura fácil | `bi_produtividade.py:54-57` — `"TAT medio (coleta -> laudo)"` em `st.columns(4)` | Mesmo problema acima, agravado pelo tamanho do texto | Encurtar para algo como `"TAT (coleta→laudo)"` |
-| Drill-down interativo criado mas nunca ligado | `src/bi/graficos.py:111` cria `alt.selection_point()`; nenhuma das 4 páginas passa `on_select="rerun"` ou lê a seleção | Funcionalidade prevista em `plano-bi.md:260` ficou pela metade | Ligar o `on_select` nas páginas, ou remover a menção do plano se não for prioridade agora |
-| Comparação temporal (Δ%) só na Visão Executiva | `bi_financeiro.py`, `bi_logistica.py`, `bi_produtividade.py` não usam `variacao()` | Função já existe e é usada só numa página | Reaproveitar `variacao()` (já usada em `bi_visao_executiva.py`) nas outras 3 |
+| Achado | Onde | Causa | Sugestão | Status |
+|---|---|---|---|---|
+| `st.metric` corta valor/rótulo com "..." | `src/ui_css.py:301-322` (fonte do valor fixa em 32px) + `bi_visao_executiva.py:58` e `bi_financeiro.py:52` (`st.columns(5)`) | Fonte grande + muitas colunas estreitas lado a lado + nenhuma regra de quebra de linha para telas médias (só existe breakpoint para celular) | Reduzir para 3-4 métricas por linha, ou fonte responsiva por breakpoint, ou `white-space: normal; overflow-wrap: break-word` no rótulo | ✅ **Corrigido em 2026-08-17** — fonte do valor responsiva por `cqw` (largura real do card, via `container-type: inline-size`), rótulo com quebra de linha (`!important` para vencer o CSS-in-JS do Streamlit) e quebra em 2 linhas como rede de segurança para números muito grandes |
+| Rótulo mais longo do sistema estoura fácil | `bi_produtividade.py:54-57` — `"TAT medio (coleta -> laudo)"` em `st.columns(4)` | Mesmo problema acima, agravado pelo tamanho do texto | Encurtar para algo como `"TAT (coleta→laudo)"` | ✅ **Corrigido em 2026-08-17** — rótulo encurtado para `"TAT (coleta -> laudo)"` |
+| Drill-down interativo criado mas nunca ligado | `src/bi/graficos.py:111` cria `alt.selection_point()`; nenhuma das 4 páginas passa `on_select="rerun"` ou lê a seleção | Funcionalidade prevista em `plano-bi.md:260` ficou pela metade | Ligar o `on_select` nas páginas, ou remover a menção do plano se não for prioridade agora | ✅ **Resolvido em 2026-08-17** — decisão do usuário foi remover em vez de implementar (cross-filter real é esforço médio-alto e toca várias páginas, não valia o custo nesta reta final). Parâmetro morto `selecao` removido de `barra_categorica`, e a promessa em `plano-bi.md:260` reescrita registrando a decisão |
+| Comparação temporal (Δ%) só na Visão Executiva | `bi_financeiro.py`, `bi_logistica.py`, `bi_produtividade.py` não usam `variacao()` | Função já existe e é usada só numa página | Reaproveitar `variacao()` (já usada em `bi_visao_executiva.py`) nas outras 3 | ✅ **Resolvido em 2026-08-17** — `variacao()` replicada nas 3 páginas para os KPIs que já vêm de `metricas.kpis()` (Faturado/Glosado/Liberado/Recebido/Taxa de glosa no Financeiro; Exames/TAT no Produtividade; Amostras/Taxa de rejeição na Logística), com `delta_color="inverse"` nas métricas em que "mais" é ruim. Métricas derivadas de outros dataframes (Unidades ativas, Trânsito médio etc.) ficaram sem delta, mesmo escopo já usado na Visão Executiva |
+| Gráficos sem demarcação visual entre si | Todas as 26 seções das 4 páginas — só `<h3>` + `<hr>` solto antes de cada gráfico | `renderizar_secao` nunca envolveu o conteúdo num container visual | Envolver cada seção em `st.container(border=True)` (padrão já usado em outras telas do sistema) | ✅ **Corrigido em 2026-08-17** — todas as seções agora ficam em cards com borda/sombra |
+| Barras com largura inconsistente entre gráficos vizinhos | "DRE gerencial" x "Carteira a receber por faixa de atraso" (`bi_visao_executiva.py:99-121`); "Sazonalidade semanal" x "Tempo medio de atendimento por setor" (`bi_produtividade.py:111-140`) | Nenhuma das duas funções de gráfico fixava a largura da barra (`mark_bar` sem `size`) nem usava a mesma `altura`/ângulo de rótulo entre gráficos adjacentes — cada um calculava a largura/altura de forma independente, dando cards com base e espessura de barra diferentes na mesma linha | Fixar `tamanho_barra` compartilhado entre os dois gráficos, igualar a `altura` passada em ambos, e travar o ângulo do rótulo do eixo (`labelAngle=0`) | ✅ **Corrigido em 2026-08-17** — `TAMANHO_BARRA_DRE_AGING` compartilhado em `graficos.py`, alturas igualadas (240px e 200px respectivamente) e rótulo do eixo vertical fixado em `labelAngle=0` |
 
 ## 3. Achados de cobertura de conteúdo — checklist dos 8 indicadores oficiais (Entrega 3)
 
@@ -56,17 +58,20 @@ Não foram encontrados bugs de cálculo (divisão por zero, JOIN duplicando linh
 
 `docs/plano-evolucao-erp.md` §5.1 ("BI por período", 3 bugs) ainda descreve o diagnóstico **pré-reconstrução** do BI como se fosse o estado atual — já foi superado pela Onda 1 (`plano-bi.md`). Sugestão: marcar a seção como histórica/superada, apontando para `plano-bi.md`.
 
+✅ **Corrigido em 2026-08-17** — adicionada uma nota no início de §5 marcando-a como diagnóstico histórico/superado (aponta para `plano-bi.md` e `revisao-bi-final.md`), e as linhas N4/N5 de §7.1 (que remetiam aos mesmos bugs) receberam o sufixo "corrigido pela reconstrução do BI".
+
 ## 7. Lista final priorizada
 
-| Prioridade | Achado | Arquivo(s) | Esforço | Natureza |
-|---|---|---|---|---|
-| 1 | `st.metric` cortando com "..." | `ui_css.py:301-322`, `bi_visao_executiva.py:58`, `bi_financeiro.py:52` | Baixo | Cosmético, mas visível e fácil de corrigir |
-| 2 | Rótulo longo em `bi_produtividade.py` | `bi_produtividade.py:54` | Baixo | Cosmético |
-| 3 | `docs/plano-evolucao-erp.md` §5.1 desatualizado | `plano-evolucao-erp.md` | Baixo | Organização de documentação |
-| 4 | Drill-down morto (criado, não ligado) | `graficos.py:111` | Médio | Decisão de escopo: ligar ou remover do plano |
-| 5 | Δ% ausente fora da Visão Executiva | `bi_financeiro.py`, `bi_logistica.py`, `bi_produtividade.py` | Médio | Melhoria de UX gerencial |
-| 6 | Indicadores 6 e 8 da Entrega 3 ausentes (insumos por setor, ocorrências de auditoria) | `src/bi/metricas.py` (novo código) | Alto | **Requisito oficial não atendido** — decisão de escopo com a equipe |
-| 7 | Estoque/Compras e painel de alertas fora do BI | `src/bi/` (novo escopo) | Alto | Evolução futura, não bloqueante |
+| Prioridade | Achado | Arquivo(s) | Esforço | Natureza | Status |
+|---|---|---|---|---|---|
+| 1 | `st.metric` cortando com "..." | `ui_css.py:301-322`, `bi_visao_executiva.py:58`, `bi_financeiro.py:52` | Baixo | Cosmético, mas visível e fácil de corrigir | ✅ Concluído em 2026-08-17 |
+| 2 | Rótulo longo em `bi_produtividade.py` | `bi_produtividade.py:54` | Baixo | Cosmético | ✅ Concluído em 2026-08-17 |
+| — | *(extra, não estava na lista original)* Gráficos sem cards + barras/alturas inconsistentes entre gráficos vizinhos | `pages/bi_*.py`, `src/bi/graficos.py` | Baixo/Médio | Cosmético, identificado pelo usuário ao validar os itens 1 e 2 | ✅ Concluído em 2026-08-17 |
+| 3 | `docs/plano-evolucao-erp.md` §5.1 desatualizado | `plano-evolucao-erp.md` | Baixo | Organização de documentação | ✅ Concluído em 2026-08-17 |
+| 4 | Drill-down morto (criado, não ligado) | `graficos.py:111` | Médio | Decisão de escopo: ligar ou remover do plano | ✅ Concluído em 2026-08-17 — removido (decisão do usuário) |
+| 5 | Δ% ausente fora da Visão Executiva | `bi_financeiro.py`, `bi_logistica.py`, `bi_produtividade.py` | Médio | Melhoria de UX gerencial | ✅ Concluído em 2026-08-17 |
+| 6 | Indicadores 6 e 8 da Entrega 3 ausentes (insumos por setor, ocorrências de auditoria) | `src/bi/metricas.py` (novo código) | Alto | **Requisito oficial não atendido** — decisão de escopo com a equipe | Pendente |
+| 7 | Estoque/Compras e painel de alertas fora do BI | `src/bi/` (novo escopo) | Alto | Evolução futura, não bloqueante | Pendente |
 
 ## Fora do escopo desta revisão
 

@@ -23,6 +23,7 @@ def main() -> None:
     with session_scope() as session:
         periodo = seletor_de_periodo(session, chave="logistica")
         indicadores = metricas.kpis(session, periodo)
+        anteriores = metricas.kpis(session, periodo.anterior())
         por_unidade = metricas.amostras_por_unidade(session, periodo)
         por_mes = metricas.amostras_por_mes(session, periodo)
         transito = metricas.tempo_transito_por_unidade(session, periodo)
@@ -43,11 +44,21 @@ def main() -> None:
 
     media_transito = float(transito["horas"].mean()) if not transito.empty else 0.0
 
+    def variacao(chave: str) -> str | None:
+        antes = anteriores.get(chave) or 0
+        agora = indicadores.get(chave) or 0
+        if not antes:
+            return None
+        return f"{(agora - antes) / antes * 100:+.1f}%"
+
     st.divider()
     colunas = st.columns(4)
-    colunas[0].metric("Amostras", f"{indicadores['amostras']:,}".replace(",", "."))
+    colunas[0].metric(
+        "Amostras", f"{indicadores['amostras']:,}".replace(",", "."), variacao("amostras")
+    )
     colunas[1].metric(
-        "Taxa de rejeicao", f"{indicadores['taxa_rejeicao']:.1f}%".replace(".", ",")
+        "Taxa de rejeicao", f"{indicadores['taxa_rejeicao']:.1f}%".replace(".", ","),
+        delta=variacao("taxa_rejeicao"), delta_color="inverse",
     )
     colunas[2].metric("Transito medio", f"{media_transito:.1f} h".replace(".", ","))
     colunas[3].metric("Unidades de origem", len(por_unidade))

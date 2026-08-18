@@ -72,7 +72,6 @@ def barra_categorica(
     horizontal: bool = True,
     cor_unica: str | None = None,
     altura: int = _ALTURA_PADRAO,
-    selecao: str | None = None,
     tamanho_barra: int | None = None,
 ) -> alt.Chart:
     """Ranking por categoria. Horizontal por padrao: nome de convenio nao cabe
@@ -116,9 +115,6 @@ def barra_categorica(
         )
         .properties(height=altura, title=titulo)
     )
-
-    if selecao:
-        grafico = grafico.add_params(alt.selection_point(fields=[categoria], name=selecao))
 
     return _tema(grafico)
 
