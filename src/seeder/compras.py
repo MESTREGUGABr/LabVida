@@ -224,6 +224,20 @@ def _seed_consumo(session: Session) -> int:
             saldo -= quantidade
             movimentos += 1
 
+        # O loop acima ignora `estoque_minimo` de proposito (simula consumo
+        # real, que nao sabe o quanto falta) — sem correcao, isso deixava a
+        # MAIORIA dos insumos "critica" por acidente. Decisao explicita aqui,
+        # depois do consumo: so uma minoria (~20%) fica de fato abaixo do
+        # minimo; o resto recebe uma pequena folga se o consumo tiver comido
+        # demais — nao depende de quantas iteracoes de consumo rolaram.
+        minimo = float(insumo.estoque_minimo or 0)
+        if random.random() < 0.2:
+            if saldo >= minimo:
+                saldo = round(minimo * random.uniform(0.3, 0.9), 3)
+        else:
+            if saldo < minimo:
+                saldo = round(minimo * random.uniform(1.1, 1.8), 3)
+
         insumo.quantidade_estoque = round(saldo, 3)
 
     session.commit()

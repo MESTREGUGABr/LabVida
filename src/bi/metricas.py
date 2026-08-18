@@ -33,6 +33,9 @@ from src.bi.models import (
     FatoLogistica,
     FatoOrdemServico,
 )
+from src.auditoria.models import AuditoriaLog
+from src.compras.insumo.models import EstoqueMovimento, InsumoMaterial
+from src.usuario.models import Usuario
 
 _PARTICULAR = "Particular"
 
@@ -69,6 +72,20 @@ def _df(session: Session, consulta: Select) -> pd.DataFrame:
 def _nome_convenio():
     """`NULL` em convenio significa particular — nunca 'sem nome'."""
     return func.coalesce(DimConvenio.nome, _PARTICULAR)
+
+
+def _humanizar(texto: str) -> str:
+    """"CRIAR_PACIENTE" -> "Criar paciente"; "ordem_servico" -> "Ordem servico".
+
+    `acao`/`entidade` de `AuditoriaLog` sao gravados em MAIUSCULO_COM_UNDERSCORE
+    ou minusculo_com_underscore pelo codigo (ver chamadas de `registrar_auditoria`),
+    nao tem cadastro proprio com nome de exibicao como convenio/setor/unidade.
+    "os" fica maiusculo (sigla de Ordem de Servico) — o resto do sistema trata
+    OS como sigla, nao palavra comum (`atendimento_os.py`, `laboratorio_bancada.py`).
+    """
+    palavras = [p.upper() if p == "os" else p for p in texto.lower().split("_")]
+    rotulo = " ".join(palavras)
+    return rotulo[:1].upper() + rotulo[1:] if rotulo else rotulo
 
 
 # ---------------------------------------------------------------------------
@@ -756,3 +773,252 @@ def kpis(session: Session, periodo: Periodo) -> dict[str, float]:
         "amostras": amostras,
         "taxa_rejeicao": (rejeitadas / amostras * 100) if amostras else 0.0,
     }
+
+
+# ---------------------------------------------------------------------------
+# Auditoria — consulta direta ao log operacional, sem ETL/fato no esquema
+# estrela. E um log de eventos imutavel (nao muda de regime como financeiro,
+# nao tem estados sobrepostos como OS), entao nao ha ganho em replica-lo no
+# star schema so pra filtrar por periodo — a data e comparada direto contra
+# `AuditoriaLog.ocorrido_em`.
+# ---------------------------------------------------------------------------
+
+
+def auditoria_kpis(session: Session, periodo: Periodo) -> dict[str, int]:
+    ocorrencias = session.scalar(
+        select(func.count(AuditoriaLog.id)).where(
+            and_(
+                func.date(AuditoriaLog.ocorrido_em) >= periodo.inicio,
+                func.date(AuditoriaLog.ocorrido_em) <= periodo.fim,
+            )
+        )
+    ) or 0
+    return {"ocorrencias": int(ocorrencias)}
+
+
+def ocorrencias_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
+    """Serie mensal. Calendario denso via `DimTempo` — mes sem ocorrencia vem
+    com zero, mesmo padrao de `exames_por_mes`."""
+    consulta = (
+        select(
+            DimTempo.ano_mes.label("mes"),
+            func.count(AuditoriaLog.id).label("ocorrencias"),
+        )
+        .select_from(DimTempo)
+        .join(AuditoriaLog, func.date(AuditoriaLog.ocorrido_em) == DimTempo.data, isouter=True)
+        .where(and_(DimTempo.data >= periodo.inicio, DimTempo.data <= periodo.fim))
+        .group_by(DimTempo.ano_mes)
+        .order_by(DimTempo.ano_mes)
+    )
+    return _df(session, consulta)
+
+
+def ocorrencias_por_acao(session: Session, periodo: Periodo) -> pd.DataFrame:
+    consulta = (
+        select(
+            AuditoriaLog.acao.label("acao"),
+            func.count(AuditoriaLog.id).label("ocorrencias"),
+        )
+        .where(
+            and_(
+                func.date(AuditoriaLog.ocorrido_em) >= periodo.inicio,
+                func.date(AuditoriaLog.ocorrido_em) <= periodo.fim,
+            )
+        )
+        .group_by(AuditoriaLog.acao)
+        .order_by(func.count(AuditoriaLog.id).desc())
+    )
+    df = _df(session, consulta)
+    if not df.empty:
+        df["acao"] = df["acao"].map(_humanizar)
+    return df
+
+
+def ocorrencias_por_entidade(session: Session, periodo: Periodo) -> pd.DataFrame:
+    consulta = (
+        select(
+            AuditoriaLog.entidade.label("entidade"),
+            func.count(AuditoriaLog.id).label("ocorrencias"),
+        )
+        .where(
+            and_(
+                func.date(AuditoriaLog.ocorrido_em) >= periodo.inicio,
+                func.date(AuditoriaLog.ocorrido_em) <= periodo.fim,
+            )
+        )
+        .group_by(AuditoriaLog.entidade)
+        .order_by(func.count(AuditoriaLog.id).desc())
+    )
+    df = _df(session, consulta)
+    if not df.empty:
+        df["entidade"] = df["entidade"].map(_humanizar)
+    return df
+
+
+def ocorrencias_recentes(session: Session, periodo: Periodo, *, limite: int = 200) -> pd.DataFrame:
+    """Detalhe (nao so agregado) para a grid da pagina de auditoria."""
+    consulta = (
+        select(
+            AuditoriaLog.ocorrido_em.label("ocorrido_em"),
+            Usuario.nome.label("usuario_nome"),
+            AuditoriaLog.acao.label("acao"),
+            AuditoriaLog.entidade.label("entidade"),
+        )
+        .join(Usuario, Usuario.id == AuditoriaLog.usuario_id)
+        .where(
+            and_(
+                func.date(AuditoriaLog.ocorrido_em) >= periodo.inicio,
+                func.date(AuditoriaLog.ocorrido_em) <= periodo.fim,
+            )
+        )
+        .order_by(AuditoriaLog.ocorrido_em.desc())
+        .limit(limite)
+    )
+    df = _df(session, consulta)
+    if not df.empty:
+        df["acao"] = df["acao"].map(_humanizar)
+        df["entidade"] = df["entidade"].map(_humanizar)
+    return df
+
+
+# ---------------------------------------------------------------------------
+# Estoque — consulta direta a `InsumoMaterial`/`EstoqueMovimento`, sem ETL.
+# Mesmo raciocinio da auditoria: sao tabelas operacionais de baixo volume,
+# sem "regime" nem estados sobrepostos que justifiquem um fato novo no
+# esquema estrela.
+# ---------------------------------------------------------------------------
+
+
+def estoque_kpis(session: Session) -> dict[str, int]:
+    """Estado atual do saldo — nao filtra por periodo (nao e serie historica)."""
+    total = session.scalar(select(func.count(InsumoMaterial.id))) or 0
+    criticos = session.scalar(
+        select(func.count(InsumoMaterial.id)).where(
+            InsumoMaterial.quantidade_estoque < InsumoMaterial.estoque_minimo
+        )
+    ) or 0
+    return {"total_insumos": int(total), "insumos_criticos": int(criticos)}
+
+
+def movimentacao_estoque_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
+    """Serie mensal ENTRADA x SAIDA. Calendario denso via `DimTempo`, mesmo
+    padrao de `fluxo_caixa_mensal`."""
+    consulta = (
+        select(
+            DimTempo.ano_mes.label("mes"),
+            func.coalesce(
+                func.sum(
+                    case((EstoqueMovimento.tipo == "ENTRADA", EstoqueMovimento.quantidade), else_=0)
+                ),
+                0,
+            ).label("entradas"),
+            func.coalesce(
+                func.sum(
+                    case((EstoqueMovimento.tipo == "SAIDA", EstoqueMovimento.quantidade), else_=0)
+                ),
+                0,
+            ).label("saidas"),
+        )
+        .select_from(DimTempo)
+        .join(EstoqueMovimento, func.date(EstoqueMovimento.ocorrido_em) == DimTempo.data, isouter=True)
+        .where(and_(DimTempo.data >= periodo.inicio, DimTempo.data <= periodo.fim))
+        .group_by(DimTempo.ano_mes)
+        .order_by(DimTempo.ano_mes)
+    )
+    return _df(session, consulta)
+
+
+def insumos_maior_consumo(session: Session, periodo: Periodo) -> pd.DataFrame:
+    """Ranking de giro: soma de saida por insumo no periodo."""
+    consulta = (
+        select(
+            InsumoMaterial.nome.label("nome"),
+            func.sum(EstoqueMovimento.quantidade).label("saida_total"),
+        )
+        .join(EstoqueMovimento, EstoqueMovimento.insumo_material_id == InsumoMaterial.id)
+        .where(
+            and_(
+                EstoqueMovimento.tipo == "SAIDA",
+                func.date(EstoqueMovimento.ocorrido_em) >= periodo.inicio,
+                func.date(EstoqueMovimento.ocorrido_em) <= periodo.fim,
+            )
+        )
+        .group_by(InsumoMaterial.nome)
+        .order_by(func.sum(EstoqueMovimento.quantidade).desc())
+    )
+    return _df(session, consulta)
+
+
+
+def insumos_criticos(session: Session) -> pd.DataFrame:
+    """Estado atual — mesma comparacao de `pages/compras_estoque.py` (saldo
+    abaixo do minimo), so que devolvendo DataFrame em vez de lista filtrada
+    em Python."""
+    consulta = (
+        select(
+            InsumoMaterial.nome.label("nome"),
+            InsumoMaterial.quantidade_estoque.label("quantidade_estoque"),
+            InsumoMaterial.estoque_minimo.label("estoque_minimo"),
+            (InsumoMaterial.estoque_minimo - InsumoMaterial.quantidade_estoque).label("deficit"),
+        )
+        .where(InsumoMaterial.quantidade_estoque < InsumoMaterial.estoque_minimo)
+        .order_by((InsumoMaterial.estoque_minimo - InsumoMaterial.quantidade_estoque).desc())
+    )
+    return _df(session, consulta)
+
+
+# ---------------------------------------------------------------------------
+# Alertas — estado atual (nao filtram por Periodo), pensados para a Visao
+# Executiva dar destaque a excecoes que precisam de acao, nao so agregados.
+# ---------------------------------------------------------------------------
+
+
+def alertas_titulos_vencidos(session: Session) -> pd.DataFrame:
+    from src.financeiro.titulo_pagar import repository as titulo_pagar_repository
+    from src.financeiro.titulo_receber import repository as titulo_receber_repository
+
+    hoje = date.today()
+    linhas = [
+        {
+            "tipo": "A receber",
+            "valor": float(titulo.valor),
+            "vencimento": titulo.vencimento,
+            "dias_atraso": (hoje - titulo.vencimento).days,
+        }
+        for titulo in titulo_receber_repository.listar_vencidos(session)
+    ] + [
+        {
+            "tipo": "A pagar",
+            "valor": float(titulo.valor),
+            "vencimento": titulo.vencimento,
+            "dias_atraso": (hoje - titulo.vencimento).days,
+        }
+        for titulo in titulo_pagar_repository.listar_vencidos(session)
+    ]
+    return pd.DataFrame(linhas, columns=["tipo", "valor", "vencimento", "dias_atraso"])
+
+
+def alertas_malotes_sem_retorno(session: Session, *, dias_limite: int = 2) -> pd.DataFrame:
+    from datetime import datetime, timezone
+
+    from src.cadastro.unidade.models import Unidade
+    from src.logistica.malote import repository as malote_repository
+
+    agora = datetime.now(timezone.utc)
+    limite = agora - timedelta(days=dias_limite)
+    malotes = malote_repository.listar_em_transito_ha_mais_de(session, limite)
+
+    unidades = {u.id: u.nome for u in session.scalars(select(Unidade)).all()}
+    linhas = [
+        {
+            "codigo_malote": malote.codigo_malote,
+            "origem": unidades.get(malote.unidade_origem_id, "-"),
+            "destino": unidades.get(malote.unidade_destino_id, "-"),
+            "despachado_em": malote.despachado_em,
+            "dias_em_transito": (agora - malote.despachado_em).days if malote.despachado_em else None,
+        }
+        for malote in malotes
+    ]
+    return pd.DataFrame(
+        linhas, columns=["codigo_malote", "origem", "destino", "despachado_em", "dias_em_transito"]
+    )

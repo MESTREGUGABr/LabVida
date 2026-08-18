@@ -81,12 +81,19 @@ def barra_categorica(
     rotulo_valor = rotulo_valor or valor.replace("_", " ").capitalize()
 
     quantitativo = _eixo_quantitativo(valor, rotulo_valor, formato)
-    # `labelAngle=0` no eixo vertical: sem isso o Vega roda o rotulo na
-    # diagonal quando acha que a categoria nao cabe na banda, o que muda a
-    # altura total do card e desalinha com um grafico vizinho na mesma linha
-    # (ex: DRE gerencial, que ja fixa o mesmo angulo).
-    nominal = alt.Y(f"{categoria}:N", title=rotulo_categoria, sort="-x") if horizontal else alt.X(
-        f"{categoria}:N", title=rotulo_categoria, sort="-y", axis=alt.Axis(labelAngle=0)
+    # `labelLimit=0` desliga o corte por reticencia do Vega (padrao ~100px) —
+    # sem isso, categoria com nome mais longo (ex: acoes de auditoria) corta
+    # tipo "REGISTRAR_COL...". `labelAngle=0` no eixo vertical: sem isso o
+    # Vega roda o rotulo na diagonal quando acha que a categoria nao cabe na
+    # banda, o que muda a altura total do card e desalinha com um grafico
+    # vizinho na mesma linha (ex: DRE gerencial, que ja fixa o mesmo angulo).
+    nominal = (
+        alt.Y(f"{categoria}:N", title=rotulo_categoria, sort="-x", axis=alt.Axis(labelLimit=0))
+        if horizontal
+        else alt.X(
+            f"{categoria}:N", title=rotulo_categoria, sort="-y",
+            axis=alt.Axis(labelAngle=0, labelLimit=0),
+        )
     )
 
     codificacao = (

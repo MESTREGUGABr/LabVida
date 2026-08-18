@@ -1,3 +1,4 @@
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -38,6 +39,21 @@ def listar_em_transito_para_unidade(session: Session, unidade_destino_id: UUID) 
             Malote.status == StatusMalote.EM_TRANSITO.value,
         )
         .order_by(Malote.criado_em.desc())
+    )
+    return list(session.scalars(stmt).all())
+
+
+def listar_em_transito_ha_mais_de(session: Session, limite: datetime) -> list[Malote]:
+    """`EM_TRANSITO` ja implica ausencia de protocolo de recebimento — so
+    `receber_malote` cria o `ProtocoloRecebimento` e muda o status pra
+    `RECEBIDO`, entao nao precisa de anti-join."""
+    stmt = (
+        select(Malote)
+        .where(
+            Malote.status == StatusMalote.EM_TRANSITO.value,
+            Malote.despachado_em < limite,
+        )
+        .order_by(Malote.despachado_em)
     )
     return list(session.scalars(stmt).all())
 

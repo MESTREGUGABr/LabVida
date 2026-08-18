@@ -7,7 +7,13 @@ from src.bi import metricas
 from src.bi.filtros import botao_atualizar, rodape_de_atualizacao, seletor_de_periodo, sem_dados
 from src.db import session_scope
 from src.ui import formatar_brl, renderizar_menu, shell
-from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
+from src.ui_components import (
+    ColunaGrid,
+    renderizar_cabecalho,
+    renderizar_empty_state,
+    renderizar_grid,
+    renderizar_secao,
+)
 from src.ui_icons import ICONE_PRODUTIVIDADE
 
 
@@ -30,6 +36,58 @@ def main() -> None:
         subtitulo="Indicadores consolidados do laboratorio no periodo",
         icone=ICONE_PRODUTIVIDADE,
     )
+
+    with session_scope() as session:
+        titulos_vencidos = metricas.alertas_titulos_vencidos(session)
+        malotes_sem_retorno = metricas.alertas_malotes_sem_retorno(session)
+
+    if not titulos_vencidos.empty or not malotes_sem_retorno.empty:
+        with st.container(border=True):
+            renderizar_secao(
+                titulo="Atencao",
+                descricao="Situacoes que podem precisar de acao imediata (nao depende do periodo abaixo)",
+            )
+            coluna_titulos, coluna_malotes = st.columns(2)
+            with coluna_titulos:
+                if titulos_vencidos.empty:
+                    st.success("Nenhum titulo vencido.")
+                else:
+                    total = titulos_vencidos["valor"].sum()
+                    st.warning(
+                        f"{len(titulos_vencidos)} titulo(s) vencido(s), "
+                        f"totalizando {formatar_brl(total)}."
+                    )
+                    with st.expander("Ver detalhes"):
+                        renderizar_grid(
+                            titulos_vencidos,
+                            colunas=[
+                                ColunaGrid(campo="tipo", rotulo="Tipo"),
+                                ColunaGrid(campo="valor", rotulo="Valor", tipo="moeda"),
+                                ColunaGrid(campo="vencimento", rotulo="Vencimento", tipo="data"),
+                                ColunaGrid(campo="dias_atraso", rotulo="Dias em atraso", tipo="inteiro"),
+                            ],
+                            chave="grid_titulos_vencidos",
+                            altura=220,
+                        )
+            with coluna_malotes:
+                if malotes_sem_retorno.empty:
+                    st.success("Nenhuma remessa sem retorno.")
+                else:
+                    st.warning(f"{len(malotes_sem_retorno)} remessa(s) sem retorno.")
+                    with st.expander("Ver detalhes"):
+                        renderizar_grid(
+                            malotes_sem_retorno,
+                            colunas=[
+                                ColunaGrid(campo="codigo_malote", rotulo="Malote"),
+                                ColunaGrid(campo="origem", rotulo="Origem"),
+                                ColunaGrid(campo="destino", rotulo="Destino"),
+                                ColunaGrid(campo="despachado_em", rotulo="Despachado em", tipo="data_hora"),
+                                ColunaGrid(campo="dias_em_transito", rotulo="Dias em transito", tipo="inteiro"),
+                            ],
+                            chave="grid_malotes_sem_retorno",
+                            altura=220,
+                        )
+        st.write("")
 
     with session_scope() as session:
         periodo = seletor_de_periodo(session, chave="executiva")

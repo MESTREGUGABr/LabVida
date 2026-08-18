@@ -39,9 +39,9 @@ Não foram encontrados bugs de cálculo (divisão por zero, JOIN duplicando linh
 | 3 | Taxa de glosa por convênio | ✅ | `metricas.py:469` (`taxa_glosa_por_convenio`) |
 | 4 | Receita por procedimento | ✅ | `metricas.py:389` (`curva_abc_procedimentos`) |
 | 5 | Inadimplência e divergências | ⚠️ parcial | inadimplência coberta (`aging_carteira`, `metricas.py:579`); **divergências não existe em nenhuma página nem em `metricas.py`** |
-| 6 | Consumo de insumos por setor | ❌ ausente | zero menção a "insumo" em `src/bi/` |
+| 6 | Consumo de insumos por setor | ❌ **decisão: não implementar** (2026-08-17) | Bloqueador estrutural, não só um FK faltando: `_processar_consumo_estoque` (`src/atendimento/amostra/service.py:110-168`) já **soma** as quantidades de insumo de todos os procedimentos/setores de uma OS antes de gravar um único `EstoqueMovimento` — a granularidade por setor é perdida antes mesmo de persistir, e `EstoqueMovimento` (`src/compras/insumo/models.py:29-39`) não tem FK de origem (só `observacao` texto livre). Corrigir de verdade exigiria mudar o fluxo de consumo de estoque em produção + FK novo + migration. Decisão: gap documentado, não implementado nesta entrega |
 | 7 | Volume de exames por período | ✅ | `metricas.py:91` (`exames_por_mes`) |
-| 8 | Ocorrências de auditoria | ❌ ausente | zero menção a "auditoria" em `src/bi/` |
+| 8 | Ocorrências de auditoria | ✅ **Implementado em 2026-08-17** | Nova página `pages/bi_auditoria.py`, consulta direta a `AuditoriaLog` (sem ETL/fato novo — log de auditoria já tinha 19 pontos de chamada cobrindo quase todos os módulos), gate por `admin:visualizar_auditoria` |
 
 **Ponto de atenção:** os itens 6 e 8 não aparecem nem como pendência conhecida em `roadmap-execucao.md` ou `plano-bi.md` (nem na Onda 1/F2, nem na Onda 2/F12 pendente) — foram prometidos na Entrega 3 e nunca entraram no planejamento subsequente do time. O item 5 (divergências) está parcialmente coberto pela F12 já documentada como pendente.
 
@@ -70,7 +70,8 @@ Não foram encontrados bugs de cálculo (divisão por zero, JOIN duplicando linh
 | 3 | `docs/plano-evolucao-erp.md` §5.1 desatualizado | `plano-evolucao-erp.md` | Baixo | Organização de documentação | ✅ Concluído em 2026-08-17 |
 | 4 | Drill-down morto (criado, não ligado) | `graficos.py:111` | Médio | Decisão de escopo: ligar ou remover do plano | ✅ Concluído em 2026-08-17 — removido (decisão do usuário) |
 | 5 | Δ% ausente fora da Visão Executiva | `bi_financeiro.py`, `bi_logistica.py`, `bi_produtividade.py` | Médio | Melhoria de UX gerencial | ✅ Concluído em 2026-08-17 |
-| 6 | Indicadores 6 e 8 da Entrega 3 ausentes (insumos por setor, ocorrências de auditoria) | `src/bi/metricas.py` (novo código) | Alto | **Requisito oficial não atendido** — decisão de escopo com a equipe | Pendente |
+| 6a | Indicador 6 da Entrega 3 — consumo de insumos por setor | `src/atendimento/amostra/service.py`, `src/compras/insumo/models.py` | Alto | **Requisito oficial não atendido** — bloqueador estrutural (ver §3) | ✅ Decidido em 2026-08-17 — **não implementar**, gap documentado |
+| 6b | Indicador 8 da Entrega 3 — ocorrências de auditoria | `pages/bi_auditoria.py` (novo), `src/bi/metricas.py` | Médio | **Requisito oficial não atendido** — infraestrutura já pronta (`AuditoriaLog`) | ✅ Concluído em 2026-08-17 |
 | 7 | Estoque/Compras e painel de alertas fora do BI | `src/bi/` (novo escopo) | Alto | Evolução futura, não bloqueante | Pendente |
 
 ## Fora do escopo desta revisão
