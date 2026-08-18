@@ -20,7 +20,17 @@ from datetime import date, datetime, timedelta, timezone
 
 from faker import Faker
 
-SEMENTE = int(os.environ.get("SEED_SEMENTE", "20261"))
+
+def _env_ou(nome: str, padrao: str) -> str:
+    """Valor da env com fallback — variável vazia vale como ausente.
+
+    O docker-compose repassa `SEED_*: ${SEED_*:-}` e envia string vazia quando
+    a variável não está definida; sem esse tratamento `float('')` quebra o boot.
+    """
+    return os.environ.get(nome) or padrao
+
+
+SEMENTE = int(_env_ou("SEED_SEMENTE", "20261"))
 
 
 def _resolver_janela_dias() -> int:
@@ -30,7 +40,7 @@ def _resolver_janela_dias() -> int:
     a série temporal do BI para anos (ex.: base de 2022 até hoje). O fallback
     continua sendo `SEED_JANELA_DIAS`.
     """
-    inicio = os.environ.get("SEED_INICIO", "").strip()
+    inicio = _env_ou("SEED_INICIO", "").strip()
     if inicio:
         try:
             dias = (date.today() - date.fromisoformat(inicio)).days
@@ -38,14 +48,14 @@ def _resolver_janela_dias() -> int:
                 return dias
         except ValueError:
             pass
-    return int(os.environ.get("SEED_JANELA_DIAS", "90"))
+    return int(_env_ou("SEED_JANELA_DIAS", "90"))
 
 
 JANELA_DIAS = _resolver_janela_dias()
 
 fake = Faker("pt_BR")
 
-_escala = float(os.environ.get("SEED_ESCALA", "1"))
+_escala = float(_env_ou("SEED_ESCALA", "1"))
 
 
 def definir_escala(valor: float) -> None:

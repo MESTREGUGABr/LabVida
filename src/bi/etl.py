@@ -130,18 +130,33 @@ def _valor(bruto) -> Decimal:
     return Decimal(str(bruto)) if bruto is not None else Decimal("0")
 
 
+# Postgres limita cada statement a 65.535 parâmetros; o INSERT em lote do
+# _upsert fatia as linhas para ficar confortavelmente abaixo disso.
+_LIMITE_PARAMETROS = 60000
+
+
 def _upsert(session: Session, modelo, linhas: list[dict], chave: list[str]) -> int:
-    """INSERT ... ON CONFLICT DO UPDATE em lote."""
+    """INSERT ... ON CONFLICT DO UPDATE em lotes.
+
+    Um fato com a série longa passa de 6 mil linhas; num INSERT único isso
+    estoura o limite de parâmetros do Postgres, então o lote é fatiado pelo
+    número de colunas da linha.
+    """
     if not linhas:
         return 0
-    stmt = pg_insert(modelo).values(linhas)
-    atualizaveis = {c: stmt.excluded[c] for c in linhas[0] if c not in chave}
-    if atualizaveis:
-        stmt = stmt.on_conflict_do_update(index_elements=chave, set_=atualizaveis)
-    else:
-        stmt = stmt.on_conflict_do_nothing(index_elements=chave)
-    session.execute(stmt)
-    return len(linhas)
+    por_lote = max(1, _LIMITE_PARAMETROS // len(linhas[0]))
+    total = 0
+    for indice in range(0, len(linhas), por_lote):
+        lote = linhas[indice : indice + por_lote]
+        stmt = pg_insert(modelo).values(lote)
+        atualizaveis = {c: stmt.excluded[c] for c in linhas[0] if c not in chave}
+        if atualizaveis:
+            stmt = stmt.on_conflict_do_update(index_elements=chave, set_=atualizaveis)
+        else:
+            stmt = stmt.on_conflict_do_nothing(index_elements=chave)
+        session.execute(stmt)
+        total += len(lote)
+    return total
 
 
 def _podar(session: Session, modelo, coluna_chave, presentes: set) -> None:
