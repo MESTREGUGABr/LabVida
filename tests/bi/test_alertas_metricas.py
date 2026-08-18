@@ -10,6 +10,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src.bi import metricas
+from src.compras.pedido_compra.models import PedidoCompra  # noqa: F401
 from src.financeiro.titulo_pagar.models import TituloPagar
 from src.logistica.malote.models import Malote
 from tests.bi._helpers import coletar, criar_os, faturar, liberar_laudos, montar_cadastros, titulo_receber, utc
