@@ -11,11 +11,12 @@ AQUI, sobre as medidas aditivas dos fatos, e nao guardadas em coluna: razao
 pre-calculada nao reagrega — a media das medias nao e a media (ADR 0009).
 """
 
+import uuid
 from dataclasses import dataclass
 from datetime import date, timedelta
 
 import pandas as pd
-from sqlalchemy import Select, and_, case, func, select
+from sqlalchemy import Select, and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from src.bi.models import (
@@ -58,9 +59,80 @@ class Periodo:
         return Periodo(self.inicio - duracao, self.inicio - timedelta(days=1), "Periodo anterior")
 
 
+@dataclass(frozen=True)
+class FiltroDimensoes:
+    """Filtro composto, combinado com `Periodo`. `None` num campo = sem
+    restricao naquela dimensao (todas passam) — retrocompatibilidade: cada
+    funcao abaixo so aplica a dimensao que o fato de origem tem de fato
+    (`hasattr`), entao passar um filtro nao quebra fatos sem aquela FK
+    (ex: `FatoLogistica` nao tem convenio nem procedimento)."""
+
+    unidades: list[int] | None = None
+    convenios: list[int] | None = None
+    incluir_particular: bool = False
+    procedimentos: list[int] | None = None
+
+
 def _no_periodo(consulta: Select, fato, periodo: Periodo) -> Select:
     return consulta.join(DimTempo, DimTempo.sk_tempo == fato.sk_tempo).where(
         and_(DimTempo.data >= periodo.inicio, DimTempo.data <= periodo.fim)
+    )
+
+
+def _condicoes_dimensoes(fato, filtro: "FiltroDimensoes | None") -> list:
+    """Condicoes de Unidade/Convenio/Procedimento, so na dimensao que o fato
+    tem (`hasattr`) — e o que garante "cada pagina so oferece o filtro que
+    faz sentido pros seus dados" sem precisar de `if` especial por funcao.
+
+    Devolve uma LISTA de condicoes, nao uma query pronta: series mensais com
+    calendario denso (`isouter=True` direto contra `DimTempo`) precisam
+    destas condicoes dentro do ON do LEFT JOIN, nao num WHERE — um WHERE
+    sobre coluna do lado direito de um LEFT JOIN vira INNER JOIN de fato e
+    faz o mes sem movimento (linha toda NULL) desaparecer, quebrando o
+    "mes sem dado entra com zero" (ver `exames_por_mes`/`receita_por_mes`).
+    """
+    if filtro is None:
+        return []
+    condicoes = []
+    if filtro.unidades and hasattr(fato, "sk_unidade"):
+        condicoes.append(fato.sk_unidade.in_(filtro.unidades))
+    if hasattr(fato, "sk_convenio"):
+        sub = []
+        if filtro.convenios:
+            sub.append(fato.sk_convenio.in_(filtro.convenios))
+        if filtro.incluir_particular:
+            sub.append(fato.sk_convenio.is_(None))
+        if sub:
+            condicoes.append(or_(*sub))
+    if filtro.procedimentos and hasattr(fato, "sk_procedimento"):
+        condicoes.append(fato.sk_procedimento.in_(filtro.procedimentos))
+    return condicoes
+
+
+def _com_dimensoes(consulta: Select, fato, filtro: "FiltroDimensoes | None") -> Select:
+    """Para JOIN comum (INNER) ou agregado sem quebra por mes: aplica via
+    WHERE. NAO use em series mensais de calendario denso — ver
+    `_condicoes_dimensoes`."""
+    condicoes = _condicoes_dimensoes(fato, filtro)
+    return consulta.where(and_(*condicoes)) if condicoes else consulta
+
+
+def _sem_convenio(filtro: "FiltroDimensoes | None") -> "FiltroDimensoes | None":
+    """Despesa (`FatoFinanceiro.fluxo == "SAIDA"`) nunca tem convenio — nao e
+    "particular", e simplesmente uma dimensao que nao existe pra aluguel,
+    fornecedor etc (o ETL grava `sk_convenio=None` pra TODA saida, sempre).
+    Selecionar "Particular" no filtro de Convenio (que vira `sk_convenio IS
+    NULL`) casava com TODAS as despesas, inflando o lado "Despesas pagas" do
+    DRE como se fossem receita de paciente particular. Usado so na consulta
+    de saidas — entradas (que tem convenio real, via o titulo/lote) continuam
+    respeitando o filtro normalmente."""
+    if filtro is None or (filtro.convenios is None and not filtro.incluir_particular):
+        return filtro
+    return FiltroDimensoes(
+        unidades=filtro.unidades,
+        convenios=None,
+        incluir_particular=False,
+        procedimentos=filtro.procedimentos,
     )
 
 
@@ -93,7 +165,9 @@ def _humanizar(texto: str) -> str:
 # ---------------------------------------------------------------------------
 
 
-def exames_por_unidade(session: Session, periodo: Periodo) -> pd.DataFrame:
+def exames_por_unidade(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     consulta = (
         select(DimUnidade.nome.label("unidade"), func.sum(FatoAtendimento.qtd_exames).label("exames"))
         .select_from(FatoAtendimento)
@@ -102,10 +176,12 @@ def exames_por_unidade(session: Session, periodo: Periodo) -> pd.DataFrame:
         .group_by(DimUnidade.nome)
         .order_by(func.sum(FatoAtendimento.qtd_exames).desc())
     )
-    return _df(session, _no_periodo(consulta, FatoAtendimento, periodo))
+    return _df(session, _com_dimensoes(_no_periodo(consulta, FatoAtendimento, periodo), FatoAtendimento, filtro))
 
 
-def exames_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
+def exames_por_mes(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     """Serie mensal. O calendario e denso, entao mes sem exame vem com zero."""
     exames = (
         select(
@@ -118,6 +194,7 @@ def exames_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
             and_(
                 FatoAtendimento.sk_tempo == DimTempo.sk_tempo,
                 FatoAtendimento.cancelado.is_(False),
+                *_condicoes_dimensoes(FatoAtendimento, filtro),
             ),
             isouter=True,
         )
@@ -128,7 +205,9 @@ def exames_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
     return _df(session, exames)
 
 
-def exames_por_convenio(session: Session, periodo: Periodo) -> pd.DataFrame:
+def exames_por_convenio(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     consulta = (
         select(_nome_convenio().label("convenio"), func.sum(FatoAtendimento.qtd_exames).label("exames"))
         .select_from(FatoAtendimento)
@@ -141,10 +220,12 @@ def exames_por_convenio(session: Session, periodo: Periodo) -> pd.DataFrame:
         .group_by(DimConvenio.nome)
         .order_by(func.sum(FatoAtendimento.qtd_exames).desc())
     )
-    return _df(session, _no_periodo(consulta, FatoAtendimento, periodo))
+    return _df(session, _com_dimensoes(_no_periodo(consulta, FatoAtendimento, periodo), FatoAtendimento, filtro))
 
 
-def exames_por_faixa_etaria(session: Session, periodo: Periodo) -> pd.DataFrame:
+def exames_por_faixa_etaria(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     consulta = (
         select(
             DimFaixaEtaria.descricao.label("faixa_etaria"),
@@ -156,10 +237,12 @@ def exames_por_faixa_etaria(session: Session, periodo: Periodo) -> pd.DataFrame:
         .group_by(DimFaixaEtaria.descricao, DimFaixaEtaria.ordem)
         .order_by(DimFaixaEtaria.ordem)
     )
-    return _df(session, _no_periodo(consulta, FatoAtendimento, periodo))
+    return _df(session, _com_dimensoes(_no_periodo(consulta, FatoAtendimento, periodo), FatoAtendimento, filtro))
 
 
-def exames_por_setor(session: Session, periodo: Periodo) -> pd.DataFrame:
+def exames_por_setor(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     """Destravado pela correcao de B4 — `DimProcedimento.setor` era sempre NULL."""
     consulta = (
         select(DimSetor.nome.label("setor"), func.sum(FatoAtendimento.qtd_exames).label("exames"))
@@ -169,10 +252,12 @@ def exames_por_setor(session: Session, periodo: Periodo) -> pd.DataFrame:
         .group_by(DimSetor.nome)
         .order_by(func.sum(FatoAtendimento.qtd_exames).desc())
     )
-    return _df(session, _no_periodo(consulta, FatoAtendimento, periodo))
+    return _df(session, _com_dimensoes(_no_periodo(consulta, FatoAtendimento, periodo), FatoAtendimento, filtro))
 
 
-def sazonalidade_por_dia_da_semana(session: Session, periodo: Periodo) -> pd.DataFrame:
+def sazonalidade_por_dia_da_semana(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     """`dia_semana` existia na dimensao desde o inicio e nunca foi usado."""
     consulta = (
         select(
@@ -192,7 +277,7 @@ def sazonalidade_por_dia_da_semana(session: Session, periodo: Periodo) -> pd.Dat
         .group_by(DimTempo.dia_semana, DimTempo.dia_semana_num)
         .order_by(DimTempo.dia_semana_num)
     )
-    return _df(session, consulta)
+    return _df(session, _com_dimensoes(consulta, FatoAtendimento, filtro))
 
 
 # ---------------------------------------------------------------------------
@@ -200,8 +285,14 @@ def sazonalidade_por_dia_da_semana(session: Session, periodo: Periodo) -> pd.Dat
 # ---------------------------------------------------------------------------
 
 
-def tat_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
-    """Tempo medio coleta -> laudo, no grao correto (uma linha por OS)."""
+def tat_por_mes(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
+    """Tempo medio coleta -> laudo, no grao correto (uma linha por OS).
+
+    `FatoOrdemServico` nao tem `sk_procedimento` (grao e a OS, nao o exame) —
+    um filtro de Exame nao se aplica aqui, so Unidade/Convenio (ver
+    `_condicoes_dimensoes`, que ja ignora `filtro.procedimentos` neste fato)."""
     consulta = (
         select(
             DimTempo.ano_mes.label("mes"),
@@ -220,16 +311,34 @@ def tat_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
         .group_by(DimTempo.ano_mes)
         .order_by(DimTempo.ano_mes)
     )
-    return _df(session, consulta)
+    return _df(session, _com_dimensoes(consulta, FatoOrdemServico, filtro))
 
 
-def tat_por_setor(session: Session, periodo: Periodo) -> pd.DataFrame:
+def tat_por_setor(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     """Media por OS dentro de cada setor.
 
     A OS e contada uma vez por setor em que tem exame — nao uma vez por exame,
     que era o erro de grao do modelo anterior.
+
+    So Unidade/Convenio filtram aqui (nao Exame): a hora e do grao da OS
+    (`FatoOrdemServico`), nao do exame individual — filtrar por um exame
+    especifico so restringiria QUAIS setores aparecem, sem mudar a hora
+    exibida (que continua sendo da OS inteira). Pra manter o mesmo
+    comportamento documentado de `tat_por_mes`, o filtro de procedimento e
+    ignorado aqui de proposito, mesmo `FatoAtendimento` tendo essa coluna.
     """
-    ordens_por_setor = (
+    filtro_sem_exame = (
+        FiltroDimensoes(
+            unidades=filtro.unidades,
+            convenios=filtro.convenios,
+            incluir_particular=filtro.incluir_particular,
+        )
+        if filtro is not None
+        else None
+    )
+    consulta_ordens = (
         select(
             DimSetor.nome.label("setor"),
             FatoOrdemServico.ordem_servico_id.label("ordem"),
@@ -250,8 +359,8 @@ def tat_por_setor(session: Session, periodo: Periodo) -> pd.DataFrame:
             )
         )
         .group_by(DimSetor.nome, FatoOrdemServico.ordem_servico_id)
-        .subquery()
     )
+    ordens_por_setor = _com_dimensoes(consulta_ordens, FatoAtendimento, filtro_sem_exame).subquery()
 
     consulta = (
         select(
@@ -270,7 +379,9 @@ def tat_por_setor(session: Session, periodo: Periodo) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def amostras_por_unidade(session: Session, periodo: Periodo) -> pd.DataFrame:
+def amostras_por_unidade(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     consulta = (
         select(
             DimUnidade.nome.label("unidade"),
@@ -282,18 +393,24 @@ def amostras_por_unidade(session: Session, periodo: Periodo) -> pd.DataFrame:
         .group_by(DimUnidade.nome)
         .order_by(func.sum(FatoLogistica.qtd_amostras).desc())
     )
-    return _df(session, _no_periodo(consulta, FatoLogistica, periodo))
+    return _df(session, _com_dimensoes(_no_periodo(consulta, FatoLogistica, periodo), FatoLogistica, filtro))
 
 
-def amostras_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
+def amostras_por_mes(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     """Serie que antes era uma barra unica em 'hoje' (bug B1)."""
+    condicao_join = and_(
+        FatoLogistica.sk_tempo == DimTempo.sk_tempo,
+        *_condicoes_dimensoes(FatoLogistica, filtro),
+    )
     consulta = (
         select(
             DimTempo.ano_mes.label("mes"),
             func.count(FatoLogistica.sk_fato).label("amostras"),
         )
         .select_from(DimTempo)
-        .join(FatoLogistica, FatoLogistica.sk_tempo == DimTempo.sk_tempo, isouter=True)
+        .join(FatoLogistica, condicao_join, isouter=True)
         .where(and_(DimTempo.data >= periodo.inicio, DimTempo.data <= periodo.fim))
         .group_by(DimTempo.ano_mes)
         .order_by(DimTempo.ano_mes)
@@ -301,7 +418,9 @@ def amostras_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
     return _df(session, consulta)
 
 
-def tempo_transito_por_unidade(session: Session, periodo: Periodo) -> pd.DataFrame:
+def tempo_transito_por_unidade(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     """Indicador novo: a coluna existia no modelo e nunca havia sido populada."""
     consulta = (
         select(
@@ -315,10 +434,12 @@ def tempo_transito_por_unidade(session: Session, periodo: Periodo) -> pd.DataFra
         .group_by(DimUnidade.nome)
         .order_by(func.avg(FatoLogistica.tempo_transito_horas).desc())
     )
-    return _df(session, _no_periodo(consulta, FatoLogistica, periodo))
+    return _df(session, _com_dimensoes(_no_periodo(consulta, FatoLogistica, periodo), FatoLogistica, filtro))
 
 
-def status_das_amostras(session: Session, periodo: Periodo) -> pd.DataFrame:
+def status_das_amostras(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     """Vem do fato, nao da tabela operacional `amostras` — que a pagina de
     logistica consultava direto, furando o modelo dimensional."""
     consulta = (
@@ -330,7 +451,7 @@ def status_das_amostras(session: Session, periodo: Periodo) -> pd.DataFrame:
         .group_by(FatoLogistica.status_atual)
         .order_by(func.count().desc())
     )
-    return _df(session, _no_periodo(consulta, FatoLogistica, periodo))
+    return _df(session, _com_dimensoes(_no_periodo(consulta, FatoLogistica, periodo), FatoLogistica, filtro))
 
 
 # ---------------------------------------------------------------------------
@@ -338,7 +459,9 @@ def status_das_amostras(session: Session, periodo: Periodo) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def receita_por_convenio(session: Session, periodo: Periodo) -> pd.DataFrame:
+def receita_por_convenio(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     consulta = (
         select(
             _nome_convenio().label("convenio"),
@@ -355,10 +478,16 @@ def receita_por_convenio(session: Session, periodo: Periodo) -> pd.DataFrame:
         .group_by(DimConvenio.nome)
         .order_by(func.sum(FatoFaturamento.valor_faturado).desc())
     )
-    return _df(session, _no_periodo(consulta, FatoFaturamento, periodo))
+    return _df(session, _com_dimensoes(_no_periodo(consulta, FatoFaturamento, periodo), FatoFaturamento, filtro))
 
 
-def receita_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
+def receita_por_mes(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
+    condicao_join = and_(
+        FatoFaturamento.sk_tempo == DimTempo.sk_tempo,
+        *_condicoes_dimensoes(FatoFaturamento, filtro),
+    )
     consulta = (
         select(
             DimTempo.ano_mes.label("mes"),
@@ -366,7 +495,7 @@ def receita_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
             func.coalesce(func.sum(FatoFaturamento.valor_glosado), 0).label("glosado"),
         )
         .select_from(DimTempo)
-        .join(FatoFaturamento, FatoFaturamento.sk_tempo == DimTempo.sk_tempo, isouter=True)
+        .join(FatoFaturamento, condicao_join, isouter=True)
         .where(and_(DimTempo.data >= periodo.inicio, DimTempo.data <= periodo.fim))
         .group_by(DimTempo.ano_mes)
         .order_by(DimTempo.ano_mes)
@@ -374,7 +503,9 @@ def receita_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
     return _df(session, consulta)
 
 
-def ticket_medio_por_convenio(session: Session, periodo: Periodo) -> pd.DataFrame:
+def ticket_medio_por_convenio(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     """Calculado sobre os aditivos — nao lido de uma coluna `ticket_medio`.
 
     Guardar a razao no fato impede reagregacao: o ticket medio de dois convenios
@@ -400,10 +531,12 @@ def ticket_medio_por_convenio(session: Session, periodo: Periodo) -> pd.DataFram
         .group_by(DimConvenio.nome)
         .order_by(func.sum(FatoFaturamento.valor_faturado).desc())
     )
-    return _df(session, _no_periodo(consulta, FatoFaturamento, periodo))
+    return _df(session, _com_dimensoes(_no_periodo(consulta, FatoFaturamento, periodo), FatoFaturamento, filtro))
 
 
-def curva_abc_procedimentos(session: Session, periodo: Periodo, limite: int = 15) -> pd.DataFrame:
+def curva_abc_procedimentos(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None, limite: int = 15
+) -> pd.DataFrame:
     """Receita por procedimento com participacao acumulada (classificacao ABC)."""
     consulta = (
         select(
@@ -416,7 +549,7 @@ def curva_abc_procedimentos(session: Session, periodo: Periodo, limite: int = 15
         .group_by(DimProcedimento.nome)
         .order_by(func.sum(FatoFaturamento.valor_faturado).desc())
     )
-    df = _df(session, _no_periodo(consulta, FatoFaturamento, periodo))
+    df = _df(session, _com_dimensoes(_no_periodo(consulta, FatoFaturamento, periodo), FatoFaturamento, filtro))
     if df.empty:
         return df
 
@@ -437,7 +570,9 @@ def curva_abc_procedimentos(session: Session, periodo: Periodo, limite: int = 15
     return df.head(limite)
 
 
-def ticket_medio_por_procedimento(session: Session, periodo: Periodo, limite: int = 10) -> pd.DataFrame:
+def ticket_medio_por_procedimento(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None, limite: int = 10
+) -> pd.DataFrame:
     consulta = (
         select(
             DimProcedimento.nome.label("procedimento"),
@@ -459,7 +594,7 @@ def ticket_medio_por_procedimento(session: Session, periodo: Periodo, limite: in
         )
         .limit(limite)
     )
-    return _df(session, _no_periodo(consulta, FatoFaturamento, periodo))
+    return _df(session, _com_dimensoes(_no_periodo(consulta, FatoFaturamento, periodo), FatoFaturamento, filtro))
 
 
 # ---------------------------------------------------------------------------
@@ -467,7 +602,9 @@ def ticket_medio_por_procedimento(session: Session, periodo: Periodo, limite: in
 # ---------------------------------------------------------------------------
 
 
-def glosa_por_motivo(session: Session, periodo: Periodo) -> pd.DataFrame:
+def glosa_por_motivo(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     """Indicador novo — exige `bi_fato_glosa`, que nao existia."""
     consulta = (
         select(
@@ -480,10 +617,12 @@ def glosa_por_motivo(session: Session, periodo: Periodo) -> pd.DataFrame:
         .group_by(DimMotivoGlosa.descricao)
         .order_by(func.sum(FatoGlosa.valor_glosado).desc())
     )
-    return _df(session, _no_periodo(consulta, FatoGlosa, periodo))
+    return _df(session, _com_dimensoes(_no_periodo(consulta, FatoGlosa, periodo), FatoGlosa, filtro))
 
 
-def taxa_glosa_por_convenio(session: Session, periodo: Periodo) -> pd.DataFrame:
+def taxa_glosa_por_convenio(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     consulta = (
         select(
             _nome_convenio().label("convenio"),
@@ -510,7 +649,7 @@ def taxa_glosa_por_convenio(session: Session, periodo: Periodo) -> pd.DataFrame:
             ).desc()
         )
     )
-    return _df(session, _no_periodo(consulta, FatoFaturamento, periodo))
+    return _df(session, _com_dimensoes(_no_periodo(consulta, FatoFaturamento, periodo), FatoFaturamento, filtro))
 
 
 # ---------------------------------------------------------------------------
@@ -518,12 +657,32 @@ def taxa_glosa_por_convenio(session: Session, periodo: Periodo) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def fluxo_caixa_mensal(session: Session, periodo: Periodo) -> pd.DataFrame:
+def fluxo_caixa_mensal(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     """Regime de CAIXA: dinheiro que de fato entrou e saiu.
 
     Antes o painel rotulado "Fluxo de Caixa" plotava cronograma de vencimentos e
     contava titulo nao pago como receita.
     """
+    # Convenio/Particular so faz sentido pro lado ENTRADA (vem do titulo/lote,
+    # que tem convenio real) — despesa (SAIDA) nunca tem convenio, entao fica
+    # de fora dessa condicao (ver `_sem_convenio`), senao "Particular" (que
+    # vira `sk_convenio IS NULL`) casaria com toda despesa.
+    condicao_convenio = _condicoes_dimensoes(
+        FatoFinanceiro,
+        FiltroDimensoes(convenios=filtro.convenios, incluir_particular=filtro.incluir_particular)
+        if filtro
+        else None,
+    )
+    condicoes_join = [
+        FatoFinanceiro.sk_tempo == DimTempo.sk_tempo,
+        FatoFinanceiro.regime == "CAIXA",
+        *_condicoes_dimensoes(FatoFinanceiro, _sem_convenio(filtro)),
+    ]
+    if condicao_convenio:
+        condicoes_join.append(or_(FatoFinanceiro.fluxo == "SAIDA", *condicao_convenio))
+
     consulta = (
         select(
             DimTempo.ano_mes.label("mes"),
@@ -537,14 +696,7 @@ def fluxo_caixa_mensal(session: Session, periodo: Periodo) -> pd.DataFrame:
             ).label("saidas"),
         )
         .select_from(DimTempo)
-        .join(
-            FatoFinanceiro,
-            and_(
-                FatoFinanceiro.sk_tempo == DimTempo.sk_tempo,
-                FatoFinanceiro.regime == "CAIXA",
-            ),
-            isouter=True,
-        )
+        .join(FatoFinanceiro, and_(*condicoes_join), isouter=True)
         .where(and_(DimTempo.data >= periodo.inicio, DimTempo.data <= periodo.fim))
         .group_by(DimTempo.ano_mes)
         .order_by(DimTempo.ano_mes)
@@ -555,7 +707,13 @@ def fluxo_caixa_mensal(session: Session, periodo: Periodo) -> pd.DataFrame:
     return df
 
 
-def previsto_x_realizado(session: Session, periodo: Periodo) -> pd.DataFrame:
+def previsto_x_realizado(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
+    condicao_join = and_(
+        FatoFinanceiro.sk_tempo == DimTempo.sk_tempo,
+        *_condicoes_dimensoes(FatoFinanceiro, filtro),
+    )
     consulta = (
         select(
             DimTempo.ano_mes.label("mes"),
@@ -585,7 +743,7 @@ def previsto_x_realizado(session: Session, periodo: Periodo) -> pd.DataFrame:
             ).label("realizado"),
         )
         .select_from(DimTempo)
-        .join(FatoFinanceiro, FatoFinanceiro.sk_tempo == DimTempo.sk_tempo, isouter=True)
+        .join(FatoFinanceiro, condicao_join, isouter=True)
         .where(and_(DimTempo.data >= periodo.inicio, DimTempo.data <= periodo.fim))
         .group_by(DimTempo.ano_mes)
         .order_by(DimTempo.ano_mes)
@@ -641,41 +799,55 @@ def aging_carteira(session: Session, referencia: date) -> pd.DataFrame:
     return _df(session, consulta)
 
 
-def dre_simplificado(session: Session, periodo: Periodo) -> pd.DataFrame:
+def dre_simplificado(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> pd.DataFrame:
     """DRE gerencial em regime de caixa — F13 do relatorio de revisao."""
     entradas = session.scalar(
-        _no_periodo(
-            select(
-                func.coalesce(
-                    func.sum(
-                        case((FatoFinanceiro.fluxo == "ENTRADA", FatoFinanceiro.valor_realizado), else_=0)
-                    ),
-                    0,
-                )
-            ).select_from(FatoFinanceiro).where(FatoFinanceiro.regime == "CAIXA"),
+        _com_dimensoes(
+            _no_periodo(
+                select(
+                    func.coalesce(
+                        func.sum(
+                            case((FatoFinanceiro.fluxo == "ENTRADA", FatoFinanceiro.valor_realizado), else_=0)
+                        ),
+                        0,
+                    )
+                ).select_from(FatoFinanceiro).where(FatoFinanceiro.regime == "CAIXA"),
+                FatoFinanceiro,
+                periodo,
+            ),
             FatoFinanceiro,
-            periodo,
+            filtro,
         )
     ) or 0
     saidas = session.scalar(
-        _no_periodo(
-            select(
-                func.coalesce(
-                    func.sum(
-                        case((FatoFinanceiro.fluxo == "SAIDA", FatoFinanceiro.valor_realizado), else_=0)
-                    ),
-                    0,
-                )
-            ).select_from(FatoFinanceiro).where(FatoFinanceiro.regime == "CAIXA"),
+        _com_dimensoes(
+            _no_periodo(
+                select(
+                    func.coalesce(
+                        func.sum(
+                            case((FatoFinanceiro.fluxo == "SAIDA", FatoFinanceiro.valor_realizado), else_=0)
+                        ),
+                        0,
+                    )
+                ).select_from(FatoFinanceiro).where(FatoFinanceiro.regime == "CAIXA"),
+                FatoFinanceiro,
+                periodo,
+            ),
             FatoFinanceiro,
-            periodo,
+            _sem_convenio(filtro),
         )
     ) or 0
     glosado = session.scalar(
-        _no_periodo(
-            select(func.coalesce(func.sum(FatoFaturamento.valor_glosado), 0)).select_from(FatoFaturamento),
+        _com_dimensoes(
+            _no_periodo(
+                select(func.coalesce(func.sum(FatoFaturamento.valor_glosado), 0)).select_from(FatoFaturamento),
+                FatoFaturamento,
+                periodo,
+            ),
             FatoFaturamento,
-            periodo,
+            filtro,
         )
     ) or 0
 
@@ -695,66 +867,86 @@ def dre_simplificado(session: Session, periodo: Periodo) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def kpis(session: Session, periodo: Periodo) -> dict[str, float]:
+def kpis(session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None) -> dict[str, float]:
     """Numeros de topo, todos derivados de medidas aditivas."""
     exames = session.scalar(
-        _no_periodo(
-            select(func.coalesce(func.sum(FatoAtendimento.qtd_exames), 0))
-            .select_from(FatoAtendimento)
-            .where(FatoAtendimento.cancelado.is_(False)),
+        _com_dimensoes(
+            _no_periodo(
+                select(func.coalesce(func.sum(FatoAtendimento.qtd_exames), 0))
+                .select_from(FatoAtendimento)
+                .where(FatoAtendimento.cancelado.is_(False)),
+                FatoAtendimento,
+                periodo,
+            ),
             FatoAtendimento,
-            periodo,
+            filtro,
         )
     ) or 0
 
     faturado, glosado = session.execute(
-        _no_periodo(
-            select(
-                func.coalesce(func.sum(FatoFaturamento.valor_faturado), 0),
-                func.coalesce(func.sum(FatoFaturamento.valor_glosado), 0),
-            ).select_from(FatoFaturamento),
+        _com_dimensoes(
+            _no_periodo(
+                select(
+                    func.coalesce(func.sum(FatoFaturamento.valor_faturado), 0),
+                    func.coalesce(func.sum(FatoFaturamento.valor_glosado), 0),
+                ).select_from(FatoFaturamento),
+                FatoFaturamento,
+                periodo,
+            ),
             FatoFaturamento,
-            periodo,
+            filtro,
         )
     ).one()
 
     recebido = session.scalar(
-        _no_periodo(
-            select(
-                func.coalesce(
-                    func.sum(
-                        case((FatoFinanceiro.fluxo == "ENTRADA", FatoFinanceiro.valor_realizado), else_=0)
-                    ),
-                    0,
+        _com_dimensoes(
+            _no_periodo(
+                select(
+                    func.coalesce(
+                        func.sum(
+                            case((FatoFinanceiro.fluxo == "ENTRADA", FatoFinanceiro.valor_realizado), else_=0)
+                        ),
+                        0,
+                    )
                 )
-            )
-            .select_from(FatoFinanceiro)
-            .where(FatoFinanceiro.regime == "CAIXA"),
+                .select_from(FatoFinanceiro)
+                .where(FatoFinanceiro.regime == "CAIXA"),
+                FatoFinanceiro,
+                periodo,
+            ),
             FatoFinanceiro,
-            periodo,
+            filtro,
         )
     ) or 0
 
     tat = session.scalar(
-        _no_periodo(
-            select(func.avg(FatoOrdemServico.tempo_ciclo_horas))
-            .select_from(FatoOrdemServico)
-            .where(FatoOrdemServico.tempo_ciclo_horas.is_not(None)),
+        _com_dimensoes(
+            _no_periodo(
+                select(func.avg(FatoOrdemServico.tempo_ciclo_horas))
+                .select_from(FatoOrdemServico)
+                .where(FatoOrdemServico.tempo_ciclo_horas.is_not(None)),
+                FatoOrdemServico,
+                periodo,
+            ),
             FatoOrdemServico,
-            periodo,
+            filtro,
         )
     )
 
     amostras, rejeitadas = session.execute(
-        _no_periodo(
-            select(
-                func.coalesce(func.sum(FatoLogistica.qtd_amostras), 0),
-                func.coalesce(
-                    func.sum(case((FatoLogistica.rejeitada.is_(True), 1), else_=0)), 0
-                ),
-            ).select_from(FatoLogistica),
+        _com_dimensoes(
+            _no_periodo(
+                select(
+                    func.coalesce(func.sum(FatoLogistica.qtd_amostras), 0),
+                    func.coalesce(
+                        func.sum(case((FatoLogistica.rejeitada.is_(True), 1), else_=0)), 0
+                    ),
+                ).select_from(FatoLogistica),
+                FatoLogistica,
+                periodo,
+            ),
             FatoLogistica,
-            periodo,
+            filtro,
         )
     ).one()
 
@@ -889,20 +1081,28 @@ def ocorrencias_recentes(session: Session, periodo: Periodo, *, limite: int = 20
 # ---------------------------------------------------------------------------
 
 
-def estoque_kpis(session: Session) -> dict[str, int]:
+def estoque_kpis(session: Session, insumos: list[uuid.UUID] | None = None) -> dict[str, int]:
     """Estado atual do saldo — nao filtra por periodo (nao e serie historica)."""
-    total = session.scalar(select(func.count(InsumoMaterial.id))) or 0
-    criticos = session.scalar(
-        select(func.count(InsumoMaterial.id)).where(
-            InsumoMaterial.quantidade_estoque < InsumoMaterial.estoque_minimo
-        )
-    ) or 0
+    consulta_total = select(func.count(InsumoMaterial.id))
+    consulta_criticos = select(func.count(InsumoMaterial.id)).where(
+        InsumoMaterial.quantidade_estoque < InsumoMaterial.estoque_minimo
+    )
+    if insumos:
+        consulta_total = consulta_total.where(InsumoMaterial.id.in_(insumos))
+        consulta_criticos = consulta_criticos.where(InsumoMaterial.id.in_(insumos))
+    total = session.scalar(consulta_total) or 0
+    criticos = session.scalar(consulta_criticos) or 0
     return {"total_insumos": int(total), "insumos_criticos": int(criticos)}
 
 
-def movimentacao_estoque_por_mes(session: Session, periodo: Periodo) -> pd.DataFrame:
+def movimentacao_estoque_por_mes(
+    session: Session, periodo: Periodo, insumos: list[uuid.UUID] | None = None
+) -> pd.DataFrame:
     """Serie mensal ENTRADA x SAIDA. Calendario denso via `DimTempo`, mesmo
     padrao de `fluxo_caixa_mensal`."""
+    condicao_join = func.date(EstoqueMovimento.ocorrido_em) == DimTempo.data
+    if insumos:
+        condicao_join = and_(condicao_join, EstoqueMovimento.insumo_material_id.in_(insumos))
     consulta = (
         select(
             DimTempo.ano_mes.label("mes"),
@@ -920,7 +1120,7 @@ def movimentacao_estoque_por_mes(session: Session, periodo: Periodo) -> pd.DataF
             ).label("saidas"),
         )
         .select_from(DimTempo)
-        .join(EstoqueMovimento, func.date(EstoqueMovimento.ocorrido_em) == DimTempo.data, isouter=True)
+        .join(EstoqueMovimento, condicao_join, isouter=True)
         .where(and_(DimTempo.data >= periodo.inicio, DimTempo.data <= periodo.fim))
         .group_by(DimTempo.ano_mes)
         .order_by(DimTempo.ano_mes)
@@ -928,21 +1128,24 @@ def movimentacao_estoque_por_mes(session: Session, periodo: Periodo) -> pd.DataF
     return _df(session, consulta)
 
 
-def insumos_maior_consumo(session: Session, periodo: Periodo) -> pd.DataFrame:
+def insumos_maior_consumo(
+    session: Session, periodo: Periodo, insumos: list[uuid.UUID] | None = None
+) -> pd.DataFrame:
     """Ranking de giro: soma de saida por insumo no periodo."""
+    condicoes = [
+        EstoqueMovimento.tipo == "SAIDA",
+        func.date(EstoqueMovimento.ocorrido_em) >= periodo.inicio,
+        func.date(EstoqueMovimento.ocorrido_em) <= periodo.fim,
+    ]
+    if insumos:
+        condicoes.append(InsumoMaterial.id.in_(insumos))
     consulta = (
         select(
             InsumoMaterial.nome.label("nome"),
             func.sum(EstoqueMovimento.quantidade).label("saida_total"),
         )
         .join(EstoqueMovimento, EstoqueMovimento.insumo_material_id == InsumoMaterial.id)
-        .where(
-            and_(
-                EstoqueMovimento.tipo == "SAIDA",
-                func.date(EstoqueMovimento.ocorrido_em) >= periodo.inicio,
-                func.date(EstoqueMovimento.ocorrido_em) <= periodo.fim,
-            )
-        )
+        .where(and_(*condicoes))
         .group_by(InsumoMaterial.nome)
         .order_by(func.sum(EstoqueMovimento.quantidade).desc())
     )
@@ -950,7 +1153,7 @@ def insumos_maior_consumo(session: Session, periodo: Periodo) -> pd.DataFrame:
 
 
 
-def insumos_criticos(session: Session) -> pd.DataFrame:
+def insumos_criticos(session: Session, insumos: list[uuid.UUID] | None = None) -> pd.DataFrame:
     """Estado atual — mesma comparacao de `pages/compras_estoque.py` (saldo
     abaixo do minimo), so que devolvendo DataFrame em vez de lista filtrada
     em Python."""
@@ -964,6 +1167,8 @@ def insumos_criticos(session: Session) -> pd.DataFrame:
         .where(InsumoMaterial.quantidade_estoque < InsumoMaterial.estoque_minimo)
         .order_by((InsumoMaterial.estoque_minimo - InsumoMaterial.quantidade_estoque).desc())
     )
+    if insumos:
+        consulta = consulta.where(InsumoMaterial.id.in_(insumos))
     return _df(session, consulta)
 
 
@@ -1031,39 +1236,54 @@ def alertas_malotes_sem_retorno(session: Session, *, dias_limite: int = 2) -> pd
 # ---------------------------------------------------------------------------
 
 
-def taxa_cancelamento_itens(session: Session, periodo: Periodo) -> float:
+def taxa_cancelamento_itens(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> float:
     """% de itens de OS cancelados no periodo — sinal de retrabalho/qualidade
-    que nenhum KPI hoje mede (Produtividade)."""
+    que nenhum KPI hoje mede (Produtividade). So Unidade/Convenio filtram
+    aqui — `FatoOrdemServico` nao tem `sk_procedimento`."""
     total, cancelados = session.execute(
-        _no_periodo(
-            select(
-                func.coalesce(func.sum(FatoOrdemServico.qtd_itens), 0),
-                func.coalesce(func.sum(FatoOrdemServico.qtd_itens_cancelados), 0),
-            ).select_from(FatoOrdemServico),
+        _com_dimensoes(
+            _no_periodo(
+                select(
+                    func.coalesce(func.sum(FatoOrdemServico.qtd_itens), 0),
+                    func.coalesce(func.sum(FatoOrdemServico.qtd_itens_cancelados), 0),
+                ).select_from(FatoOrdemServico),
+                FatoOrdemServico,
+                periodo,
+            ),
             FatoOrdemServico,
-            periodo,
+            filtro,
         )
     ).one()
     total, cancelados = float(total), float(cancelados)
     return (cancelados / total * 100) if total else 0.0
 
 
-def tempo_coleta_recebimento_medio(session: Session, periodo: Periodo) -> float:
+def tempo_coleta_recebimento_medio(
+    session: Session, periodo: Periodo, filtro: FiltroDimensoes | None = None
+) -> float:
     """Media de `FatoLogistica.tempo_coleta_recebimento_horas` — coluna ja
     carregada pelo ETL mas nunca lida em nenhuma metrica de Logistica."""
     media = session.scalar(
-        _no_periodo(
-            select(func.avg(FatoLogistica.tempo_coleta_recebimento_horas))
-            .select_from(FatoLogistica)
-            .where(FatoLogistica.tempo_coleta_recebimento_horas.is_not(None)),
+        _com_dimensoes(
+            _no_periodo(
+                select(func.avg(FatoLogistica.tempo_coleta_recebimento_horas))
+                .select_from(FatoLogistica)
+                .where(FatoLogistica.tempo_coleta_recebimento_horas.is_not(None)),
+                FatoLogistica,
+                periodo,
+            ),
             FatoLogistica,
-            periodo,
+            filtro,
         )
     )
     return float(media) if media is not None else 0.0
 
 
-def cobertura_dias(session: Session, periodo: Periodo) -> float | None:
+def cobertura_dias(
+    session: Session, periodo: Periodo, insumos: list[uuid.UUID] | None = None
+) -> float | None:
     """Dias de estoque restantes no ritmo de consumo do periodo: saldo atual
     total / consumo medio diario. Deliberadamente so quantidade, sem preco
     de compra (a valorizacao monetaria foi descartada nesta sessao).
@@ -1072,15 +1292,18 @@ def cobertura_dias(session: Session, periodo: Periodo) -> float | None:
     diferente de retornar `0.0`, que precisa continuar significando "estoque
     zerado com consumo ativo" (situacao bem mais grave, nao pode ficar
     escondida atras da mesma mensagem de "sem dado")."""
-    saldo_total = session.scalar(select(func.coalesce(func.sum(InsumoMaterial.quantidade_estoque), 0))) or 0
+    consulta_saldo = select(func.coalesce(func.sum(InsumoMaterial.quantidade_estoque), 0))
+    condicoes_consumo = [
+        EstoqueMovimento.tipo == "SAIDA",
+        func.date(EstoqueMovimento.ocorrido_em) >= periodo.inicio,
+        func.date(EstoqueMovimento.ocorrido_em) <= periodo.fim,
+    ]
+    if insumos:
+        consulta_saldo = consulta_saldo.where(InsumoMaterial.id.in_(insumos))
+        condicoes_consumo.append(EstoqueMovimento.insumo_material_id.in_(insumos))
+    saldo_total = session.scalar(consulta_saldo) or 0
     consumo_total = session.scalar(
-        select(func.coalesce(func.sum(EstoqueMovimento.quantidade), 0)).where(
-            and_(
-                EstoqueMovimento.tipo == "SAIDA",
-                func.date(EstoqueMovimento.ocorrido_em) >= periodo.inicio,
-                func.date(EstoqueMovimento.ocorrido_em) <= periodo.fim,
-            )
-        )
+        select(func.coalesce(func.sum(EstoqueMovimento.quantidade), 0)).where(and_(*condicoes_consumo))
     ) or 0
     dias = periodo.dias
     consumo_diario = float(consumo_total) / dias if dias else 0.0

@@ -4,16 +4,16 @@ import streamlit as st
 
 from src.bi import graficos
 from src.bi import metricas
-from src.bi.filtros import botao_atualizar, rodape_de_atualizacao, seletor_de_periodo, sem_dados
+from src.bi.filtros import (
+    botao_atualizar,
+    rodape_de_atualizacao,
+    seletor_de_filtros,
+    seletor_de_periodo,
+    sem_dados,
+)
 from src.db import session_scope
 from src.ui import formatar_brl, renderizar_menu, shell
-from src.ui_components import (
-    ColunaGrid,
-    renderizar_cabecalho,
-    renderizar_empty_state,
-    renderizar_grid,
-    renderizar_secao,
-)
+from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
 from src.ui_icons import ICONE_PRODUTIVIDADE
 
 
@@ -65,16 +65,22 @@ def main() -> None:
 
                     st.warning(f"Titulos vencidos: {', '.join(partes)}.")
                     with st.expander("Ver detalhes"):
-                        renderizar_grid(
-                            titulos_vencidos,
-                            colunas=[
-                                ColunaGrid(campo="tipo", rotulo="Tipo"),
-                                ColunaGrid(campo="valor", rotulo="Valor", tipo="moeda"),
-                                ColunaGrid(campo="vencimento", rotulo="Vencimento", tipo="data"),
-                                ColunaGrid(campo="dias_atraso", rotulo="Dias em atraso", tipo="inteiro"),
-                            ],
-                            chave="grid_titulos_vencidos",
-                            altura=220,
+                        # `st.dataframe` em vez do AgGrid de `renderizar_grid`: o AgGrid
+                        # monta com largura zero quando o container esta escondido no
+                        # primeiro render (`st.expander` comeca fechado) e nunca
+                        # recalcula depois — ficava em branco mesmo com dado presente.
+                        st.dataframe(
+                            titulos_vencidos.rename(
+                                columns={
+                                    "tipo": "Tipo",
+                                    "valor": "Valor",
+                                    "vencimento": "Vencimento",
+                                    "dias_atraso": "Dias em atraso",
+                                }
+                            ),
+                            hide_index=True,
+                            width="stretch",
+                            column_config={"Valor": st.column_config.NumberColumn(format="R$ %.2f")},
                         )
             with coluna_malotes:
                 if malotes_sem_retorno.empty:
@@ -82,32 +88,54 @@ def main() -> None:
                 else:
                     st.warning(f"{len(malotes_sem_retorno)} remessa(s) sem retorno.")
                     with st.expander("Ver detalhes"):
-                        renderizar_grid(
-                            malotes_sem_retorno,
-                            colunas=[
-                                ColunaGrid(campo="codigo_malote", rotulo="Malote"),
-                                ColunaGrid(campo="origem", rotulo="Origem"),
-                                ColunaGrid(campo="destino", rotulo="Destino"),
-                                ColunaGrid(campo="despachado_em", rotulo="Despachado em", tipo="data_hora"),
-                                ColunaGrid(campo="dias_em_transito", rotulo="Dias em transito", tipo="inteiro"),
-                            ],
-                            chave="grid_malotes_sem_retorno",
-                            altura=220,
+                        st.dataframe(
+                            malotes_sem_retorno.rename(
+                                columns={
+                                    "codigo_malote": "Malote",
+                                    "origem": "Origem",
+                                    "destino": "Destino",
+                                    "despachado_em": "Despachado em",
+                                    "dias_em_transito": "Dias em transito",
+                                }
+                            ),
+                            hide_index=True,
+                            width="stretch",
                         )
         st.write("")
 
     with session_scope() as session:
         periodo = seletor_de_periodo(session, chave="executiva")
-        indicadores = metricas.kpis(session, periodo)
-        anteriores = metricas.kpis(session, periodo.anterior())
-        receita_mes = metricas.receita_por_mes(session, periodo)
-        previsto_realizado = metricas.previsto_x_realizado(session, periodo)
-        dre = metricas.dre_simplificado(session, periodo)
-        dre_anterior = metricas.dre_simplificado(session, periodo.anterior())
-        taxa_glosa = metricas.taxa_glosa_por_convenio(session, periodo)
+        filtro = seletor_de_filtros(session, chave="executiva", incluir_procedimento=False)
+        if filtro.unidades:
+            st.caption(
+                "'Recebido (caixa)' e o 'DRE gerencial' sao caixa consolidado do "
+                "laboratorio — um lote de faturamento pode reunir OSs de varias "
+                "unidades, entao esse valor nao pertence a nenhuma unidade de coleta "
+                "especifica e some ao filtrar por uma."
+            )
+        if filtro.convenios or filtro.incluir_particular:
+            st.caption(
+                "'Despesas pagas' e o 'Resultado' do DRE sao sempre o total consolidado "
+                "— aluguel, fornecedor etc nao tem convenio, entao o filtro de Convenio "
+                "so restringe a 'Receita recebida'. Com 'Particular' selecionado (sem "
+                "nenhum paciente particular na base), a receita zera mas a despesa "
+                "continua cheia, e o Resultado aparece negativo por isso — nao e bug."
+            )
+        indicadores = metricas.kpis(session, periodo, filtro)
+        anteriores = metricas.kpis(session, periodo.anterior(), filtro)
+        receita_mes = metricas.receita_por_mes(session, periodo, filtro)
+        previsto_realizado = metricas.previsto_x_realizado(session, periodo, filtro)
+        dre = metricas.dre_simplificado(session, periodo, filtro)
+        dre_anterior = metricas.dre_simplificado(session, periodo.anterior(), filtro)
+        taxa_glosa = metricas.taxa_glosa_por_convenio(session, periodo, filtro)
         aging = metricas.aging_carteira(session, periodo.fim)
         rodape_de_atualizacao(session)
-        houve_carga = indicadores["exames"] > 0 or indicadores["faturado"] > 0
+        # Sem filtro (so periodo): filtro estreito demais (ex.: "Particular"
+        # numa base sem paciente particular) zerando os KPIs NAO significa
+        # que o ETL nunca rodou — checar com o filtro aplicado mostrava a
+        # tela de "execute o ETL" pro caso errado.
+        sem_filtro = metricas.kpis(session, periodo)
+        houve_carga = sem_filtro["exames"] > 0 or sem_filtro["faturado"] > 0
 
     if not houve_carga:
         _sem_carga()

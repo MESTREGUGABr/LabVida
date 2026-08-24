@@ -8,7 +8,7 @@ volume, sem "regime" nem estados sobrepostos que justifiquem isso.
 import streamlit as st
 
 from src.bi import graficos, metricas
-from src.bi.filtros import seletor_de_periodo, sem_dados
+from src.bi.filtros import seletor_de_insumos, seletor_de_periodo, sem_dados
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
 from src.ui_components import (
@@ -33,11 +33,12 @@ def main() -> None:
 
     with session_scope() as session:
         periodo = seletor_de_periodo(session, chave="estoque")
-        indicadores = metricas.estoque_kpis(session)
-        por_mes = metricas.movimentacao_estoque_por_mes(session, periodo)
-        maior_consumo = metricas.insumos_maior_consumo(session, periodo)
-        criticos = metricas.insumos_criticos(session)
-        cobertura = metricas.cobertura_dias(session, periodo)
+        insumos = seletor_de_insumos(session, chave="estoque")
+        indicadores = metricas.estoque_kpis(session, insumos)
+        por_mes = metricas.movimentacao_estoque_por_mes(session, periodo, insumos)
+        maior_consumo = metricas.insumos_maior_consumo(session, periodo, insumos)
+        criticos = metricas.insumos_criticos(session, insumos)
+        cobertura = metricas.cobertura_dias(session, periodo, insumos)
 
     if indicadores["total_insumos"] == 0:
         renderizar_empty_state(

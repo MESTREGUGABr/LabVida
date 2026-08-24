@@ -3,7 +3,13 @@
 import streamlit as st
 
 from src.bi import graficos, metricas
-from src.bi.filtros import botao_atualizar, rodape_de_atualizacao, seletor_de_periodo, sem_dados
+from src.bi.filtros import (
+    botao_atualizar,
+    rodape_de_atualizacao,
+    seletor_de_filtros,
+    seletor_de_periodo,
+    sem_dados,
+)
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
 from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
@@ -22,21 +28,31 @@ def main() -> None:
 
     with session_scope() as session:
         periodo = seletor_de_periodo(session, chave="produtividade")
-        indicadores = metricas.kpis(session, periodo)
-        anteriores = metricas.kpis(session, periodo.anterior())
-        por_unidade = metricas.exames_por_unidade(session, periodo)
-        por_mes = metricas.exames_por_mes(session, periodo)
-        por_convenio = metricas.exames_por_convenio(session, periodo)
-        por_faixa = metricas.exames_por_faixa_etaria(session, periodo)
-        por_setor = metricas.exames_por_setor(session, periodo)
-        sazonalidade = metricas.sazonalidade_por_dia_da_semana(session, periodo)
-        tat_mes = metricas.tat_por_mes(session, periodo)
-        tat_setor = metricas.tat_por_setor(session, periodo)
-        taxa_cancelamento = metricas.taxa_cancelamento_itens(session, periodo)
-        taxa_cancelamento_anterior = metricas.taxa_cancelamento_itens(session, periodo.anterior())
+        filtro = seletor_de_filtros(session, chave="produtividade")
+        if filtro.procedimentos:
+            st.caption(
+                "O filtro de Exame nao se aplica ao TAT nem a Taxa de "
+                "cancelamento — esses indicadores sao do grao da OS inteira, "
+                "nao do exame individual."
+            )
+        indicadores = metricas.kpis(session, periodo, filtro)
+        anteriores = metricas.kpis(session, periodo.anterior(), filtro)
+        por_unidade = metricas.exames_por_unidade(session, periodo, filtro)
+        por_mes = metricas.exames_por_mes(session, periodo, filtro)
+        por_convenio = metricas.exames_por_convenio(session, periodo, filtro)
+        por_faixa = metricas.exames_por_faixa_etaria(session, periodo, filtro)
+        por_setor = metricas.exames_por_setor(session, periodo, filtro)
+        sazonalidade = metricas.sazonalidade_por_dia_da_semana(session, periodo, filtro)
+        tat_mes = metricas.tat_por_mes(session, periodo, filtro)
+        tat_setor = metricas.tat_por_setor(session, periodo, filtro)
+        taxa_cancelamento = metricas.taxa_cancelamento_itens(session, periodo, filtro)
+        taxa_cancelamento_anterior = metricas.taxa_cancelamento_itens(session, periodo.anterior(), filtro)
         rodape_de_atualizacao(session)
+        # Sem filtro (so periodo): filtro estreito demais zerando os KPIs nao
+        # significa que o ETL nunca rodou.
+        sem_filtro = metricas.kpis(session, periodo)
 
-    if indicadores["exames"] == 0:
+    if sem_filtro["exames"] == 0:
         renderizar_empty_state(
             icone=ICONE_PRODUTIVIDADE,
             titulo="Nenhum exame no periodo",
@@ -95,21 +111,27 @@ def main() -> None:
     with esquerda:
         with st.container(border=True):
             renderizar_secao(titulo="Exames por unidade")
-            st.altair_chart(
-                graficos.barra_categorica(
-                    por_unidade, categoria="unidade", valor="exames", rotulo_valor="Exames"
-                ),
-                use_container_width=True,
-            )
+            if por_unidade.empty:
+                sem_dados()
+            else:
+                st.altair_chart(
+                    graficos.barra_categorica(
+                        por_unidade, categoria="unidade", valor="exames", rotulo_valor="Exames"
+                    ),
+                    use_container_width=True,
+                )
     with direita:
         with st.container(border=True):
             renderizar_secao(titulo="Exames por convenio")
-            st.altair_chart(
-                graficos.barra_categorica(
-                    por_convenio, categoria="convenio", valor="exames", rotulo_valor="Exames"
-                ),
-                use_container_width=True,
-            )
+            if por_convenio.empty:
+                sem_dados()
+            else:
+                st.altair_chart(
+                    graficos.barra_categorica(
+                        por_convenio, categoria="convenio", valor="exames", rotulo_valor="Exames"
+                    ),
+                    use_container_width=True,
+                )
 
     st.write("")
     esquerda, direita = st.columns(2)
@@ -126,14 +148,17 @@ def main() -> None:
     with direita:
         with st.container(border=True):
             renderizar_secao(titulo="Distribuicao por faixa etaria")
-            st.altair_chart(
-                graficos.barra_categorica(
-                    por_faixa, categoria="faixa_etaria", valor="exames",
-                    rotulo_categoria="Faixa etaria", rotulo_valor="Exames",
-                    horizontal=False, cor_unica=graficos.COR_NEUTRA,
-                ),
-                use_container_width=True,
-            )
+            if por_faixa.empty:
+                sem_dados()
+            else:
+                st.altair_chart(
+                    graficos.barra_categorica(
+                        por_faixa, categoria="faixa_etaria", valor="exames",
+                        rotulo_categoria="Faixa etaria", rotulo_valor="Exames",
+                        horizontal=False, cor_unica=graficos.COR_NEUTRA,
+                    ),
+                    use_container_width=True,
+                )
 
     st.write("")
     esquerda, direita = st.columns([2, 3])

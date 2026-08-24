@@ -3,7 +3,13 @@
 import streamlit as st
 
 from src.bi import graficos, metricas
-from src.bi.filtros import botao_atualizar, rodape_de_atualizacao, seletor_de_periodo, sem_dados
+from src.bi.filtros import (
+    botao_atualizar,
+    rodape_de_atualizacao,
+    seletor_de_filtros,
+    seletor_de_periodo,
+    sem_dados,
+)
 from src.db import session_scope
 from src.ui import renderizar_menu, shell
 from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
@@ -22,21 +28,27 @@ def main() -> None:
 
     with session_scope() as session:
         periodo = seletor_de_periodo(session, chave="logistica")
-        indicadores = metricas.kpis(session, periodo)
-        anteriores = metricas.kpis(session, periodo.anterior())
-        por_unidade = metricas.amostras_por_unidade(session, periodo)
-        por_mes = metricas.amostras_por_mes(session, periodo)
-        transito = metricas.tempo_transito_por_unidade(session, periodo)
+        filtro = seletor_de_filtros(
+            session, chave="logistica", incluir_convenio=False, incluir_procedimento=False
+        )
+        indicadores = metricas.kpis(session, periodo, filtro)
+        anteriores = metricas.kpis(session, periodo.anterior(), filtro)
+        por_unidade = metricas.amostras_por_unidade(session, periodo, filtro)
+        por_mes = metricas.amostras_por_mes(session, periodo, filtro)
+        transito = metricas.tempo_transito_por_unidade(session, periodo, filtro)
         # Vem do fato, nao da tabela operacional `amostras` — a versao anterior
         # consultava o OLTP direto, furando o modelo dimensional.
-        status = metricas.status_das_amostras(session, periodo)
-        tempo_coleta_recebimento = metricas.tempo_coleta_recebimento_medio(session, periodo)
+        status = metricas.status_das_amostras(session, periodo, filtro)
+        tempo_coleta_recebimento = metricas.tempo_coleta_recebimento_medio(session, periodo, filtro)
         tempo_coleta_recebimento_anterior = metricas.tempo_coleta_recebimento_medio(
-            session, periodo.anterior()
+            session, periodo.anterior(), filtro
         )
         rodape_de_atualizacao(session)
+        # Sem filtro (so periodo): filtro estreito demais zerando os KPIs nao
+        # significa que o ETL nunca rodou.
+        sem_filtro = metricas.kpis(session, periodo)
 
-    if indicadores["amostras"] == 0:
+    if sem_filtro["amostras"] == 0:
         renderizar_empty_state(
             icone=ICONE_AMOSTRA,
             titulo="Nenhuma amostra no periodo",
@@ -93,12 +105,15 @@ def main() -> None:
     with esquerda:
         with st.container(border=True):
             renderizar_secao(titulo="Amostras por unidade de origem")
-            st.altair_chart(
-                graficos.barra_categorica(
-                    por_unidade, categoria="unidade", valor="amostras", rotulo_valor="Amostras"
-                ),
-                use_container_width=True,
-            )
+            if por_unidade.empty:
+                sem_dados()
+            else:
+                st.altair_chart(
+                    graficos.barra_categorica(
+                        por_unidade, categoria="unidade", valor="amostras", rotulo_valor="Amostras"
+                    ),
+                    use_container_width=True,
+                )
     with direita:
         with st.container(border=True):
             renderizar_secao(titulo="Tempo medio de transito")

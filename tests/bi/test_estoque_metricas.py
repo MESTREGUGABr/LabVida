@@ -148,3 +148,34 @@ def test_cobertura_dias_estoque_zerado_com_consumo_e_zero_nao_none(session: Sess
     session.commit()
 
     assert metricas.cobertura_dias(session, JANEIRO) == 0.0
+
+
+def test_filtro_por_insumo_restringe_kpis_e_movimentacao(session: Session) -> None:
+    tubo = criar_insumo(
+        session, InsumoCreate(nome="Tubo A", finalidade="x", quantidade_estoque=5, estoque_minimo=10)
+    )
+    reagente = criar_insumo(
+        session, InsumoCreate(nome="Reagente B", finalidade="x", quantidade_estoque=50, estoque_minimo=10)
+    )
+    session.add(
+        EstoqueMovimento(
+            insumo_material_id=tubo.id, tipo=TipoMovimentoEstoque.SAIDA,
+            quantidade=2, ocorrido_em=utc(2026, 1, 15),
+        )
+    )
+    session.add(
+        EstoqueMovimento(
+            insumo_material_id=reagente.id, tipo=TipoMovimentoEstoque.SAIDA,
+            quantidade=9, ocorrido_em=utc(2026, 1, 15),
+        )
+    )
+    session.commit()
+
+    so_tubo = [tubo.id]
+    indicadores = metricas.estoque_kpis(session, so_tubo)
+    assert indicadores["total_insumos"] == 1
+    assert indicadores["insumos_criticos"] == 1  # tubo esta abaixo do minimo
+
+    consumo = metricas.insumos_maior_consumo(session, JANEIRO, so_tubo)
+    assert len(consumo) == 1
+    assert consumo.iloc[0]["nome"] == "Tubo A"
