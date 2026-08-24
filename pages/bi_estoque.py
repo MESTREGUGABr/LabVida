@@ -37,6 +37,7 @@ def main() -> None:
         por_mes = metricas.movimentacao_estoque_por_mes(session, periodo)
         maior_consumo = metricas.insumos_maior_consumo(session, periodo)
         criticos = metricas.insumos_criticos(session)
+        cobertura = metricas.cobertura_dias(session, periodo)
 
     if indicadores["total_insumos"] == 0:
         renderizar_empty_state(
@@ -48,7 +49,14 @@ def main() -> None:
 
     st.caption("Saldo e criticidade em tempo real; movimentacao e giro no periodo selecionado.")
     st.divider()
-    st.metric("Insumos criticos", f"{indicadores['insumos_criticos']} de {indicadores['total_insumos']}")
+    colunas = st.columns(2)
+    colunas[0].metric(
+        "Insumos criticos", f"{indicadores['insumos_criticos']} de {indicadores['total_insumos']}"
+    )
+    colunas[1].metric(
+        "Cobertura de estoque",
+        f"{cobertura:.0f} dias" if cobertura is not None else "Sem consumo no periodo",
+    )
 
     with st.container(border=True):
         renderizar_secao(titulo="Movimentacao mensal (entradas x saidas)")

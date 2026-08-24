@@ -104,3 +104,47 @@ def test_insumos_maior_consumo_filtra_por_periodo(session: Session) -> None:
 
     assert len(df) == 1
     assert float(df.iloc[0]["saida_total"]) == 15
+
+
+def test_cobertura_dias_saldo_sobre_consumo_diario_medio(session: Session) -> None:
+    criar_insumo(session, InsumoCreate(nome="Reagente", finalidade="x", quantidade_estoque=100, estoque_minimo=10))
+    insumo = criar_insumo(
+        session, InsumoCreate(nome="Outro", finalidade="x", quantidade_estoque=0, estoque_minimo=10)
+    )
+    session.add(
+        EstoqueMovimento(
+            insumo_material_id=insumo.id, tipo=TipoMovimentoEstoque.SAIDA,
+            quantidade=31, ocorrido_em=utc(2026, 1, 15),
+        )
+    )
+    session.commit()
+
+    # Saldo total = 100 (o segundo insumo esta zerado); consumo diario medio
+    # em janeiro (31 dias) = 31/31 = 1 -> cobertura = 100 dias.
+    assert metricas.cobertura_dias(session, JANEIRO) == 100.0
+
+
+def test_cobertura_dias_sem_consumo_e_none(session: Session) -> None:
+    """`None` = sem base para estimar (nao houve saida no periodo) — nao pode
+    ser confundido com "0 dias" (estoque zerado com consumo ativo)."""
+    criar_insumo(session, InsumoCreate(nome="Reagente", finalidade="x", quantidade_estoque=100, estoque_minimo=10))
+    session.commit()
+
+    assert metricas.cobertura_dias(session, JANEIRO) is None
+
+
+def test_cobertura_dias_estoque_zerado_com_consumo_e_zero_nao_none(session: Session) -> None:
+    """Caso mais grave: acabou o estoque e ainda ha consumo registrado no
+    periodo — tem que aparecer como "0 dias" (alerta), nao como "sem dado"."""
+    insumo = criar_insumo(
+        session, InsumoCreate(nome="Reagente", finalidade="x", quantidade_estoque=0, estoque_minimo=10)
+    )
+    session.add(
+        EstoqueMovimento(
+            insumo_material_id=insumo.id, tipo=TipoMovimentoEstoque.SAIDA,
+            quantidade=5, ocorrido_em=utc(2026, 1, 15),
+        )
+    )
+    session.commit()
+
+    assert metricas.cobertura_dias(session, JANEIRO) == 0.0

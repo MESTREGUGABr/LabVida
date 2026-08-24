@@ -103,6 +103,7 @@ def main() -> None:
         receita_mes = metricas.receita_por_mes(session, periodo)
         previsto_realizado = metricas.previsto_x_realizado(session, periodo)
         dre = metricas.dre_simplificado(session, periodo)
+        dre_anterior = metricas.dre_simplificado(session, periodo.anterior())
         taxa_glosa = metricas.taxa_glosa_por_convenio(session, periodo)
         aging = metricas.aging_carteira(session, periodo.fim)
         rodape_de_atualizacao(session)
@@ -119,18 +120,39 @@ def main() -> None:
             return None
         return f"{(agora - antes) / antes * 100:+.1f}%"
 
+    def _resultado(dataframe) -> float:
+        linha = dataframe[dataframe["linha"] == "Resultado"]
+        return float(linha["valor"].iloc[0]) if not linha.empty else 0.0
+
+    resultado_atual = _resultado(dre)
+    resultado_anterior = _resultado(dre_anterior)
+    # Divide pelo modulo, nao pelo valor: "Resultado" pode ser negativo (mes
+    # deficitario), e dividir por um anterior negativo inverteria o sinal do
+    # delta (ex.: piorar de -100 pra -150 apareceria como "+50%", como se
+    # tivesse melhorado). Os outros KPIs da pagina nunca ficam negativos,
+    # entao esse caso nao aparecia antes do KPI de Resultado.
+    variacao_resultado = (
+        f"{(resultado_atual - resultado_anterior) / abs(resultado_anterior) * 100:+.1f}%"
+        if resultado_anterior
+        else None
+    )
+
     st.divider()
-    colunas = st.columns(5)
-    colunas[0].metric("Exames", f"{indicadores['exames']:,}".replace(",", "."), variacao("exames"))
-    colunas[1].metric("Faturado", formatar_brl(indicadores["faturado"]), variacao("faturado"))
-    colunas[2].metric("Recebido (caixa)", formatar_brl(indicadores["recebido"]), variacao("recebido"))
-    colunas[3].metric(
+    linha1 = st.columns(3)
+    linha1[0].metric("Exames", f"{indicadores['exames']:,}".replace(",", "."), variacao("exames"))
+    linha1[1].metric("Faturado", formatar_brl(indicadores["faturado"]), variacao("faturado"))
+    linha1[2].metric("Recebido (caixa)", formatar_brl(indicadores["recebido"]), variacao("recebido"))
+
+    st.write("")
+    linha2 = st.columns(3)
+    linha2[0].metric(
         "Taxa de glosa",
         f"{indicadores['taxa_glosa']:.1f}%".replace(".", ","),
         delta=variacao("taxa_glosa"),
         delta_color="inverse",
     )
-    colunas[4].metric("Ticket medio", formatar_brl(indicadores["ticket_medio"]), variacao("ticket_medio"))
+    linha2[1].metric("Ticket medio", formatar_brl(indicadores["ticket_medio"]), variacao("ticket_medio"))
+    linha2[2].metric("Resultado (DRE)", formatar_brl(resultado_atual), variacao_resultado)
 
     esquerda, direita = st.columns(2)
 

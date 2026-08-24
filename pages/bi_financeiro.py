@@ -57,17 +57,23 @@ def main() -> None:
         return f"{(agora - antes) / antes * 100:+.1f}%"
 
     st.divider()
-    colunas = st.columns(5)
-    colunas[0].metric("Faturado", formatar_brl(indicadores["faturado"]), variacao("faturado"))
-    colunas[1].metric(
+    linha1 = st.columns(3)
+    linha1[0].metric("Faturado", formatar_brl(indicadores["faturado"]), variacao("faturado"))
+    linha1[1].metric(
         "Glosado", formatar_brl(indicadores["glosado"]),
         delta=variacao("glosado"), delta_color="inverse",
     )
-    colunas[2].metric("Liberado", formatar_brl(indicadores["liberado"]), variacao("liberado"))
-    colunas[3].metric("Recebido (caixa)", formatar_brl(indicadores["recebido"]), variacao("recebido"))
-    colunas[4].metric(
+    linha1[2].metric("Liberado", formatar_brl(indicadores["liberado"]), variacao("liberado"))
+
+    st.write("")
+    linha2 = st.columns(3)
+    linha2[0].metric("Recebido (caixa)", formatar_brl(indicadores["recebido"]), variacao("recebido"))
+    linha2[1].metric(
         "Taxa de glosa", f"{indicadores['taxa_glosa']:.1f}%".replace(".", ","),
         delta=variacao("taxa_glosa"), delta_color="inverse",
+    )
+    linha2[2].metric(
+        "Ticket medio", formatar_brl(indicadores["ticket_medio"]), variacao("ticket_medio")
     )
 
     with st.container(border=True):

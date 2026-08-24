@@ -1022,3 +1022,68 @@ def alertas_malotes_sem_retorno(session: Session, *, dias_limite: int = 2) -> pd
     return pd.DataFrame(
         linhas, columns=["codigo_malote", "origem", "destino", "despachado_em", "dias_em_transito"]
     )
+
+
+# ---------------------------------------------------------------------------
+# KPIs adicionais — um por pagina de BI, pedido do professor apos a
+# apresentacao ("KPIs mais significativos"). Cada um usa dado que ja existe
+# no fato/tabela, so nunca tinha sido lido em nenhuma metrica.
+# ---------------------------------------------------------------------------
+
+
+def taxa_cancelamento_itens(session: Session, periodo: Periodo) -> float:
+    """% de itens de OS cancelados no periodo — sinal de retrabalho/qualidade
+    que nenhum KPI hoje mede (Produtividade)."""
+    total, cancelados = session.execute(
+        _no_periodo(
+            select(
+                func.coalesce(func.sum(FatoOrdemServico.qtd_itens), 0),
+                func.coalesce(func.sum(FatoOrdemServico.qtd_itens_cancelados), 0),
+            ).select_from(FatoOrdemServico),
+            FatoOrdemServico,
+            periodo,
+        )
+    ).one()
+    total, cancelados = float(total), float(cancelados)
+    return (cancelados / total * 100) if total else 0.0
+
+
+def tempo_coleta_recebimento_medio(session: Session, periodo: Periodo) -> float:
+    """Media de `FatoLogistica.tempo_coleta_recebimento_horas` — coluna ja
+    carregada pelo ETL mas nunca lida em nenhuma metrica de Logistica."""
+    media = session.scalar(
+        _no_periodo(
+            select(func.avg(FatoLogistica.tempo_coleta_recebimento_horas))
+            .select_from(FatoLogistica)
+            .where(FatoLogistica.tempo_coleta_recebimento_horas.is_not(None)),
+            FatoLogistica,
+            periodo,
+        )
+    )
+    return float(media) if media is not None else 0.0
+
+
+def cobertura_dias(session: Session, periodo: Periodo) -> float | None:
+    """Dias de estoque restantes no ritmo de consumo do periodo: saldo atual
+    total / consumo medio diario. Deliberadamente so quantidade, sem preco
+    de compra (a valorizacao monetaria foi descartada nesta sessao).
+
+    `None` quando nao ha consumo no periodo (sem base para estimar dias) —
+    diferente de retornar `0.0`, que precisa continuar significando "estoque
+    zerado com consumo ativo" (situacao bem mais grave, nao pode ficar
+    escondida atras da mesma mensagem de "sem dado")."""
+    saldo_total = session.scalar(select(func.coalesce(func.sum(InsumoMaterial.quantidade_estoque), 0))) or 0
+    consumo_total = session.scalar(
+        select(func.coalesce(func.sum(EstoqueMovimento.quantidade), 0)).where(
+            and_(
+                EstoqueMovimento.tipo == "SAIDA",
+                func.date(EstoqueMovimento.ocorrido_em) >= periodo.inicio,
+                func.date(EstoqueMovimento.ocorrido_em) <= periodo.fim,
+            )
+        )
+    ) or 0
+    dias = periodo.dias
+    consumo_diario = float(consumo_total) / dias if dias else 0.0
+    if not consumo_diario:
+        return None
+    return float(saldo_total) / consumo_diario

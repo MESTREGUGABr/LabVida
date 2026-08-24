@@ -32,6 +32,8 @@ def main() -> None:
         sazonalidade = metricas.sazonalidade_por_dia_da_semana(session, periodo)
         tat_mes = metricas.tat_por_mes(session, periodo)
         tat_setor = metricas.tat_por_setor(session, periodo)
+        taxa_cancelamento = metricas.taxa_cancelamento_itens(session, periodo)
+        taxa_cancelamento_anterior = metricas.taxa_cancelamento_itens(session, periodo.anterior())
         rodape_de_atualizacao(session)
 
     if indicadores["exames"] == 0:
@@ -51,20 +53,34 @@ def main() -> None:
             return None
         return f"{(agora - antes) / antes * 100:+.1f}%"
 
+    variacao_cancelamento = (
+        f"{taxa_cancelamento - taxa_cancelamento_anterior:+.1f}pp"
+        if taxa_cancelamento_anterior
+        else None
+    )
+
     st.divider()
-    colunas = st.columns(4)
-    colunas[0].metric(
+    linha1 = st.columns(3)
+    linha1[0].metric(
         "Exames", f"{indicadores['exames']:,}".replace(",", "."), variacao("exames")
     )
-    colunas[1].metric("Unidades ativas", len(por_unidade))
-    colunas[2].metric(
+    linha1[1].metric("Unidades ativas", len(por_unidade))
+    linha1[2].metric(
         "Media por unidade",
         f"{indicadores['exames'] / len(por_unidade):.0f}" if len(por_unidade) else "0",
     )
-    colunas[3].metric(
+
+    st.write("")
+    linha2 = st.columns(3)
+    linha2[0].metric(
         "TAT (coleta -> laudo)",
         f"{indicadores['tat_horas']:.1f} h".replace(".", ","),
         delta=variacao("tat_horas"), delta_color="inverse",
+    )
+    linha2[1].metric(
+        "Taxa de cancelamento",
+        f"{taxa_cancelamento:.1f}%".replace(".", ","),
+        delta=variacao_cancelamento, delta_color="inverse",
     )
 
     with st.container(border=True):

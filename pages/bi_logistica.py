@@ -30,6 +30,10 @@ def main() -> None:
         # Vem do fato, nao da tabela operacional `amostras` — a versao anterior
         # consultava o OLTP direto, furando o modelo dimensional.
         status = metricas.status_das_amostras(session, periodo)
+        tempo_coleta_recebimento = metricas.tempo_coleta_recebimento_medio(session, periodo)
+        tempo_coleta_recebimento_anterior = metricas.tempo_coleta_recebimento_medio(
+            session, periodo.anterior()
+        )
         rodape_de_atualizacao(session)
 
     if indicadores["amostras"] == 0:
@@ -51,17 +55,31 @@ def main() -> None:
             return None
         return f"{(agora - antes) / antes * 100:+.1f}%"
 
+    variacao_coleta_recebimento = (
+        f"{(tempo_coleta_recebimento - tempo_coleta_recebimento_anterior) / tempo_coleta_recebimento_anterior * 100:+.1f}%"
+        if tempo_coleta_recebimento_anterior
+        else None
+    )
+
     st.divider()
-    colunas = st.columns(4)
-    colunas[0].metric(
+    linha1 = st.columns(3)
+    linha1[0].metric(
         "Amostras", f"{indicadores['amostras']:,}".replace(",", "."), variacao("amostras")
     )
-    colunas[1].metric(
+    linha1[1].metric(
         "Taxa de rejeicao", f"{indicadores['taxa_rejeicao']:.1f}%".replace(".", ","),
         delta=variacao("taxa_rejeicao"), delta_color="inverse",
     )
-    colunas[2].metric("Transito medio", f"{media_transito:.1f} h".replace(".", ","))
-    colunas[3].metric("Unidades de origem", len(por_unidade))
+    linha1[2].metric("Transito medio", f"{media_transito:.1f} h".replace(".", ","))
+
+    st.write("")
+    linha2 = st.columns(3)
+    linha2[0].metric("Unidades de origem", len(por_unidade))
+    linha2[1].metric(
+        "Coleta -> recebimento",
+        f"{tempo_coleta_recebimento:.1f} h".replace(".", ","),
+        delta=variacao_coleta_recebimento, delta_color="inverse",
+    )
 
     with st.container(border=True):
         renderizar_secao(titulo="Amostras coletadas por mes")

@@ -8,8 +8,10 @@ tela do Streamlit.
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.atendimento.ordem_servico.models import OsItem
 from src.bi import metricas
 from src.bi.etl import executar_etl
 from src.bi.metricas import Periodo
@@ -22,6 +24,7 @@ from tests.bi._helpers import (
     montar_cadastros,
     receber_em_caixa,
     titulo_receber,
+    transportar,
     utc,
 )
 
@@ -302,3 +305,40 @@ def test_status_das_amostras_vem_do_fato(session: Session) -> None:
 
     assert int(status["quantidade"].sum()) == 1
     assert status["status"].iloc[0] == "COLETADA"
+
+
+def test_taxa_cancelamento_itens(session: Session) -> None:
+    cenario = montar_cadastros(session)
+    ordem = criar_os(
+        session, cenario, aberta_em=utc(2026, 1, 10),
+        procedimentos=[cenario.procedimento_bioquimica, cenario.procedimento_hematologia],
+    )
+    itens = session.scalars(select(OsItem).where(OsItem.ordem_servico_id == ordem.id)).all()
+    itens[0].status = "CANCELADO"
+    session.commit()
+
+    executar_etl()
+
+    assert metricas.taxa_cancelamento_itens(session, JANEIRO) == 50.0
+
+
+def test_taxa_cancelamento_itens_sem_dados_e_zero(session: Session) -> None:
+    assert metricas.taxa_cancelamento_itens(session, JANEIRO) == 0.0
+
+
+def test_tempo_coleta_recebimento_medio(session: Session) -> None:
+    cenario = montar_cadastros(session)
+    ordem = criar_os(session, cenario, aberta_em=utc(2026, 1, 10))
+    amostra = coletar(session, cenario, ordem, coletada_em=utc(2026, 1, 10, 8))
+    transportar(
+        session, cenario, amostra,
+        despachado_em=utc(2026, 1, 10, 12), recebido_em=utc(2026, 1, 10, 20),
+    )
+
+    executar_etl()
+
+    assert metricas.tempo_coleta_recebimento_medio(session, JANEIRO) == 12.0
+
+
+def test_tempo_coleta_recebimento_medio_sem_dados_e_zero(session: Session) -> None:
+    assert metricas.tempo_coleta_recebimento_medio(session, JANEIRO) == 0.0
