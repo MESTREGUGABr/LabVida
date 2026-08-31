@@ -50,6 +50,8 @@ ifndef msg
 endif
 	docker compose run --rm app alembic revision --autogenerate -m "$(msg)"
 
+# app_seed ja roda automaticamente no "make up" (servico one-shot no compose);
+# este alvo serve para rodar so o seed de novo sem tocar no app/Streamlit.
 seeder:
 	docker compose up -d postgres
-	docker compose run --rm app sh -c "alembic upgrade head && python -m src.seeder"
+	docker compose run --rm app_seed

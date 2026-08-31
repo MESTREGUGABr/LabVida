@@ -62,11 +62,11 @@ docker compose up --build -d
 
 Acesse **<http://localhost:8501>**. Na tela de login, use a aba **"Criar conta"** (qualquer conta criada já entra como admin) ou entre com um usuário do seeder — ver [seção 12](#12-usuários-e-senhas-de-acesso-ao-sistema).
 
-> ⏳ **Nota sobre a inicialização:** A primeira subida do container pode levar de **30 a 60 segundos** para liberar o acesso na porta 8501. Isso ocorre porque o boot executa automaticamente o build/instalação das dependências, as migrações do banco (`alembic upgrade head`) e a geração da base de dados de demonstração (`python -m src.seeder`), simulando ~3 meses de operação real do laboratório.
+> ⏳ **Nota sobre a inicialização:** A primeira subida leva de **30 a 60 segundos** para liberar o acesso na porta 8501. O compose sobe um serviço `app_seed` (one-shot) que aplica as migrações (`alembic upgrade head`) e gera a base de dados de demonstração (`python -m src.seeder`), simulando ~3 meses de operação real do laboratório; o serviço `app` (Streamlit) só inicia depois que o `app_seed` termina com sucesso.
 >
 > **Não é preciso criar `venv`, instalar dependências nem rodar `make migrate` para usar o sistema via Docker.**
 
-Acompanhar o boot em tempo real: `docker compose logs -f app` · Encerrar: `docker compose down`
+Acompanhar o boot em tempo real: `docker compose logs -f app_seed` (migrations/seed) e `docker compose logs -f app` (Streamlit) · Encerrar: `docker compose down`
 
 As seções [7](#7-como-instalar-as-dependências) (venv) e [9](#9-como-importar-os-scripts-sql--migrations-alembic) (migrações manuais) são necessárias apenas para execução **sem Docker** ou para rodar a suíte de testes na máquina local.
 
@@ -383,7 +383,7 @@ Para importar diretamente os arquivos SQL fornecidos na raiz do projeto:
 
 ### 9.2. Aplicar as Migrações de Estrutura (Alembic)
 
-> **Ao subir por Docker, as migrações já são aplicadas automaticamente** no boot do container (item 3 da caixa acima). Os comandos abaixo servem para reaplicá-las manualmente ou para uso sem Docker. Confira o resultado com `docker compose logs app | grep "Running upgrade"`.
+> **Ao subir por Docker, as migrações já são aplicadas automaticamente** pelo serviço `app_seed` antes do `app` iniciar (item 3 da caixa acima). Os comandos abaixo servem para reaplicá-las manualmente ou para uso sem Docker. Confira o resultado com `docker compose logs app_seed | grep "Running upgrade"`.
 
 - **Via Docker:**
 
@@ -402,7 +402,7 @@ Para importar diretamente os arquivos SQL fornecidos na raiz do projeto:
 
 ### 9.2. Popular o Banco com Dados de Exemplo (Seed)
 
-> Também executado automaticamente no boot do container Docker (leva ~35s na primeira vez; nas seguintes é ignorado, pois cada módulo é idempotente).
+> Também executado automaticamente pelo serviço `app_seed` no `docker compose up` (leva ~35s na primeira vez; nas seguintes é ignorado, pois cada módulo é idempotente).
 
 O seeder não gera registros soltos: ele **simula ~3 meses de operação do laboratório**, atravessando o fluxo ponta a ponta pelos mesmos services da aplicação. Ou seja, as regras de negócio são validadas de verdade — OS de convênio só coleta com autorização, resultado só entra com amostra recebida no central, laudo só é liberado por responsável técnico com resultados revisados, lote só fecha se passar na pré-auditoria TISS.
 
@@ -455,21 +455,22 @@ Como cada módulo do seeder é idempotente, a base atual precisa ser recriada an
 # 1. Apaga o volume do Postgres (perde os dados atuais — tudo dummy)
 docker compose down -v
 
-# 2. Sobe com a janela longa definida (o boot aplica migrations e roda o seeder)
+# 2. Sobe com a janela longa definida (app_seed aplica migrations e roda o seeder
+#    antes do app/Streamlit iniciar)
 SEED_INICIO=2022-01-01 docker compose up -d
 ```
 
 > Deixe `SEED_INICIO=2022-01-01` no `.env` se quiser que a base longa vire o padrão do projeto (o compose repassa a variável ao container).
 
-> ⏳ O seed com a janela de 2022 até hoje gera ~7.5k OS e pode levar de **20 a 60 minutos** na primeira subida; o app só responde na porta 8501 depois do seeder concluir. Acompanhe com `docker compose logs -f app`. Alternativamente, suba só o banco e rode o seeder à parte:
+> ⏳ O seed com a janela de 2022 até hoje gera ~6k OS e pode levar de **15 a 60 minutos** na primeira subida (medido: 14min51s em 31/08/2026); o `app` (Streamlit) só inicia depois que o `app_seed` termina. Acompanhe com `docker compose logs -f app_seed`. Alternativamente, rode só o seed à parte:
 >
 > ```bash
 > docker compose up -d postgres
-> SEED_INICIO=2022-01-01 docker compose run --rm app python -m src.seeder
+> SEED_INICIO=2022-01-01 docker compose run --rm app_seed
 > docker compose up -d
 > ```
 >
-> (A segunda subida do `app` reusa os dados já semeados: os módulos detectam as tabelas cheias e não duplicam nada.)
+> (A segunda subida reusa os dados já semeados: os módulos detectam as tabelas cheias e não duplicam nada.)
 
 ---
 
@@ -527,7 +528,7 @@ LGPD_ENCRYPTION_KEY=Q22r1OivohTtSBRaMi-hjLxXxrQ3SwEdOumlaNDfvw8=
 docker compose up -d
 ```
 
-Acesse no navegador: `http://localhost:8501` *(Nota: na primeira execução, o container leva de 30 a 60 segundos para concluir as migrações e o seeder de dados inicial antes da aplicação responder).*
+Acesse no navegador: `http://localhost:8501` *(Nota: na primeira execução, o serviço `app_seed` leva de 30 a 60 segundos para concluir as migrações e o seeder de dados inicial antes do `app` iniciar).*
 
 ### Opção B — Desenvolvimento Local
 
@@ -578,7 +579,7 @@ Qualquer outro e-mail da lista em [`src/seeder/catalogo.py`](src/seeder/catalogo
   | `make build` | `docker compose build` |
   | `make logs` | `docker compose logs -f app` |
   | `make migrate` | `docker compose run --rm app alembic upgrade head` |
-  | `make seeder` | `docker compose run --rm app python -m src.seeder` |
+  | `make seeder` | `docker compose run --rm app_seed` |
   | `make test` | `docker compose --profile test run --rm app_test` |
   | `make clean` | `docker compose down -v` |
 
@@ -602,7 +603,7 @@ Qualquer outro e-mail da lista em [`src/seeder/catalogo.py`](src/seeder/catalogo
 | `E-mail ou senha inválidos` ao logar com usuário do seeder | `SENHA_PADRAO_SEED` foi trocada depois que o seeder já tinha criado o usuário | Use a senha com a qual o usuário foi criado, ou redefina a senha dele em *Administração → Usuários* |
 | `O termo 'make' não é reconhecido...` | GNU Make não instalado (padrão no Windows) | Use o comando `docker compose` equivalente da tabela acima |
 | `failed to resolve host 'postgres'` | `DATABASE_URL` com host da rede interna do Docker sendo usado na máquina host | Use `@localhost:5432` para rodar fora do Docker ([seção 8, Opção B](#opção-b--postgresql-local-sem-docker)) |
-| `docker compose up` conclui mas a porta 8501 não responde | Migrações/seed ainda executando no boot | Acompanhe com `docker compose logs -f app` |
+| `docker compose up` conclui mas a porta 8501 não responde | O serviço `app_seed` (migrações/seed) ainda não terminou — o `app` só inicia depois | Acompanhe com `docker compose logs -f app_seed` |
 
 ---
 

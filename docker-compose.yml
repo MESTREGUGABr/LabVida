@@ -1,10 +1,28 @@
 services:
+  # Servico one-shot: aplica migrations e roda o seeder, depois sai (restart: "no").
+  # Separado do "app" para que uma falha no seed nao mascare o Streamlit como "up"
+  # (o compose so sobe o app se o app_seed terminar com exit code 0) e para que os
+  # logs de migration/seed nao fiquem misturados com os do servidor Streamlit.
+  app_seed:
+    build: .
+    command: sh -c "alembic upgrade head && python -m src.seeder"
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://labvida:labvida@postgres:5432/labvida}
+      LGPD_ENCRYPTION_KEY: ${LGPD_ENCRYPTION_KEY:?LGPD_ENCRYPTION_KEY is required}
+      SENHA_PADRAO_SEED: ${SENHA_PADRAO_SEED:-labvida123}
+      SEED_INICIO: ${SEED_INICIO:-}
+      SEED_JANELA_DIAS: ${SEED_JANELA_DIAS:-}
+      SEED_ESCALA: ${SEED_ESCALA:-}
+    volumes:
+      - .:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   app:
     build: .
-    command: >
-      sh -c "alembic upgrade head &&
-      python -m src.seeder &&
-      streamlit run app.py --server.address=0.0.0.0 --server.port=8501"
+    command: streamlit run app.py --server.address=0.0.0.0 --server.port=8501
     environment:
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://labvida:labvida@postgres:5432/labvida}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8501}
@@ -20,6 +38,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      app_seed:
+        condition: service_completed_successfully
 
   postgres:
     image: postgres:16-alpine
