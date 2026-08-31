@@ -8,7 +8,13 @@ conta como dinheiro recebido.
 import streamlit as st
 
 from src.bi import graficos, metricas
-from src.bi.filtros import botao_atualizar, rodape_de_atualizacao, seletor_de_periodo, sem_dados
+from src.bi.filtros import (
+    botao_atualizar,
+    rodape_de_atualizacao,
+    seletor_de_filtros,
+    seletor_de_periodo,
+    sem_dados,
+)
 from src.db import session_scope
 from src.ui import formatar_brl, renderizar_menu, shell
 from src.ui_components import renderizar_cabecalho, renderizar_empty_state, renderizar_secao
@@ -27,19 +33,41 @@ def main() -> None:
 
     with session_scope() as session:
         periodo = seletor_de_periodo(session, chave="financeiro")
-        indicadores = metricas.kpis(session, periodo)
-        anteriores = metricas.kpis(session, periodo.anterior())
-        por_convenio = metricas.receita_por_convenio(session, periodo)
-        por_mes = metricas.receita_por_mes(session, periodo)
-        ticket_convenio = metricas.ticket_medio_por_convenio(session, periodo)
-        ticket_procedimento = metricas.ticket_medio_por_procedimento(session, periodo)
-        abc = metricas.curva_abc_procedimentos(session, periodo)
-        glosa_motivo = metricas.glosa_por_motivo(session, periodo)
-        taxa_glosa = metricas.taxa_glosa_por_convenio(session, periodo)
-        caixa = metricas.fluxo_caixa_mensal(session, periodo)
+        filtro = seletor_de_filtros(session, chave="financeiro")
+        if filtro.procedimentos:
+            st.caption(
+                "O filtro de Exame nao se aplica a 'Recebido (caixa)' nem a "
+                "'Fluxo de caixa realizado' — o regime de caixa nao tem essa dimensao."
+            )
+        if filtro.unidades:
+            st.caption(
+                "'Recebido (caixa)' e o 'Fluxo de caixa realizado' tambem sao caixa "
+                "consolidado do laboratorio — um lote de faturamento pode reunir OSs "
+                "de varias unidades, entao esse valor nao pertence a nenhuma unidade "
+                "de coleta especifica e some ao filtrar por uma."
+            )
+        if filtro.convenios or filtro.incluir_particular:
+            st.caption(
+                "As 'saidas' do 'Fluxo de caixa realizado' sao sempre o total "
+                "consolidado — aluguel, fornecedor etc nao tem convenio, entao o "
+                "filtro de Convenio so restringe entrada/receita, nunca despesa."
+            )
+        indicadores = metricas.kpis(session, periodo, filtro)
+        anteriores = metricas.kpis(session, periodo.anterior(), filtro)
+        por_convenio = metricas.receita_por_convenio(session, periodo, filtro)
+        por_mes = metricas.receita_por_mes(session, periodo, filtro)
+        ticket_convenio = metricas.ticket_medio_por_convenio(session, periodo, filtro)
+        ticket_procedimento = metricas.ticket_medio_por_procedimento(session, periodo, filtro)
+        abc = metricas.curva_abc_procedimentos(session, periodo, filtro)
+        glosa_motivo = metricas.glosa_por_motivo(session, periodo, filtro)
+        taxa_glosa = metricas.taxa_glosa_por_convenio(session, periodo, filtro)
+        caixa = metricas.fluxo_caixa_mensal(session, periodo, filtro)
         rodape_de_atualizacao(session)
+        # Sem filtro (so periodo): filtro estreito demais zerando os KPIs nao
+        # significa que o ETL nunca rodou.
+        sem_filtro = metricas.kpis(session, periodo)
 
-    if indicadores["faturado"] == 0 and indicadores["recebido"] == 0:
+    if sem_filtro["faturado"] == 0 and sem_filtro["recebido"] == 0:
         renderizar_empty_state(
             icone=ICONE_FINANCEIRO,
             titulo="Nenhum dado financeiro no periodo",
@@ -57,17 +85,23 @@ def main() -> None:
         return f"{(agora - antes) / antes * 100:+.1f}%"
 
     st.divider()
-    colunas = st.columns(5)
-    colunas[0].metric("Faturado", formatar_brl(indicadores["faturado"]), variacao("faturado"))
-    colunas[1].metric(
+    linha1 = st.columns(3)
+    linha1[0].metric("Faturado", formatar_brl(indicadores["faturado"]), variacao("faturado"))
+    linha1[1].metric(
         "Glosado", formatar_brl(indicadores["glosado"]),
         delta=variacao("glosado"), delta_color="inverse",
     )
-    colunas[2].metric("Liberado", formatar_brl(indicadores["liberado"]), variacao("liberado"))
-    colunas[3].metric("Recebido (caixa)", formatar_brl(indicadores["recebido"]), variacao("recebido"))
-    colunas[4].metric(
+    linha1[2].metric("Liberado", formatar_brl(indicadores["liberado"]), variacao("liberado"))
+
+    st.write("")
+    linha2 = st.columns(3)
+    linha2[0].metric("Recebido (caixa)", formatar_brl(indicadores["recebido"]), variacao("recebido"))
+    linha2[1].metric(
         "Taxa de glosa", f"{indicadores['taxa_glosa']:.1f}%".replace(".", ","),
         delta=variacao("taxa_glosa"), delta_color="inverse",
+    )
+    linha2[2].metric(
+        "Ticket medio", formatar_brl(indicadores["ticket_medio"]), variacao("ticket_medio")
     )
 
     with st.container(border=True):
@@ -89,13 +123,16 @@ def main() -> None:
     with esquerda:
         with st.container(border=True):
             renderizar_secao(titulo="Receita por convenio")
-            st.altair_chart(
-                graficos.barra_categorica(
-                    por_convenio, categoria="convenio", valor="liberado",
-                    rotulo_categoria="Convenio", rotulo_valor="Liberado", formato="moeda",
-                ),
-                use_container_width=True,
-            )
+            if por_convenio.empty:
+                sem_dados()
+            else:
+                st.altair_chart(
+                    graficos.barra_categorica(
+                        por_convenio, categoria="convenio", valor="liberado",
+                        rotulo_categoria="Convenio", rotulo_valor="Liberado", formato="moeda",
+                    ),
+                    use_container_width=True,
+                )
     with direita:
         with st.container(border=True):
             renderizar_secao(titulo="Ticket medio por convenio")

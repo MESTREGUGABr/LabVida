@@ -8,11 +8,16 @@ tela do Streamlit.
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from src.atendimento.ordem_servico.models import OsItem
 from src.bi import metricas
 from src.bi.etl import executar_etl
-from src.bi.metricas import Periodo
+from src.bi.metricas import FiltroDimensoes, Periodo
+from src.bi.models import DimConvenio, DimProcedimento, DimUnidade
+from src.financeiro.movimento_caixa.models import MovimentoCaixa
+from src.financeiro.titulo_pagar.models import TituloPagar
 from tests.bi._helpers import (
     coletar,
     criar_os,
@@ -22,6 +27,7 @@ from tests.bi._helpers import (
     montar_cadastros,
     receber_em_caixa,
     titulo_receber,
+    transportar,
     utc,
 )
 
@@ -302,3 +308,237 @@ def test_status_das_amostras_vem_do_fato(session: Session) -> None:
 
     assert int(status["quantidade"].sum()) == 1
     assert status["status"].iloc[0] == "COLETADA"
+
+
+def test_taxa_cancelamento_itens(session: Session) -> None:
+    cenario = montar_cadastros(session)
+    ordem = criar_os(
+        session, cenario, aberta_em=utc(2026, 1, 10),
+        procedimentos=[cenario.procedimento_bioquimica, cenario.procedimento_hematologia],
+    )
+    itens = session.scalars(select(OsItem).where(OsItem.ordem_servico_id == ordem.id)).all()
+    itens[0].status = "CANCELADO"
+    session.commit()
+
+    executar_etl()
+
+    assert metricas.taxa_cancelamento_itens(session, JANEIRO) == 50.0
+
+
+def test_taxa_cancelamento_itens_sem_dados_e_zero(session: Session) -> None:
+    assert metricas.taxa_cancelamento_itens(session, JANEIRO) == 0.0
+
+
+def test_tempo_coleta_recebimento_medio(session: Session) -> None:
+    cenario = montar_cadastros(session)
+    ordem = criar_os(session, cenario, aberta_em=utc(2026, 1, 10))
+    amostra = coletar(session, cenario, ordem, coletada_em=utc(2026, 1, 10, 8))
+    transportar(
+        session, cenario, amostra,
+        despachado_em=utc(2026, 1, 10, 12), recebido_em=utc(2026, 1, 10, 20),
+    )
+
+    executar_etl()
+
+    assert metricas.tempo_coleta_recebimento_medio(session, JANEIRO) == 12.0
+
+
+def test_tempo_coleta_recebimento_medio_sem_dados_e_zero(session: Session) -> None:
+    assert metricas.tempo_coleta_recebimento_medio(session, JANEIRO) == 0.0
+
+
+def _sk_unidade(session: Session, unidade_id) -> int:
+    return session.scalar(select(DimUnidade.sk_unidade).where(DimUnidade.id_origem == unidade_id))
+
+
+def _sk_convenio(session: Session, convenio_id) -> int:
+    return session.scalar(select(DimConvenio.sk_convenio).where(DimConvenio.id_origem == convenio_id))
+
+
+def test_filtro_por_unidade_restringe_kpis_e_grafico(session: Session) -> None:
+    cenario = montar_cadastros(session)
+    ordem_a = criar_os(session, cenario, aberta_em=utc(2026, 1, 10))
+    coletar(session, cenario, ordem_a, coletada_em=utc(2026, 1, 10, 8))
+
+    ordem_b = criar_os(session, cenario, aberta_em=utc(2026, 1, 12))
+    ordem_b.unidade_id = cenario.unidade_central
+    session.commit()
+    coletar(session, cenario, ordem_b, coletada_em=utc(2026, 1, 12, 8))
+
+    executar_etl()
+
+    sk_a = _sk_unidade(session, cenario.unidade_coleta)
+    filtro = FiltroDimensoes(unidades=[sk_a])
+
+    assert metricas.kpis(session, JANEIRO)["exames"] == 2
+    assert metricas.kpis(session, JANEIRO, filtro)["exames"] == 1
+
+    por_unidade = metricas.exames_por_unidade(session, JANEIRO, filtro)
+    assert len(por_unidade) == 1
+    assert por_unidade.iloc[0]["exames"] == 1
+
+
+def test_filtro_convenio_particular_e_or_nao_exclusao(session: Session) -> None:
+    cenario = montar_cadastros(session)
+    ordem_convenio = criar_os(session, cenario, aberta_em=utc(2026, 1, 10))
+    coletar(session, cenario, ordem_convenio, coletada_em=utc(2026, 1, 10, 8))
+
+    ordem_particular = criar_os(session, cenario, aberta_em=utc(2026, 1, 12), convenio_id=None)
+    coletar(session, cenario, ordem_particular, coletada_em=utc(2026, 1, 12, 8))
+
+    executar_etl()
+
+    sk_convenio = _sk_convenio(session, cenario.convenio)
+
+    so_convenio = FiltroDimensoes(convenios=[sk_convenio], incluir_particular=False)
+    assert metricas.kpis(session, JANEIRO, so_convenio)["exames"] == 1
+
+    convenio_e_particular = FiltroDimensoes(convenios=[sk_convenio], incluir_particular=True)
+    assert metricas.kpis(session, JANEIRO, convenio_e_particular)["exames"] == 2
+
+
+def test_filtro_nao_quebra_calendario_denso(session: Session) -> None:
+    """Regressao: um WHERE direto sobre o lado do LEFT JOIN faria o mes sem
+    dado QUE CASA com o filtro desaparecer da serie, em vez de aparecer com
+    zero — quebrando o "mes sem movimento entra com zero" quando ha filtro
+    de dimensao ativo."""
+    cenario = montar_cadastros(session)
+    ordem_a = criar_os(session, cenario, aberta_em=utc(2026, 1, 10))
+    coletar(session, cenario, ordem_a, coletada_em=utc(2026, 1, 10, 8))
+
+    ordem_b = criar_os(session, cenario, aberta_em=utc(2026, 2, 10))
+    ordem_b.unidade_id = cenario.unidade_central
+    session.commit()
+    coletar(session, cenario, ordem_b, coletada_em=utc(2026, 2, 10, 8))
+
+    executar_etl()
+
+    sk_a = _sk_unidade(session, cenario.unidade_coleta)
+    trimestre = Periodo(date(2026, 1, 1), date(2026, 3, 31), "1o trimestre")
+    df = metricas.exames_por_mes(session, trimestre, FiltroDimensoes(unidades=[sk_a]))
+
+    meses = dict(zip(df["mes"], df["exames"]))
+    assert meses.get("2026-01") == 1
+    # Fevereiro tem exame, mas so de outra unidade (filtrada) — tem que
+    # continuar aparecendo com zero, nao desaparecer da serie.
+    assert meses.get("2026-02") == 0
+    assert meses.get("2026-03") == 0
+
+
+def test_filtro_procedimento_nao_afeta_tat_nem_cancelamento(session: Session) -> None:
+    """Limitacao documentada: `FatoOrdemServico` nao tem `sk_procedimento` —
+    o filtro de Exame nao pode restringir TAT/Taxa de cancelamento
+    (indicadores do grao da OS, nao do exame)."""
+    cenario = montar_cadastros(session)
+    ordem = criar_os(
+        session, cenario, aberta_em=utc(2026, 1, 10),
+        procedimentos=[cenario.procedimento_bioquimica, cenario.procedimento_hematologia],
+    )
+    itens = session.scalars(select(OsItem).where(OsItem.ordem_servico_id == ordem.id)).all()
+    itens[0].status = "CANCELADO"
+    session.commit()
+
+    executar_etl()
+
+    sk_procedimento = session.scalar(
+        select(DimProcedimento.sk_procedimento).where(
+            DimProcedimento.id_origem == cenario.procedimento_bioquimica
+        )
+    )
+    filtro = FiltroDimensoes(procedimentos=[sk_procedimento])
+
+    sem_filtro = metricas.taxa_cancelamento_itens(session, JANEIRO)
+    com_filtro = metricas.taxa_cancelamento_itens(session, JANEIRO, filtro)
+    assert sem_filtro == com_filtro == 50.0
+
+
+def test_filtro_procedimento_nao_afeta_recebido_caixa(session: Session) -> None:
+    """Limitacao documentada: `FatoFinanceiro` nao tem `sk_procedimento` —
+    o filtro de Exame nao pode restringir 'Recebido (caixa)' nem o fluxo de
+    caixa (regime de caixa nao carrega essa dimensao)."""
+    cenario = montar_cadastros(session)
+    ordem = criar_os(session, cenario, aberta_em=utc(2026, 1, 10), valor=Decimal("100.00"))
+    coletar(session, cenario, ordem, coletada_em=utc(2026, 1, 10, 8))
+    laudos = liberar_laudos(session, ordem, liberado_em=utc(2026, 1, 11))
+    lote = faturar(session, cenario, laudos, fechado_em=utc(2026, 1, 12), valor=Decimal("100.00"))
+    titulo = titulo_receber(session, lote, valor=Decimal("100.00"), vencimento=date(2026, 2, 11))
+    receber_em_caixa(session, titulo, valor=Decimal("100.00"), ocorrido_em=utc(2026, 1, 15))
+
+    executar_etl()
+
+    sk_procedimento = session.scalar(
+        select(DimProcedimento.sk_procedimento).where(
+            DimProcedimento.id_origem == cenario.procedimento_bioquimica
+        )
+    )
+    filtro = FiltroDimensoes(procedimentos=[sk_procedimento])
+
+    sem_filtro = metricas.kpis(session, JANEIRO)["recebido"]
+    com_filtro = metricas.kpis(session, JANEIRO, filtro)["recebido"]
+    assert sem_filtro == com_filtro == 100.0
+
+
+def test_filtro_unidade_de_coleta_zera_recebido_caixa(session: Session) -> None:
+    """`FatoFinanceiro.sk_unidade` aponta pra unidade CENTRAL (caixa
+    consolidado do laboratorio) — nao pra unidade de coleta da OS que gerou o
+    faturamento, ja que um lote pode reunir OSs de varias unidades. Filtrar
+    por uma unidade de COLETA tem que zerar 'Recebido (caixa)'/'Resultado
+    (DRE)' (o valor pertence ao consolidado, nao aquela unidade); filtrar
+    pela unidade CENTRAL devolve o valor cheio."""
+    cenario = montar_cadastros(session)
+    ordem = criar_os(session, cenario, aberta_em=utc(2026, 1, 10), valor=Decimal("100.00"))
+    coletar(session, cenario, ordem, coletada_em=utc(2026, 1, 10, 8))
+    laudos = liberar_laudos(session, ordem, liberado_em=utc(2026, 1, 11))
+    lote = faturar(session, cenario, laudos, fechado_em=utc(2026, 1, 12), valor=Decimal("100.00"))
+    titulo = titulo_receber(session, lote, valor=Decimal("100.00"), vencimento=date(2026, 2, 11))
+    receber_em_caixa(session, titulo, valor=Decimal("100.00"), ocorrido_em=utc(2026, 1, 15))
+
+    executar_etl()
+
+    sk_coleta = _sk_unidade(session, cenario.unidade_coleta)
+    sk_central = _sk_unidade(session, cenario.unidade_central)
+
+    assert metricas.kpis(session, JANEIRO)["recebido"] == 100.0
+    assert metricas.kpis(session, JANEIRO, FiltroDimensoes(unidades=[sk_coleta]))["recebido"] == 0.0
+    assert metricas.kpis(session, JANEIRO, FiltroDimensoes(unidades=[sk_central]))["recebido"] == 100.0
+
+    dre_coleta = metricas.dre_simplificado(session, JANEIRO, FiltroDimensoes(unidades=[sk_coleta]))
+    assert float(dre_coleta[dre_coleta["linha"] == "Receita recebida"]["valor"].iloc[0]) == 0.0
+
+
+def test_filtro_particular_nao_infla_despesas_como_receita(session: Session) -> None:
+    """Despesa (`TituloPagar`/`MovimentoCaixa` SAIDA) nunca tem convenio — o
+    ETL grava `sk_convenio=None` pra toda saida, sempre, porque aluguel/
+    fornecedor nao tem essa dimensao. Selecionar "Particular" no filtro de
+    Convenio (que vira `sk_convenio IS NULL`) casava com TODA despesa, fazendo
+    o DRE mostrar um resultado bem negativo mesmo sem nenhum paciente
+    particular real na base — bug de regra de negocio, nao falta de dado."""
+    cenario = montar_cadastros(session)
+    ordem = criar_os(session, cenario, aberta_em=utc(2026, 1, 5))
+    laudos = liberar_laudos(session, ordem, liberado_em=utc(2026, 1, 6))
+    lote = faturar(session, cenario, laudos, fechado_em=utc(2026, 1, 20), valor=Decimal("100.00"))
+    titulo = titulo_receber(session, lote, valor=Decimal("100.00"), vencimento=date(2026, 1, 28))
+    receber_em_caixa(session, titulo, valor=Decimal("100.00"), ocorrido_em=utc(2026, 1, 15))
+
+    pagar = TituloPagar(valor=Decimal("500.00"), vencimento=date(2026, 1, 10), status="PAGO")
+    session.add(pagar)
+    session.flush()
+    session.add(
+        MovimentoCaixa(
+            titulo_pagar_id=pagar.id, tipo="SAIDA",
+            valor=Decimal("500.00"), ocorrido_em=utc(2026, 1, 12),
+        )
+    )
+    session.commit()
+
+    executar_etl()
+
+    particular = FiltroDimensoes(incluir_particular=True)
+    dre = metricas.dre_simplificado(session, JANEIRO, particular)
+
+    assert float(dre[dre["linha"] == "Receita recebida"]["valor"].iloc[0]) == 0.0
+    assert float(dre[dre["linha"] == "Despesas pagas"]["valor"].iloc[0]) == -500.0
+
+    caixa = metricas.fluxo_caixa_mensal(session, JANEIRO, particular)
+    assert float(caixa[caixa["mes"] == "2026-01"]["saidas"].iloc[0]) == 500.0
+    assert float(caixa[caixa["mes"] == "2026-01"]["entradas"].iloc[0]) == 0.0

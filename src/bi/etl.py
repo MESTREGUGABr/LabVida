@@ -626,8 +626,19 @@ def _fato_financeiro(session: Session, dims: dict) -> int:
 
     Antes o ETL somava `titulo.valor` de TODO titulo em `valor_recebido`,
     independente do status: titulo ABERTO virava receita realizada na tela.
+
+    `sk_unidade` aqui nao e atribuicao por unidade de coleta: 87,5% dos lotes
+    de faturamento fechados hoje misturam itens de OSs de 2 a 4 unidades
+    diferentes (`lotes_faturamento` nao tem `unidade_id`, e o fechamento so
+    valida convenio), e `Usuario` nao tem coluna de unidade — nao ha unidade
+    real recuperavel sem mudar o modelo de faturamento/RH. E caixa
+    consolidado, entao aponta para a unidade CENTRAL (o Laboratorio, o
+    "centro de resolucao") em vez de sortear a primeira unidade de coleta do
+    dicionario, que era o bug antigo.
     """
-    unidade_padrao = next(iter(dims["unidade"].values()), None)
+    unidade_padrao = session.scalar(
+        select(DimUnidade.sk_unidade).where(DimUnidade.tipo == "CENTRAL").limit(1)
+    )
     if unidade_padrao is None:
         _podar(session, FatoFinanceiro, FatoFinanceiro.origem_id, set())
         return 0

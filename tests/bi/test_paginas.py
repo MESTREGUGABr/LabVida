@@ -100,6 +100,40 @@ def test_dashboard_renderiza_com_dados(pagina: str, base_carregada: dict) -> Non
     assert not app.exception, f"{pagina} quebrou: {app.exception}"
 
 
+_PAGINAS_COM_CONVENIO = {
+    "bi_visao_executiva.py": "executiva",
+    "bi_produtividade.py": "produtividade",
+    "bi_financeiro.py": "financeiro",
+}
+
+
+@pytest.mark.parametrize("pagina", sorted(_PAGINAS_COM_CONVENIO))
+def test_filtro_particular_sem_dado_nao_mostra_tela_de_sem_carga(
+    pagina: str, base_carregada: dict
+) -> None:
+    """Regressao: `base_carregada` nao tem nenhuma OS particular (todo mundo
+    tem convenio). Filtrar por "Particular" tem que mostrar a pagina com os
+    KPIs/graficos zerados, NAO a tela de "execute o ETL" — o ETL rodou e tem
+    dado, so esse filtro especifico nao bate com nada."""
+    chave = _PAGINAS_COM_CONVENIO[pagina]
+    app = AppTest.from_file(str(PROJECT_ROOT / "pages" / pagina), default_timeout=60)
+    app.session_state["user"] = base_carregada
+    app.run()
+
+    # Preset default e "Ultimos 3 meses" ancorado em hoje (data real de quando
+    # o teste roda) — nao cobre o Jan/Fev fixo do cenario. "Tudo" garante que
+    # o periodo em si nao seja a causa de nao ter dado, isolando o efeito do
+    # filtro de Convenio.
+    app.segmented_control(key=f"{chave}_preset").select("Tudo").run()
+    app.multiselect(key=f"{chave}_filtro_convenio").select("Particular").run()
+
+    assert not app.exception, f"{pagina} quebrou com filtro Particular: {app.exception}"
+    assert len(app.metric) > 0, (
+        f"{pagina} mostrou a tela de 'sem carga' pro filtro Particular, "
+        "que so nao bateu com nenhum dado (o ETL rodou e tem dado sem o filtro)"
+    )
+
+
 @pytest.mark.parametrize("pagina", _PAGINAS)
 def test_dashboard_renderiza_sem_dados(pagina: str, session, monkeypatch) -> None:
     """Base vazia nao pode dar traceback — tem que cair no estado vazio.

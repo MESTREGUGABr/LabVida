@@ -9,6 +9,7 @@ coisa em todas — e a `Periodo` que sai daqui e a unica forma de filtrar data e
 `src/bi/metricas.py`.
 """
 
+import uuid
 from datetime import date, timedelta
 
 import streamlit as st
@@ -16,10 +17,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src.bi.etl import ultima_execucao
-from src.bi.metricas import Periodo
-from src.bi.models import DimTempo
+from src.bi.metricas import FiltroDimensoes, Periodo
+from src.bi.models import DimConvenio, DimProcedimento, DimTempo, DimUnidade
 
 _PRESETS = ["Mes atual", "Ultimos 3 meses", "Ultimos 12 meses", "Tudo", "Personalizado"]
+_PARTICULAR = "Particular"
 
 
 def _limites_do_dw(session: Session) -> tuple[date, date]:
@@ -95,6 +97,95 @@ def seletor_de_periodo(session: Session, *, chave: str = "bi_periodo") -> Period
             )
 
     return Periodo(inicio=inicio, fim=fim, rotulo=preset)
+
+
+def seletor_de_filtros(
+    session: Session,
+    *,
+    chave: str,
+    incluir_convenio: bool = True,
+    incluir_procedimento: bool = True,
+) -> FiltroDimensoes:
+    """Widgets de Unidade/Convenio/Exame, combinaveis com o periodo.
+
+    Nada selecionado num multiselect = sem filtro naquela dimensao (todas
+    passam) — mesma convencao de "vazio = tudo" do resto do BI.
+    """
+    # So unidades de COLETA: nenhum fato do BI guarda `sk_unidade` de uma
+    # unidade CENTRAL (laboratorio) — o fato sempre traz a unidade de coleta
+    # de origem da OS. Oferecer o laboratorio como opcao so daria "zero
+    # resultado" sempre, sem nenhum indicador dessa pagina responder a ele.
+    unidades_opcoes = session.execute(
+        select(DimUnidade.sk_unidade, DimUnidade.nome)
+        .where(DimUnidade.tipo == "COLETA")
+        .order_by(DimUnidade.nome)
+    ).all()
+
+    quantidade_colunas = 1 + int(incluir_convenio) + int(incluir_procedimento)
+    colunas = st.columns(quantidade_colunas)
+
+    with colunas[0]:
+        escolhidas_unidade = st.multiselect(
+            "Unidade",
+            options=[nome for _, nome in unidades_opcoes],
+            key=f"{chave}_filtro_unidade",
+        )
+    sk_unidades = [sk for sk, nome in unidades_opcoes if nome in escolhidas_unidade] or None
+
+    sk_convenios: list[int] | None = None
+    incluir_particular = False
+    if incluir_convenio:
+        convenios_opcoes = session.execute(
+            select(DimConvenio.sk_convenio, DimConvenio.nome).order_by(DimConvenio.nome)
+        ).all()
+        with colunas[1]:
+            escolhidos_convenio = st.multiselect(
+                "Convenio",
+                options=[_PARTICULAR] + [nome for _, nome in convenios_opcoes],
+                key=f"{chave}_filtro_convenio",
+            )
+        incluir_particular = _PARTICULAR in escolhidos_convenio
+        sk_convenios = [
+            sk for sk, nome in convenios_opcoes if nome in escolhidos_convenio
+        ] or None
+
+    sk_procedimentos: list[int] | None = None
+    if incluir_procedimento:
+        procedimentos_opcoes = session.execute(
+            select(DimProcedimento.sk_procedimento, DimProcedimento.nome).order_by(DimProcedimento.nome)
+        ).all()
+        with colunas[-1]:
+            escolhidos_procedimento = st.multiselect(
+                "Exame",
+                options=[nome for _, nome in procedimentos_opcoes],
+                key=f"{chave}_filtro_procedimento",
+            )
+        sk_procedimentos = [
+            sk for sk, nome in procedimentos_opcoes if nome in escolhidos_procedimento
+        ] or None
+
+    return FiltroDimensoes(
+        unidades=sk_unidades,
+        convenios=sk_convenios,
+        incluir_particular=incluir_particular,
+        procedimentos=sk_procedimentos,
+    )
+
+
+def seletor_de_insumos(session: Session, *, chave: str) -> list[uuid.UUID] | None:
+    """Filtro por insumo na pagina de Estoque — fora do esquema estrela
+    (`InsumoMaterial` e tabela operacional, sem FK pra unidade/convenio)."""
+    from src.compras.insumo.models import InsumoMaterial
+
+    opcoes = session.execute(
+        select(InsumoMaterial.id, InsumoMaterial.nome).order_by(InsumoMaterial.nome)
+    ).all()
+    escolhidos = st.multiselect(
+        "Insumo",
+        options=[nome for _, nome in opcoes],
+        key=f"{chave}_filtro_insumo",
+    )
+    return [id_ for id_, nome in opcoes if nome in escolhidos] or None
 
 
 def rodape_de_atualizacao(session: Session) -> None:
