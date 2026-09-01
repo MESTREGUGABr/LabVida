@@ -54,15 +54,15 @@ Caminho mais curto para ter o sistema completo rodando (app + PostgreSQL + migra
 # 1. Criar o .env a partir do modelo  (Windows:  copy .env.exemplo .env)
 cp .env.exemplo .env
 
-# 2. Preencher LGPD_ENCRYPTION_KEY no .env (ver seção 10 — obrigatória)
-
-# 3. Subir tudo
+# 2. Subir tudo (o .env.exemplo já vem pré-configurado e pronto para uso)
 docker compose up --build -d
 ```
 
 Acesse **<http://localhost:8501>**. Na tela de login, use a aba **"Criar conta"** (qualquer conta criada já entra como admin) ou entre com um usuário do seeder — ver [seção 12](#12-usuários-e-senhas-de-acesso-ao-sistema).
 
-> ⏳ **Nota sobre a inicialização:** A primeira subida leva de **30 a 60 segundos** para liberar o acesso na porta 8501. O compose sobe um serviço `app_seed` (one-shot) que aplica as migrações (`alembic upgrade head`) e gera a base de dados de demonstração (`python -m src.seeder`), simulando ~3 meses de operação real do laboratório; o serviço `app` (Streamlit) só inicia depois que o `app_seed` termina com sucesso.
+> ⏳ **Nota sobre a inicialização:** A primeira subida leva cerca de **40 segundos** para liberar o acesso na porta 8501. O compose sobe um serviço `app_seed` (one-shot) que aplica as migrações (`alembic upgrade head`) e gera a base de dados de demonstração (`python -m src.seeder`), simulando 6 meses de operação real do laboratório (`SEED_JANELA_DIAS=180` por padrão no `.env`); o serviço `app` (Streamlit) só inicia depois que o `app_seed` termina com sucesso.
+>
+> 💡 **Quer mais ou menos dados?** Basta alterar as variáveis no seu `.env` (ex.: `SEED_JANELA_DIAS=365` para 1 ano ou `SEED_INICIO=2022-01-01` para série histórica completa) e reiniciar o banco — ver [seção 9.2](#92-executar-o-seeder-dados-de-demonstração).
 >
 > **Não é preciso criar `venv`, instalar dependências nem rodar `make migrate` para usar o sistema via Docker.**
 
@@ -431,46 +431,26 @@ O seeder não gera registros soltos: ele **simula ~3 meses de operação do labo
 | **Compras** | 8 fornecedores, 24 insumos com preço de tabela, ~18 pedidos em todos os status e estoque com entradas e saídas |
 | **BI** | Carga do esquema estrela (dimensões + fatos de atendimento, faturamento, financeiro e logística) |
 
-**Ajustar o volume:** todo o volume é escalável, útil para gerar uma base menor (demonstração rápida) ou maior (teste de carga):
+**Ajustar o volume de dados pelo `.env`:** todo o volume de dados gerado é configurável diretamente pelo arquivo `.env`. Basta alterar a variável desejada, resetar o volume anterior e subir o compose novamente:
 
 ```bash
-python -m src.seeder --escala 0.2   # ~1/5 do volume
-SEED_ESCALA=3 python -m src.seeder  # 3x o volume
-```
+# 1. Altere o .env conforme a necessidade (exemplos abaixo)
 
-| Variável | Padrão | Efeito |
-| --- | :---: | --- |
-| `SEED_ESCALA` | `1.0` | Multiplicador de volume de todos os módulos |
-| `SEED_JANELA_DIAS` | `90` | Período de operação simulado (afeta a série temporal do BI) |
-| `SEED_INICIO` | — | Data ISO de início da operação simulada (ex.: `2022-01-01`); tem precedência sobre `SEED_JANELA_DIAS` |
-| `SEED_SEMENTE` | `20261` | Semente do gerador aleatório |
-
-**Estender a série temporal (ex.: operação de 2022 até hoje):** a janela inteira sai da data definida em `SEED_INICIO`, e os volumes padrão (OS, pacientes, pedidos) crescem proporcionalmente para manter a densidade por mês — com `2022-01-01` a base fica com ~7.5k OS e ~56 competências.
-
-A série não é uniforme: `src/seeder/trajetoria.py` molda a **evolução real da empresa** — crescimento ~2%/mês (≈27% ao ano), sazonalidade local (pico de inverno, vales em dez-jan, domingo residual), e o catálogo define o ciclo de vida da rede: a Unidade São José abre em jul/2023 e a Boa Vista em fev/2024, os convênios Hapvida, SulAmérica, NotreDame, Cassi e Golden Cross entram na carteira ao longo dos anos, o mix particular cai de ~30% para ~12%, o TAT da bancada melhora e a rejeição de amostras cai de ~8% para ~4%. O resultado no BI: faturamento, volume de exames e custos fixos crescem juntos, mês a mês.
-
-Como cada módulo do seeder é idempotente, a base atual precisa ser recriada antes:
-
-```bash
-# 1. Apaga o volume do Postgres (perde os dados atuais — tudo dummy)
+# 2. Resete o volume anterior do banco
 docker compose down -v
 
-# 2. Sobe com a janela longa definida (app_seed aplica migrations e roda o seeder
-#    antes do app/Streamlit iniciar)
-SEED_INICIO=2022-01-01 docker compose up -d
+# 3. Suba o container com o novo volume
+docker compose up -d
 ```
 
-> Deixe `SEED_INICIO=2022-01-01` no `.env` se quiser que a base longa vire o padrão do projeto (o compose repassa a variável ao container).
+| Variável no `.env` | Padrão | Descrição e Exemplos de Uso |
+| --- | :---: | --- |
+| `SEED_JANELA_DIAS` | `180` | **Período de operação simulado em dias.**<br>• `SEED_JANELA_DIAS=180`: **6 meses** (~580 OS, ~440 pacientes) — executa em **~40 segundos** (padrão do `.env.exemplo`).<br>• `SEED_JANELA_DIAS=365`: **1 ano** (~1.170 OS, ~900 pacientes) — executa em **~1,5 minuto**.<br>• `SEED_JANELA_DIAS=90`: **3 meses** (~270 OS, ~220 pacientes) — executa em **~20 segundos**. |
+| `SEED_INICIO` | — | **Data ISO de início da operação simulada** (tem precedência sobre `SEED_JANELA_DIAS`).<br>• `SEED_INICIO=2022-01-01`: Série histórica completa de **2022 até hoje** (~7.5k OS, ~4k pacientes, 56 competências no BI). Leva de **15 a 25 minutos** na primeira subida. |
+| `SEED_ESCALA` | `1.0` | **Multiplicador de densidade de volume de todos os módulos.**<br>• `SEED_ESCALA=0.5`: reduz pela metade a densidade diária.<br>• `SEED_ESCALA=2.0`: dobra a quantidade diária de OS e pacientes. |
+| `SEED_SEMENTE` | `20261` | Semente do gerador aleatório (garante reproduzibilidade). |
 
-> ⏳ O seed com a janela de 2022 até hoje gera ~6k OS e pode levar de **15 a 60 minutos** na primeira subida (medido: 14min51s em 31/08/2026); o `app` (Streamlit) só inicia depois que o `app_seed` termina. Acompanhe com `docker compose logs -f app_seed`. Alternativamente, rode só o seed à parte:
->
-> ```bash
-> docker compose up -d postgres
-> SEED_INICIO=2022-01-01 docker compose run --rm app_seed
-> docker compose up -d
-> ```
->
-> (A segunda subida reusa os dados já semeados: os módulos detectam as tabelas cheias e não duplicam nada.)
+> 💡 **Nota sobre Idempotência:** Cada módulo do seeder verifica se já existem registros no banco antes de inserir. Por isso, ao alterar o volume no `.env`, **é obrigatório rodar `docker compose down -v`** (ou `make clean`) antes de subir novamente para que o novo volume seja aplicado a partir de um banco limpo.
 
 ---
 
@@ -489,27 +469,36 @@ SEED_INICIO=2022-01-01 docker compose up -d
   copy .env.exemplo .env
   ```
 
-**10.2. Preencher as Variáveis de Ambiente**
+**10.2. Conteúdo e Variáveis de Ambiente**
 
-No arquivo `.env`, preencha os parâmetros de conexão e a chave de criptografia:
+O arquivo `.env.exemplo` já vem totalmente pronto para uso imediato com o Docker Compose:
 
 ```dotenv
+# Host "postgres" = nome do servico na rede interna do Docker Compose.
+# Para rodar alembic/streamlit fora do Docker, troque por: @localhost:5432
 DATABASE_URL=postgresql+psycopg://labvida:labvida@postgres:5432/labvida
 POSTGRES_USER=labvida
 POSTGRES_PASSWORD=labvida
 POSTGRES_DB=labvida
 
+# Aplicacao Streamlit
 APP_BASE_URL=http://localhost:8501
 PORT=8501
 
-# Login local (F15) — senha de todos os usuários do seeder de demo. Opcional,
-# default "labvida123" se ausente. Ver seção 12.
+# Seeder da base de demonstracao (ajuste aqui caso queira mais ou menos dados)
+SEED_JANELA_DIAS=180
+SEED_ESCALA=1.0
+
+# Login local (F15) — senha de todos os usuários do seeder de demo (ver seção 12)
 SENHA_PADRAO_SEED=labvida123
 
-LGPD_ENCRYPTION_KEY=Q22r1OivohTtSBRaMi-hjLxXxrQ3SwEdOumlaNDfvw8=
+# LGPD — chave Fernet (32 bytes em base64 url-safe) usada para criptografar o CPF na origem.
+LGPD_ENCRYPTION_KEY=ke9CYhoBKGYp0F6I6F5mP0ucTXNfrziOZgQ3C7T6j8I=
 ```
 
-> ⚠️ **`LGPD_ENCRYPTION_KEY` é obrigatória e precisa estar preenchida antes de `docker compose up`** — o Compose interrompe a subida logo no início se estiver vazia:
+> ⚠️ **`LGPD_ENCRYPTION_KEY` é obrigatória e precisa estar preenchida antes de `docker compose up`** — o Compose interrompe a subida logo no início se estiver vazia (já preenchida com chave de exemplo no `.env.exemplo`).
+>
+> Sobre o `DATABASE_URL`: use `@postgres:5432` para executar **via Docker** (nome do serviço na rede do Compose) e `@localhost:5432` para executar **na máquina host** (ver [seção 8, Opção B](#opção-b--postgresql-local-sem-docker)).
 >
 > ```
 > error while interpolating services.app.environment.LGPD_ENCRYPTION_KEY:
